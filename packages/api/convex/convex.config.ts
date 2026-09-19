@@ -18,6 +18,8 @@ const app = defineApp({
     // Resend API key for sign-in codes. Unset in local development and on the
     // e2e backend: emails then land in the internal `emailOutbox` table.
     RESEND_API_KEY: v.optional(v.string()),
+    // The app's URL, which Convex Auth redirects back to. Set by `auth:setup`.
+    SITE_URL: v.optional(v.string()),
   },
 });
 app.use(staticHosting, { name: "www" });

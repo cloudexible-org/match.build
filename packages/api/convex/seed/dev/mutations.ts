@@ -8,8 +8,9 @@
  * candidate left, a message was sent) leaves those changes alone.
  *
  * An `internalMutation`, so only an admin key can run it. It also refuses to
- * run where RESEND_API_KEY is set: that is production, where `.test` accounts
- * could never receive a sign-in code anyway.
+ * run unless SITE_URL is a `.localhost` origin (only the dev deployment's app
+ * runs there) and RESEND_API_KEY is unset (`.test` accounts can only sign in
+ * through the outbox).
  */
 
 import { ConvexError, v } from "convex/values";
@@ -27,6 +28,16 @@ import {
 /** Seeded invites stay open for a year; nothing opens them by link. */
 const DEV_INVITE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
+function isLocalhostSite(siteUrl: string | undefined): boolean {
+  if (siteUrl === undefined) return false;
+  try {
+    const { hostname } = new URL(siteUrl);
+    return hostname === "localhost" || hostname.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
+
 function devUser(slug: string): DevUser {
   const user = DEV_USERS.find((u) => u.slug === slug);
   if (user === undefined) throw new Error(`Unknown dev user "${slug}"`);
@@ -40,9 +51,9 @@ export const apply = internalMutation({
     accounts: v.array(v.object({ email: v.string(), role: v.string() })),
   }),
   handler: async (ctx) => {
-    if (env.RESEND_API_KEY !== undefined) {
+    if (!isLocalhostSite(env.SITE_URL) || env.RESEND_API_KEY !== undefined) {
       throw new ConvexError(
-        "Refusing to seed: RESEND_API_KEY is set, so this is not a dev deployment.",
+        "Refusing to seed: SITE_URL is not on .localhost or RESEND_API_KEY is set, so this is not a dev deployment.",
       );
     }
 

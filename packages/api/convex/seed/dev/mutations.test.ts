@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../_generated/api";
 import schema from "../../schema";
 import { DEV_MATCHMAKER, DEV_MEMBERS, DEV_USERS } from "./fixture";
@@ -11,6 +11,10 @@ const modules = import.meta.glob([
   "!/convex/**/*.test.*",
   "!/convex/**/*.d.ts",
 ]);
+
+beforeEach(() => {
+  vi.stubEnv("SITE_URL", "https://matchmaker.localhost/app");
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -69,6 +73,14 @@ describe("seed.dev.mutations.apply", () => {
       users: DEV_USERS.length,
       candidates: DEV_MEMBERS.length + 1,
     });
+  });
+
+  test("refuses to run where SITE_URL is not on .localhost", async () => {
+    vi.stubEnv("SITE_URL", "https://www.aileenlancif.com/app");
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(internal.seed.dev.mutations.apply, {}),
+    ).rejects.toThrow(/not a dev deployment/);
   });
 
   test("refuses to run where RESEND_API_KEY is set", async () => {
