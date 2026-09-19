@@ -1,5 +1,5 @@
 import { api } from "@repo/api";
-import { cn } from "@repo/ui";
+import { buttonVariants, cn } from "@repo/ui";
 import { useQuery } from "convex/react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -10,8 +10,9 @@ import { FullPageStatus } from "../components/full-page-status";
  * Home (prd/phase-1.md §2): everything this account can open — invitations,
  * its own matchmaker profiles, and the matchmakers it has joined.
  *
- * Creating a matchmaker profile (step 2) and accepting invitations (step 4)
- * add their controls here as those steps land.
+ * The UI allows one matchmaker profile per account (prd/phase-1.md §1), so
+ * "Create matchmaker profile" disappears once the account owns one.
+ * Accepting invitations (step 4) adds its controls here when it lands.
  */
 export function HomePage() {
   const me = useQuery(api.users.queries.me);
@@ -53,6 +54,17 @@ export function HomePage() {
         <Section
           title="Your matchmaker profiles"
           testId="home-matchmaker-profiles"
+          action={
+            home.matchmakerProfiles.length === 0 ? (
+              <Link
+                to="/mm/new"
+                className={buttonVariants({ size: "sm" })}
+                data-testid="home-create-matchmaker"
+              >
+                Create matchmaker profile
+              </Link>
+            ) : undefined
+          }
         >
           {home.matchmakerProfiles.length === 0 ? (
             <Empty>You don't have a matchmaker profile yet.</Empty>
@@ -99,10 +111,12 @@ export function HomePage() {
 function Section({
   title,
   testId,
+  action,
   children,
 }: {
   title: string;
   testId: string;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   const headingId = `${testId}-heading`;
@@ -112,12 +126,15 @@ function Section({
       data-testid={testId}
       className="flex flex-col gap-3"
     >
-      <h2
-        id={headingId}
-        className="text-sm font-medium uppercase tracking-wide text-muted-foreground"
-      >
-        {title}
-      </h2>
+      <div className="flex min-h-8 items-center justify-between gap-3">
+        <h2
+          id={headingId}
+          className="text-sm font-medium uppercase tracking-wide text-muted-foreground"
+        >
+          {title}
+        </h2>
+        {action}
+      </div>
       <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
         {children}
       </ul>
