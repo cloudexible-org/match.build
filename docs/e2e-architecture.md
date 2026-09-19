@@ -40,8 +40,8 @@ Run it:
 ```bash
 pnpm test:e2e                              # every project
 pnpm --filter e2e exec playwright test --project=www
-E2E_CONVEX=0 pnpm test:e2e                 # skip the backend (how CI runs)
-E2E_DOPPLER=0 pnpm test:e2e                # app servers without Doppler (how CI runs)
+E2E_CONVEX=0 pnpm test:e2e                 # skip the backend
+E2E_DOPPLER=0 pnpm test:e2e                # app servers without Doppler
 pnpm --filter e2e convex:local             # just the backend, for poking at data
 ```
 
@@ -59,9 +59,8 @@ is the only one that is disposable. It is also anonymous — no Convex account �
 so anyone who clones this template can run the suite.
 
 `E2E_CONVEX=0` drops the backend, its webServer and the `app-convex` project.
-CI sets it: provisioning a backend on a cold runner for every push is not worth
-it, and the `app` and `www` projects assert only statically-rendered chrome and
-client-side behaviour, so they still run there.
+Use it when you only want the `app` and `www` projects, which assert on
+statically-rendered chrome and client-side behaviour and never touch Convex.
 
 ### The port is chosen per run, never 3210 or the recorded one
 
@@ -292,18 +291,19 @@ the fix only holds while the reasoning is visible.
    serves the report and blocks the process, hanging any non-interactive run.
 
 5. ~~**No execution path.**~~ **Fixed 2026-07-28.** Root now has
-   `test:e2e` (`turbo test --filter=e2e`), and `.github/workflows/ci.yml` has a
-   dedicated `e2e` job running it on every push and PR. `pnpm test` still
-   excludes the suite, so the unit-test loop stays fast. The `e2e#test` turbo
-   task is `cache: false` on purpose — `e2e` does not depend on `app` in the
-   workspace graph, so apps/app's sources are absent from the task hash and a
-   cached pass would survive a UI regression.
+   `test:e2e` (`turbo test --filter=e2e`). `pnpm test` still excludes the
+   suite, so the unit-test loop stays fast. The `e2e#test` turbo task is
+   `cache: false` on purpose — `e2e` does not depend on `app` in the workspace
+   graph, so apps/app's sources are absent from the task hash and a cached pass
+   would survive a UI regression.
 
-**Standing constraint:** CI supplies `VITE_CONVEX_URL` as a *placeholder* that
-never connects, so every spec must pass with the backend unreachable — assert
-only on statically-rendered chrome. Pointing CI at a real deployment is a
-prerequisite for moving any `app-convex` spec into CI, along with the
-isolation rules in §8.
+**The suite runs locally, not in GitHub Actions.** `.github/workflows/ci.yml`
+is lint, typecheck and build only; it had a dedicated `e2e` job until
+2026-09-19, removed because standing a browser suite up on a cold runner
+against placeholder env was a recurring red build that told us nothing a local
+run didn't. Run `pnpm test:e2e` before you push. Giving it a CI job again means
+giving it a real deployment first — see §8 for the isolation rules that
+prerequisite carries.
 
 ---
 
@@ -654,8 +654,8 @@ They will. Handle it like this:
 1. Fix the web server command and `reuseExistingServer` (§3) — until teardown
    works, every run costs a manual process kill.
 2. Point the POM and spec at what `apps/app` actually renders (§4).
-3. Give the suite an execution path — a CI job, or drop it from
-   `--filter=!e2e`. Without this, (2) rots again.
+3. Give the suite an execution path — `pnpm test:e2e` at the root, run
+   locally before pushing. Without this, (2) rots again.
 4. Add `data-testid` to `apps/app` as specs need them.
 5. One read-only spec to shake out POM drift cheaply.
 6. Namespaced write specs (§8), one flow at a time.
