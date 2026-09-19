@@ -2,7 +2,7 @@
 
 **Working name:** matchmaker.io
 **Status:** Draft v1 — for implementation
-**Stack:** Next.js (App Router) + TypeScript + React, Convex (DB, functions, scheduling, agents), Resend (transactional + inbound email, via the Convex Resend component), Vercel hosting.
+**Stack:** [turbostack](https://github.com/cloudexible-org/turbostack) monorepo (Turborepo + pnpm, TypeScript). Two frontends: a **React + Vite** app for matchmakers and clients, and a **Next.js** marketing site (static export). Convex handles the DB, functions, scheduling, agents and HTTP actions. Resend handles transactional and inbound email through the Convex Resend component. Clerk handles auth. **Both frontends are hosted on Convex** (`*.convex.site`, via `@convex-dev/static-hosting`), so there is no Vercel. See §12 for the platform layout.
 
 ---
 
@@ -353,7 +353,7 @@ Expect the DNS step to be the single hardest moment for non-technical matchmaker
 
 The fiddly part. Requirements:
 
-- **Routing:** issue a unique per-conversation reply-to address using `conversations.replyToToken`, e.g. `c+<token>@inbound.matchmaker.io`, set as `Reply-To` on every outbound email. Inbound webhook resolves the token → conversation. Never attempt to match on sender email alone (same person, two matchmakers; forwarded mail; aliases).
+- **Routing:** issue a unique per-conversation reply-to address using `conversations.replyToToken`, e.g. `c+<token>@inbound.matchmaker.io`, set as `Reply-To` on every outbound email. The inbound webhook is a Convex HTTP action under the deployment's `/api/` prefix (e.g. `https://<deployment>.convex.site/api/resend/inbound`, with Resend's signature verified). It resolves the token → conversation. Never attempt to match on sender email alone (same person, two matchmakers; forwarded mail; aliases).
 - **Cleaning:** strip quoted reply history, signatures, and "On [date] X wrote:" blocks before storing. Store the cleaned plain text in `body`; retain raw HTML in `bodyHtml` for fallback display.
 - **Idempotency:** dedupe on Resend's message id; webhooks can redeliver.
 - **Attachments:** out of scope for v1 — acknowledge in the thread but do not process.
@@ -382,8 +382,38 @@ This is a hard requirement, not a nice-to-have.
 
 ---
 
-## 12. Build order
+## 12. Platform & repository
 
+The codebase starts from the **turbostack** template (`cloudexible-org/turbostack`), a Turborepo + pnpm monorepo:
+
+| Workspace | What it is | Served at |
+|---|---|---|
+| `apps/app` | **React + Vite SPA.** The product: the matchmaker's three-column workspace and the client's chat-only view, in one app, with the signed-in user's role deciding which renders. | `/app/` |
+| `apps/www` | **Next.js marketing site**, built as a static export (`output: "export"`). Landing, pricing and waitlist. It has no auth; its sign-in CTAs link to `/app/`. | `/` |
+| `packages/api` | Convex backend: schema, functions, agents, HTTP actions, static-hosting mounts. | `/api/…` (HTTP actions) |
+| `packages/ui` | Shared shadcn/ui + Base UI components (no Radix). | — |
+| `apps/e2e` | Playwright suites for both apps plus a seeded local Convex backend. | — |
+
+**Hosting: Convex, not Vercel.** A single Convex deployment serves everything from one origin, `https://<deployment>.convex.site`, through two instances of `@convex-dev/static-hosting`:
+
+- `www` is mounted at `/` and serves `apps/www/out`, with unknown paths returning 404.
+- `app` is mounted at `/app/` and serves `apps/app/dist`, with SPA fallback so deep links like `/app/clients/…` work on reload.
+- The app's own HTTP actions (the Resend inbound webhook, health checks) live under `/api/`.
+
+`pnpm ship` runs `convex deploy`, then builds and uploads both sites. Uploads publish atomically. Keeping one origin means the magic links in client emails, the app and the webhooks all share a host. That simplifies Clerk's allowed origins and avoids CORS between the frontends and the backend.
+
+**Consequences for implementation:**
+
+- Nothing in `apps/www` may need a Node server at request time: no middleware/proxy, route handlers, server actions or request-time rendering. Anything dynamic belongs in the Vite app or in Convex.
+- All server logic lives in Convex. There are no frontend-hosted API routes.
+- A custom domain (e.g. `matchmaker.io`) points at the Convex deployment (see the `convex-domains` skill). Resend's inbound MX records sit on a separate subdomain (`inbound.matchmaker.io`).
+- **Auth:** Clerk, as shipped by turbostack, wired to Convex through its JWT template. Matchmakers and clients are both Clerk users. Clients sign in with Clerk's email magic link from the first email (§5.3). Role and tenancy resolve in Convex from the authenticated subject (§10), never from the client.
+
+---
+
+## 13. Build order
+
+0. **Scaffold:** bring in turbostack and switch hosting to Convex static hosting (www at `/`, app at `/app/`, HTTP actions at `/api/`). *Done.*
 1. Auth, matchmaker record, tenancy helper, schema.
 2. Client creation (manual, no AI) + conversation + message storage.
 3. Outbound email via Resend + domain verification onboarding.
@@ -399,10 +429,11 @@ Ship 1–7 to a single friendly matchmaker before building V2.
 
 ---
 
-## 13. Open questions
+## 14. Open questions
 
 - **Voice cold start.** On day one there is no sent-message history. Onboarding asks for pasted samples — how many, and is that enough for the first email to not feel generic?
 - **The introduction moment.** V2, but unresolved: what exactly gets shared with each party, how much of the other's profile, and does the introduction happen through the platform or hand back to the matchmaker's own channels? This is the product's payoff moment and needs design before V2 starts.
 - **Fact visibility to clients.** Currently none. Is there a version where a client reviewing and correcting their own profile improves data quality enough to be worth the complexity?
 - **Auto-apply threshold.** 0.8 is a guess. Needs tuning against real conversations; too low and it feels presumptuous, too high and it nags.
 - **Suggested-reply count.** 1 vs 3. Three options may be more choice paralysis than help on mobile.
+- **One Clerk instance for two audiences?** Matchmakers and clients share one Clerk application in this plan. Clerk bills per monthly active user, so client MAUs count toward the bill. The alternative is Convex-native magic links for clients only (a token in the email, exchanged for a session scoped to one conversation). Decide before step 5.

@@ -1,0 +1,61 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+node_modules
+.pnpm-store
+
+# testing
+coverage
+
+# next.js
+.next/
+out/
+build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+ts-debug.log*
+pnpm-debug.log*
+
+# local env files
+.env*.local
+!.env.example
+.env
+
+# The e2e suite's own Next distDir. Separate from .next so its `next dev`
+# has its own lock and can run while `pnpm dev` is up — see apps/www/next.config.ts.
+.next-e2e
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# turbo
+.turbo
+
+# convex
+# NOTE: this pattern contains a slash, so it is anchored to the repo root and
+# matches only ./convex/_generated — NOT packages/api/convex/_generated, whose
+# generated client is deliberately tracked.
+convex/_generated/*
+# …but keep the AI guidelines. AGENTS.md tells every agent to "always read
+# convex/_generated/ai/guidelines.md first", and while it was ignored that file
+# was absent from a fresh clone — present only on machines that had run
+# `npx convex ai-files install`. The state file stays ignored: it is per-machine
+# install bookkeeping.
+!convex/_generated/ai/
+convex/_generated/ai/ai-files.state.json
+# Local deployment state: ports, admin key and deployment name, all specific to
+# one machine. apps/e2e reads the port and identity from here.
+.convex/
+
+*storybook.log
+storybook-static
+
+test-results/
+playwright-report/

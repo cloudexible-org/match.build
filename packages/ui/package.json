@@ -1,0 +1,35 @@
+{
+  "name": "@repo/ui",
+  "version": "4.5.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.tsx"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.8.0",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@chromatic-com/storybook": "^5.3.1",
+    "@repo/config": "workspace:*",
+    "@storybook/addon-a11y": "^10.6.0",
+    "@storybook/addon-docs": "^10.6.0",
+    "@storybook/addon-vitest": "^10.6.0",
+    "@storybook/react-vite": "^10.6.0",
+    "@types/react": "catalog:",
+    "@vitest/browser-playwright": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.11",
+    "playwright": "^1.63.0",
+    "storybook": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^4.1.11"
+  },
+  "scripts": {
+    "storybook": "portless storybook.matchmaker --app-port 6006 storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "vitest run"
+  }
+}

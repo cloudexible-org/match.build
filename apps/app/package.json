@@ -1,0 +1,35 @@
+{
+  "name": "app",
+  "private": true,
+  "version": "4.5.0",
+  "type": "module",
+  "scripts": {
+    "dev": "portless app.matchmaker --app-port 5173 vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "preview": "vite preview",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@repo/analytics": "workspace:*",
+    "@repo/api": "workspace:*",
+    "@repo/ui": "workspace:*",
+    "@t3-oss/env-core": "^0.13.11",
+    "convex": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*",
+    "@tailwindcss/postcss": "catalog:default",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react-swc": "^4.3.3",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "^8.3.0"
+  }
+}

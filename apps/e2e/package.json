@@ -1,0 +1,19 @@
+{
+  "name": "e2e",
+  "version": "4.5.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "typecheck": "tsc --noEmit",
+    "convex:local": "node scripts/convex-local.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@repo/config": "workspace:*",
+    "@types/node": "catalog:",
+    "convex": "catalog:",
+    "typescript": "catalog:"
+  }
+}

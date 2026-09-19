@@ -1,0 +1,12 @@
+{
+  "extends": "@repo/config/base.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["convex/**/*.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}

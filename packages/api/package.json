@@ -1,0 +1,28 @@
+{
+  "name": "@repo/api",
+  "version": "4.5.0",
+  "private": true,
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "dev": "convex dev",
+    "ship": "convex deploy && pnpm run ship:www && pnpm run ship:app",
+    "ship:www": "static-hosting upload --prod --component www --dist ../../apps/www/out --no-spa --build-command 'cd ../../apps/www && NEXT_PUBLIC_CONVEX_URL=$VITE_CONVEX_URL pnpm run build'",
+    "ship:app": "static-hosting upload --prod --component app --dist ../../apps/app/dist --build-command 'cd ../../apps/app && pnpm run build'",
+    "preview:www": "static-hosting upload --component www --dist ../../apps/www/out --no-spa --build-command 'cd ../../apps/www && NEXT_PUBLIC_CONVEX_URL=$VITE_CONVEX_URL pnpm run build'",
+    "preview:app": "static-hosting upload --component app --dist ../../apps/app/dist --build-command 'cd ../../apps/app && pnpm run build'",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "echo \"No tests for API yet\""
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*",
+    "@types/node": "catalog:",
+    "convex": "catalog:",
+    "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@convex-dev/static-hosting": "^0.2.1"
+  }
+}
