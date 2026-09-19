@@ -1,29 +1,33 @@
 import { internal } from "../_generated/api";
 import { type ActionCtx, env } from "../_generated/server";
-import { SIGN_IN_FROM, signInCodeEmail } from "./rules";
+import { type EmailMessage, SIGN_IN_FROM, signInCodeEmail } from "./rules";
+
+export type OutgoingEmail = {
+  from: string;
+  to: string;
+  kind: "sign_in_code" | "invite";
+  message: EmailMessage;
+};
 
 /**
- * Sends a sign-in code. With `RESEND_API_KEY` set it goes out through Resend;
+ * Sends one email. With `RESEND_API_KEY` set it goes out through Resend;
  * without it (local development, the e2e backend) it is written to the
- * internal `emailOutbox` table and logged, so sign-in still works offline.
+ * internal `emailOutbox` table instead, so every flow still works offline.
  *
- * Called from Convex Auth's `sendVerificationRequest`, which runs in an action.
+ * Runs in an action: email is only ever sent from one, scheduled by the
+ * mutation that decided to send it.
  */
-export async function sendSignInCode(
+export async function sendEmail(
   ctx: ActionCtx,
-  to: string,
-  code: string,
+  email: OutgoingEmail,
 ): Promise<void> {
-  const message = signInCodeEmail(code);
-
   if (env.RESEND_API_KEY === undefined) {
     await ctx.runMutation(internal.email.mutations.recordOutbox, {
-      to,
-      kind: "sign_in_code",
-      subject: message.subject,
-      text: message.text,
+      to: email.to,
+      kind: email.kind,
+      subject: email.message.subject,
+      text: email.message.text,
     });
-    console.log(`RESEND_API_KEY unset — sign-in code for ${to}: ${code}`);
     return;
   }
 
@@ -34,16 +38,36 @@ export async function sendSignInCode(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: SIGN_IN_FROM,
-      to: [to],
-      subject: message.subject,
-      text: message.text,
-      html: message.html,
+      from: email.from,
+      to: [email.to],
+      subject: email.message.subject,
+      text: email.message.text,
+      html: email.message.html,
     }),
   });
   if (!response.ok) {
     throw new Error(
-      `Could not send the sign-in email (Resend ${response.status}).`,
+      `Could not send the ${email.kind} email (Resend ${response.status}).`,
     );
+  }
+}
+
+/**
+ * Sends a sign-in code. Called from Convex Auth's `sendVerificationRequest`,
+ * which runs in an action. Without Resend the code is also logged.
+ */
+export async function sendSignInCode(
+  ctx: ActionCtx,
+  to: string,
+  code: string,
+): Promise<void> {
+  await sendEmail(ctx, {
+    from: SIGN_IN_FROM,
+    to,
+    kind: "sign_in_code",
+    message: signInCodeEmail(code),
+  });
+  if (env.RESEND_API_KEY === undefined) {
+    console.log(`RESEND_API_KEY unset — sign-in code for ${to}: ${code}`);
   }
 }

@@ -50,11 +50,12 @@ This document defines the core standards and automated workflows that any AI age
 ## 8. Convex Backend Layout
 * **One directory per domain:** backend code lives in `packages/api/convex/<domain>/` (e.g. `convex/waitlist/`), never as loose files at the `convex/` root. Only `schema.ts`, `http.ts`, `convex.config.ts`, `auth.config.ts`, `auth.ts` and `crons.ts` stay at the root (`auth.ts` because Convex Auth's client calls it as `auth:signIn`).
 * **Access helpers:** every function derives who the caller is and which tenant they may touch from `requireUser` (`users/helpers.ts`), `requireMatchmaker` (`matchmakers/helpers.ts`) or `requireCandidateSelf` (`candidates/helpers.ts`), never from arguments alone. Any change to audited state calls `recordAudit` (`audit/helpers.ts`) in the same mutation. See `prd/phase-1.md` §5 and §9.
-* **Four files per domain, split by role:**
+* **Four files per domain (plus `actions.ts` where needed), split by role:**
     * `rules.ts` — pure validation, normalisation and limits. No Convex imports, so frontends can import it through `@repo/api` and validate exactly as the server does.
     * `mutations.ts` — `mutation` / `internalMutation` definitions only.
     * `queries.ts` — `query` / `internalQuery` definitions only.
     * `helpers.ts` — plain functions that take a `ctx` (lookups, shared writes) and are called from that domain's queries and mutations. Never registered as functions.
+    * `actions.ts` — only where a domain calls out of Convex (email, later LLMs): `action` / `internalAction` definitions, usually scheduled from a mutation. Never `"use node"` in a file that also defines queries or mutations.
 * **Tests sit beside the file they cover:** `rules.test.ts`, `mutations.test.ts` (convex-test), etc.
 * Function references follow the path: `api.<domain>.mutations.<name>`, `internal.<domain>.queries.<name>`.
 

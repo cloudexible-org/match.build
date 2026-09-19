@@ -120,6 +120,7 @@ describe("candidates.onboard", () => {
     expect(state.events.map((event) => event.action)).toEqual([
       "candidate.created",
       "invite.created",
+      "invite.sent",
     ]);
     for (const event of state.events) {
       expect(event).toMatchObject({

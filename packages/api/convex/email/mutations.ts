@@ -5,7 +5,7 @@ import { internalMutation } from "../_generated/server";
 export const recordOutbox = internalMutation({
   args: {
     to: v.string(),
-    kind: v.literal("sign_in_code"),
+    kind: v.union(v.literal("sign_in_code"), v.literal("invite")),
     subject: v.string(),
     text: v.string(),
   },

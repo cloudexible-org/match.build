@@ -239,10 +239,11 @@ export default defineSchema({
 
   // Emails that were *not* sent because no RESEND_API_KEY is configured —
   // local development and the e2e backend. Internal only: it can hold sign-in
-  // codes in plain text, and nothing on the public API reads it.
+  // codes and invite links in plain text, and nothing on the public API
+  // reads it.
   emailOutbox: defineTable({
     to: v.string(),
-    kind: v.literal("sign_in_code"),
+    kind: v.union(v.literal("sign_in_code"), v.literal("invite")),
     subject: v.string(),
     text: v.string(),
   }).index("by_to", ["to"]),

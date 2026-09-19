@@ -1,7 +1,9 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
 import { requireMatchmaker } from "../matchmakers/helpers";
+import { usernameKey } from "../matchmakers/rules";
 import { socialPlatform } from "../schema";
+import { getCurrentUser } from "../users/helpers";
 
 const membership = v.union(
   v.literal("invited"),
@@ -103,8 +105,15 @@ export const conversation = query({
         membershipChangedAt: v.number(),
         invite: v.union(
           v.null(),
-          v.object({ expiresAt: v.number(), copyable: v.boolean() }),
+          v.object({
+            expiresAt: v.number(),
+            lastSentAt: v.optional(v.number()),
+            copyable: v.boolean(),
+          }),
         ),
+        // The linked account's email, when it differs from the invited one
+        // ("Accepted as other@example.com", prd §3.2).
+        acceptedAs: v.optional(v.string()),
       }),
       messages: v.array(
         v.object({
@@ -151,10 +160,11 @@ export const conversation = query({
             .order("desc")
             .take(MAX_MESSAGES);
 
-    let name = candidate.name;
-    if (name === undefined && candidate.userId !== undefined) {
-      name = (await ctx.db.get("users", candidate.userId))?.name;
-    }
+    const account =
+      candidate.userId === undefined
+        ? null
+        : await ctx.db.get("users", candidate.userId);
+    const name = candidate.name ?? account?.name;
     return {
       candidate: {
         candidateId: candidate._id,
@@ -168,8 +178,13 @@ export const conversation = query({
             ? null
             : {
                 expiresAt: candidate.invite.expiresAt,
+                lastSentAt: candidate.invite.lastSentAt,
                 copyable: candidate.invite.nonce !== undefined,
               },
+        acceptedAs:
+          account?.email !== undefined && account.email !== candidate.email
+            ? account.email
+            : undefined,
       },
       messages: messages.reverse().map((message) => ({
         _id: message._id,
@@ -180,6 +195,48 @@ export const conversation = query({
         body: message.body,
         sentAt: message.sentAt,
       })),
+    };
+  },
+});
+
+/**
+ * The signed-in account's membership with the matchmaker a
+ * `/c/:matchmakerUsername` URL names, or `null` when it has none (never
+ * joined, left, or no such matchmaker — alike). Candidate-facing: returns
+ * only what the candidate may see, never the matchmaker's private data.
+ */
+export const self = query({
+  args: { matchmakerUsername: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      candidateId: v.id("candidates"),
+      matchmakerUsername: v.string(),
+      matchmakerDisplayName: v.string(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (user === null) return null;
+    const key = usernameKey(args.matchmakerUsername);
+    if (!key) return null;
+    const matchmaker = await ctx.db
+      .query("matchmakers")
+      .withIndex("by_usernameKey", (q) => q.eq("usernameKey", key))
+      .first();
+    if (matchmaker === null) return null;
+    const rows = await ctx.db
+      .query("candidates")
+      .withIndex("by_userId_and_matchmakerId", (q) =>
+        q.eq("userId", user._id).eq("matchmakerId", matchmaker._id),
+      )
+      .take(10);
+    const joined = rows.find((row) => row.membership === "joined");
+    if (joined === undefined) return null;
+    return {
+      candidateId: joined._id,
+      matchmakerUsername: matchmaker.username,
+      matchmakerDisplayName: matchmaker.displayName,
     };
   },
 });

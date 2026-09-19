@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { recordAudit } from "../audit/helpers";
 import { diffFields } from "../audit/rules";
-import { newInvite } from "../invites/helpers";
+import { openInvite, sendInvite } from "../invites/helpers";
 import { requireMatchmaker } from "../matchmakers/helpers";
 import { socialPlatform } from "../schema";
 import { normaliseEmail } from "../waitlist/rules";
@@ -21,7 +21,8 @@ import {
  * Onboards a candidate (prd/phase-1.md §3.1). In one transaction: the
  * candidate row (`invited`, `active`) with an open invite, its conversation,
  * the pasted history as a private message at the start of the thread, and the
- * audit events. The invitation email is sent by step 4's invite flow.
+ * audit events; the invitation email is scheduled, and the invite's expiry
+ * with it.
  *
  * Never looks at `users`: the result is the same whether or not the email
  * belongs to an account, so onboarding can't reveal who is on the platform
@@ -90,8 +91,7 @@ export const onboard = mutation({
       membershipChangedAt: now,
       status: "active",
     });
-    const invite = await newInvite(candidateId, now);
-    await ctx.db.patch("candidates", candidateId, { invite });
+    const invite = await openInvite(ctx, candidateId, now);
 
     const history = normaliseImportedHistory(args.importedHistory ?? "");
     const lastSeq = history === undefined ? 0 : 1;
@@ -147,6 +147,16 @@ export const onboard = mutation({
         { field: "email", after: email },
         { field: "expiresAt", after: invite.expiresAt },
       ],
+    });
+
+    const candidate = await ctx.db.get("candidates", candidateId);
+    if (candidate === null) throw new Error("Candidate vanished mid-mutation");
+    await sendInvite(ctx, {
+      candidate,
+      invite,
+      actor,
+      action: "invite.sent",
+      now,
     });
 
     return { kind: "created" as const, candidateId };
