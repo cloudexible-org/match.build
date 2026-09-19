@@ -228,8 +228,41 @@ export class ConversationPage {
     return this.page.getByTestId("conversation-message");
   }
 
-  getInviteBanner() {
-    return this.page.getByTestId("invite-banner");
+  /** Where the candidate stands: open invite, declined, left, … */
+  getMembershipBanner() {
+    return this.page.getByTestId("membership-banner");
+  }
+
+  /** "Invited as … · Accepted as …", or the email under a named candidate. */
+  getCandidateEmail() {
+    return this.page.getByTestId("conversation-candidate-email");
+  }
+
+  getResendButton() {
+    return this.getMembershipBanner().getByRole("button", { name: "Resend" });
+  }
+
+  getRevokeButton() {
+    return this.getMembershipBanner().getByRole("button", {
+      name: "Revoke",
+      exact: true,
+    });
+  }
+
+  getReinviteButton() {
+    return this.getMembershipBanner().getByRole("button", {
+      name: /^Re-invite/,
+    });
+  }
+
+  async changeEmail(email: string) {
+    await this.getMembershipBanner()
+      .getByRole("button", { name: "Change email" })
+      .click();
+    await this.page.getByLabel("New email").fill(email);
+    await this.page
+      .getByRole("button", { name: "Send new invitation" })
+      .click();
   }
 
   getInviteLink() {

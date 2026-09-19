@@ -63,10 +63,10 @@ test("a matchmaker onboards a candidate and lands in their conversation", async 
   );
 
   // The invite link is on this origin, and the same one after a reload.
-  await expect(conversation.getInviteBanner()).toContainText(
+  await expect(conversation.getMembershipBanner()).toContainText(
     "Invited · not joined yet.",
   );
-  await expect(conversation.getInviteBanner()).toContainText(
+  await expect(conversation.getMembershipBanner()).toContainText(
     "jane.doe@example.test",
   );
   const link = conversation.getInviteLink();

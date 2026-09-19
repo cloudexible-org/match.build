@@ -23,11 +23,23 @@ export function uniqueUsername(): string {
   return `e2e.${Date.now().toString(36)}${process.pid}`;
 }
 
-/** Signs up a brand-new account and names it; ends on the home page. */
-export async function signUp(page: Page, label: string, name: string) {
-  const email = uniqueEmail(label);
+/**
+ * Signs up a brand-new account and names it; ends on the home page, or on
+ * the page that sent the visitor to sign in.
+ *
+ * `email` defaults to a fresh address; pass one to sign up as an invited
+ * person. `goto: false` starts from wherever the page already is (the
+ * sign-in page a protected link redirected to).
+ */
+export async function signUp(
+  page: Page,
+  label: string,
+  name: string,
+  options: { email?: string; goto?: boolean } = {},
+) {
+  const email = options.email ?? uniqueEmail(label);
   const signIn = new SignInPage(page);
-  await signIn.goto();
+  if (options.goto !== false) await signIn.goto();
   const before = await latestSignInEmail(email);
   await signIn.requestCode(email);
   await signIn.enterCode(await waitForSignInCode(email, before));

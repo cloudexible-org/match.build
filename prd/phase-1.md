@@ -519,7 +519,7 @@ Candidate conversations include sexual orientation, religion, health and family 
 1. *Done.* **Auth & foundations:** Convex Auth with email OTP; `users` override with `deletedAt` and `createOrUpdateUser`; access helpers; `recordAudit` and the action list; schema; home page skeleton. Remove the demo `messages` table and Clerk.
 2. *Done.* **Matchmaker profiles:** create (username rules, reserved list), workspace route, settings.
 3. *Done.* **Onboarding:** Onboard form → candidate + conversation + private imported message + invitation.
-4. **Invitations:** invite email, `/invite/:token`, home-page invitations, accept/decline, resend/revoke/change email, expiry job.
+4. *Done.* **Invitations:** invite email, `/invite/:token`, home-page invitations, accept/decline, resend/revoke/change email, expiry job.
 5. **Chat:** real-time messaging on both sides, read markers, private-message badge, candidate view.
 6. **Candidate panel:** Details, Notes, History.
 7. **Leaving & account deletion.**
