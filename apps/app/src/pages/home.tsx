@@ -11,8 +11,8 @@ import { FullPageStatus } from "../components/full-page-status";
  * its own matchmaker profiles, and the matchmakers it has joined.
  *
  * The UI allows one matchmaker profile per account (prd/phase-1.md §1), so
- * "Create matchmaker profile" disappears once the account owns one.
- * Accepting invitations (step 4) adds its controls here when it lands.
+ * "Create matchmaker profile" disappears once the account owns one. An
+ * invitation opens the same accept screen as its link.
  */
 export function HomePage() {
   const me = useQuery(api.users.queries.me);
@@ -39,14 +39,18 @@ export function HomePage() {
         {home.invitations.length > 0 && (
           <Section title="Invitations" testId="home-invitations">
             {home.invitations.map((invite) => (
-              <Row key={invite.candidateId}>
+              <RowLink
+                key={invite.candidateId}
+                to={`/invitations/${invite.candidateId}`}
+              >
                 <span>
                   <span className="font-medium">
                     {invite.matchmakerDisplayName}
                   </span>{" "}
                   invited you to join.
                 </span>
-              </Row>
+                <span className="text-sm font-medium text-primary">View</span>
+              </RowLink>
             ))}
           </Section>
         )}
@@ -143,10 +147,6 @@ function Section({
 }
 
 const rowClass = "flex items-center justify-between gap-3 px-4 py-3";
-
-function Row({ children }: { children: ReactNode }) {
-  return <li className={rowClass}>{children}</li>;
-}
 
 function RowLink({ to, children }: { to: string; children: ReactNode }) {
   return (

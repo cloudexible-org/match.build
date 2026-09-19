@@ -1,9 +1,9 @@
-import { api, type Id } from "@repo/api";
-import { Button, buttonVariants, cn, Input } from "@repo/ui";
+import { api } from "@repo/api";
+import { buttonVariants, cn } from "@repo/ui";
 import { useQuery } from "convex/react";
-import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { candidateDisplayName, inviteUrl } from "../workspace/candidate-labels";
+import { candidateDisplayName } from "../workspace/candidate-labels";
+import { MembershipBanner } from "../workspace/membership-banner";
 import { useWorkspace } from "../workspace/workspace-layout";
 
 /**
@@ -11,8 +11,7 @@ import { useWorkspace } from "../workspace/workspace-layout";
  * (prd/phase-1.md §3.1, §4.1): who they are, their invite while it's open,
  * and the thread, private messages included and marked.
  *
- * Read-only for now: the composer and live chat arrive with step 5, and the
- * invite's Resend / Change email / Revoke with step 4.
+ * Read-only for now: the composer and live chat arrive with step 5.
  */
 export function ConversationPage() {
   const workspace = useWorkspace();
@@ -63,21 +62,28 @@ export function ConversationPage() {
           >
             {name}
           </h2>
-          {candidate.name !== undefined && (
-            <span className="truncate text-xs text-muted-foreground">
-              {candidate.email}
+          {(candidate.name !== undefined ||
+            candidate.acceptedAs !== undefined) && (
+            <span
+              className="truncate text-xs text-muted-foreground"
+              data-testid="conversation-candidate-email"
+            >
+              {candidate.acceptedAs !== undefined
+                ? `Invited as ${candidate.email} · Accepted as ${candidate.acceptedAs}`
+                : candidate.email}
             </span>
           )}
         </div>
       </header>
 
-      {candidate.membership === "invited" && (
-        <InviteBanner
-          candidateId={candidate.candidateId}
-          email={candidate.email}
-          invite={candidate.invite}
-        />
-      )}
+      <MembershipBanner
+        candidateId={candidate.candidateId}
+        name={name}
+        email={candidate.email}
+        membership={candidate.membership}
+        membershipChangedAt={candidate.membershipChangedAt}
+        invite={candidate.invite}
+      />
 
       <ol
         className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
@@ -116,90 +122,16 @@ export function ConversationPage() {
       </ol>
 
       <footer className="shrink-0 border-t border-border px-4 py-3 text-sm text-muted-foreground">
-        {candidate.membership === "invited"
-          ? `You can message ${name} once they accept your invitation.`
-          : candidate.membership === "joined"
-            ? "Messaging arrives in the next update."
-            : `${name} isn't a member any more. You can still read the thread.`}
+        {
+          {
+            invited: `You can message ${name} once they accept your invitation.`,
+            declined: `You can message ${name} if they accept a new invitation.`,
+            joined: "Messaging arrives in the next update.",
+            left: `${name} isn't a member any more. You can still read the thread.`,
+            account_deleted: `${name} isn't a member any more. You can still read the thread.`,
+          }[candidate.membership]
+        }
       </footer>
-    </div>
-  );
-}
-
-function InviteBanner({
-  candidateId,
-  email,
-  invite,
-}: {
-  candidateId: Id<"candidates">;
-  email: string;
-  invite: { expiresAt: number; copyable: boolean } | null;
-}) {
-  const workspace = useWorkspace();
-  const token = useQuery(
-    api.invites.queries.token,
-    invite?.copyable
-      ? { matchmakerId: workspace.matchmakerId, candidateId }
-      : "skip",
-  );
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  const link =
-    typeof token === "string"
-      ? inviteUrl(token, window.location.origin, import.meta.env.BASE_URL)
-      : null;
-
-  async function copy() {
-    if (link === null) return;
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-    } catch {
-      // Clipboard blocked (permissions, insecure origin): the link is still
-      // selectable in the field.
-    }
-  }
-
-  return (
-    <div
-      className="flex shrink-0 flex-col gap-2 border-b border-border bg-accent/40 px-4 py-3"
-      data-testid="invite-banner"
-    >
-      <p className="text-sm">
-        <span className="font-medium">Invited · not joined yet.</span>{" "}
-        {invite === null
-          ? "This invitation is no longer open."
-          : `The invitation to ${email} expires on ${new Date(invite.expiresAt).toLocaleDateString()}.`}
-      </p>
-      {invite !== null &&
-        (invite.copyable ? (
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              readOnly
-              aria-label="Invite link"
-              value={link ?? ""}
-              onFocus={(event) => event.target.select()}
-              data-testid="invite-link"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={link === null}
-              onClick={() => void copy()}
-            >
-              {copied ? "Copied" : "Copy invite link"}
-            </Button>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            This invitation's link can't be copied. Re-invite to get a new one.
-          </p>
-        ))}
     </div>
   );
 }
