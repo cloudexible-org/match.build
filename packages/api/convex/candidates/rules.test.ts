@@ -2,6 +2,7 @@ import type { Infer } from "convex/values";
 import { describe, expect, test } from "vitest";
 import type { socialPlatform } from "../schema";
 import {
+  candidateEmailError,
   candidateNameError,
   handleError,
   importedHistoryError,
@@ -86,6 +87,12 @@ describe("social handles", () => {
 });
 
 describe("name and history", () => {
+  test("the email is required and worded for someone else", () => {
+    expect(candidateEmailError(" ")).toBe("Enter their email address.");
+    expect(candidateEmailError("jane@")).toBe("Enter a valid email address.");
+    expect(candidateEmailError(" Jane@Example.test ")).toBeNull();
+  });
+
   test("the name is optional and bounded", () => {
     expect(normaliseCandidateName("   ")).toBeUndefined();
     expect(normaliseCandidateName(" Jane   Doe ")).toBe("Jane Doe");

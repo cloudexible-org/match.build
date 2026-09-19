@@ -5,9 +5,10 @@ import { diffFields } from "../audit/rules";
 import { newInvite } from "../invites/helpers";
 import { requireMatchmaker } from "../matchmakers/helpers";
 import { socialPlatform } from "../schema";
-import { emailError, normaliseEmail } from "../waitlist/rules";
+import { normaliseEmail } from "../waitlist/rules";
 import {
   CANDIDATE_LIMITS,
+  candidateEmailError,
   candidateNameError,
   handleError,
   importedHistoryError,
@@ -56,7 +57,7 @@ export const onboard = mutation({
       );
     }
     const invalid =
-      emailError(args.email) ??
+      candidateEmailError(args.email) ??
       candidateNameError(args.name ?? "") ??
       importedHistoryError(args.importedHistory ?? "") ??
       args.socialHandles

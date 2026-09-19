@@ -122,13 +122,13 @@ describe("candidates.conversation", () => {
       matchmakerId,
       candidateId,
     });
-    expect(view.candidate).toMatchObject({
+    expect(view?.candidate).toMatchObject({
       candidateId,
       email: "jane@example.test",
       membership: "invited",
       invite: { copyable: true },
     });
-    expect(view.messages).toMatchObject([
+    expect(view?.messages).toMatchObject([
       {
         seq: 1,
         visibility: "matchmaker",
@@ -138,15 +138,45 @@ describe("candidates.conversation", () => {
     ]);
   });
 
-  test("another matchmaker can't open it, even through their own workspace", async () => {
-    const { asOther, onboard, otherMatchmakerId } = await world();
+  test("another tenant's candidate, an unknown id and a malformed one all answer null", async () => {
+    const { t, asOwner, asOther, onboard, matchmakerId, otherMatchmakerId } =
+      await world();
     const { candidateId } = await onboard("jane@example.test");
-    await expect(
-      asOther.query(api.candidates.queries.conversation, {
+    const conversation = api.candidates.queries.conversation;
+    expect(
+      await asOther.query(conversation, {
         matchmakerId: otherMatchmakerId,
         candidateId,
       }),
-    ).rejects.toThrow("Not found.");
+    ).toBeNull();
+    const deletedId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("candidates", {
+        matchmakerId,
+        email: "gone@example.test",
+        socialHandles: [],
+        membership: "invited",
+        membershipChangedAt: 0,
+        status: "active",
+      });
+      await ctx.db.delete("candidates", id);
+      return id;
+    });
+    expect(
+      await asOwner.query(conversation, {
+        matchmakerId,
+        candidateId: deletedId,
+      }),
+    ).toBeNull();
+    expect(
+      await asOwner.query(conversation, {
+        matchmakerId,
+        candidateId: "not-an-id",
+      }),
+    ).toBeNull();
+    // The workspace itself is still checked.
+    await expect(
+      asOther.query(conversation, { matchmakerId, candidateId }),
+    ).rejects.toThrow("Matchmaker profile not found.");
   });
 });
 

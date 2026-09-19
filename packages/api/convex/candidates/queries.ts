@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
-import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
+import { requireMatchmaker } from "../matchmakers/helpers";
 import { socialPlatform } from "../schema";
 
 const membership = v.union(
@@ -80,51 +80,61 @@ const MAX_MESSAGES = 100;
  * details and invite state, and the latest messages of every visibility,
  * oldest first. Private messages are the matchmaker's own; nothing here is
  * ever returned to a candidate.
+ *
+ * `candidateId` comes from the URL, so it is taken as a string: a malformed
+ * id, an unknown one and another tenant's all answer `null` alike.
  */
 export const conversation = query({
   args: {
     matchmakerId: v.id("matchmakers"),
-    candidateId: v.id("candidates"),
+    candidateId: v.string(),
   },
-  returns: v.object({
-    candidate: v.object({
-      candidateId: v.id("candidates"),
-      name: v.optional(v.string()),
-      email: v.string(),
-      socialHandles: v.array(
-        v.object({ platform: socialPlatform, handle: v.string() }),
-      ),
-      membership,
-      membershipChangedAt: v.number(),
-      invite: v.union(
-        v.null(),
-        v.object({ expiresAt: v.number(), copyable: v.boolean() }),
+  returns: v.union(
+    v.null(),
+    v.object({
+      candidate: v.object({
+        candidateId: v.id("candidates"),
+        name: v.optional(v.string()),
+        email: v.string(),
+        socialHandles: v.array(
+          v.object({ platform: socialPlatform, handle: v.string() }),
+        ),
+        membership,
+        membershipChangedAt: v.number(),
+        invite: v.union(
+          v.null(),
+          v.object({ expiresAt: v.number(), copyable: v.boolean() }),
+        ),
+      }),
+      messages: v.array(
+        v.object({
+          _id: v.id("messages"),
+          seq: v.number(),
+          author: v.union(
+            v.literal("matchmaker"),
+            v.literal("candidate"),
+            v.literal("system"),
+          ),
+          visibility: v.union(v.literal("everyone"), v.literal("matchmaker")),
+          source: v.union(
+            v.literal("typed"),
+            v.literal("imported"),
+            v.literal("system"),
+          ),
+          body: v.string(),
+          sentAt: v.number(),
+        }),
       ),
     }),
-    messages: v.array(
-      v.object({
-        _id: v.id("messages"),
-        seq: v.number(),
-        author: v.union(
-          v.literal("matchmaker"),
-          v.literal("candidate"),
-          v.literal("system"),
-        ),
-        visibility: v.union(v.literal("everyone"), v.literal("matchmaker")),
-        source: v.union(
-          v.literal("typed"),
-          v.literal("imported"),
-          v.literal("system"),
-        ),
-        body: v.string(),
-        sentAt: v.number(),
-      }),
-    ),
-  }),
+  ),
   handler: async (ctx, args) => {
     const { matchmaker } = await requireMatchmaker(ctx, args.matchmakerId);
-    const candidate = await ctx.db.get("candidates", args.candidateId);
-    assertSameTenant(candidate, matchmaker._id);
+    const candidateId = ctx.db.normalizeId("candidates", args.candidateId);
+    const candidate =
+      candidateId === null ? null : await ctx.db.get("candidates", candidateId);
+    if (candidate === null || candidate.matchmakerId !== matchmaker._id) {
+      return null;
+    }
 
     const conversation = await ctx.db
       .query("conversations")

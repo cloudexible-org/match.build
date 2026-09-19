@@ -5,7 +5,7 @@
  */
 
 import { normaliseName, USER_LIMITS } from "../users/rules";
-import { normaliseInstagram } from "../waitlist/rules";
+import { emailError, normaliseInstagram } from "../waitlist/rules";
 
 export const CANDIDATE_LIMITS = {
   name: USER_LIMITS.name,
@@ -38,6 +38,12 @@ export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   linkedin: "LinkedIn",
   other: "Other",
 };
+
+/** Like the account email rule, but worded for someone else's address. */
+export function candidateEmailError(raw: string): string | null {
+  if (!raw.trim()) return "Enter their email address.";
+  return emailError(raw);
+}
 
 /** The candidate's name is optional: blank means "use their account name". */
 export function normaliseCandidateName(raw: string): string | undefined {
