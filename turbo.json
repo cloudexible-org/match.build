@@ -6,13 +6,10 @@
       "dependsOn": ["^build"],
       "env": [
         // Build-time inputs that change the emitted bundle, so they are part of
-        // the cache key. STATIC_HOSTING_BASE_PATH is set by the
-        // @convex-dev/static-hosting CLI to the component's mount (`/app/`),
-        // and VITE_CONVEX_URL / NEXT_PUBLIC_CONVEX_URL to the target deployment.
+        // the cache key. The @convex-dev/static-hosting CLI sets
+        // VITE_CONVEX_URL / NEXT_PUBLIC_CONVEX_URL to the target deployment.
         "CONVEX_DEPLOY_KEY",
-        "STATIC_HOSTING_BASE_PATH",
         "VITE_CONVEX_URL",
-        "VITE_CLERK_PUBLISHABLE_KEY",
         "NEXT_PUBLIC_CONVEX_URL"
       ],
       "outputs": [".next/**", "!.next/cache/**", "out/**", "dist/**"]
@@ -36,8 +33,8 @@
       "dependsOn": [],
       // Turbo 2 runs strict env mode: undeclared vars are not passed through.
       // apps/www's env.ts requires a well-formed NEXT_PUBLIC_CONVEX_URL. The
-      // Clerk and PostHog keys are optional in both apps and are deliberately
-      // omitted — no spec may depend on them being set.
+      // PostHog keys are optional in both apps and are deliberately omitted —
+      // no spec may depend on them being set.
       //
       // VITE_CONVEX_URL is NOT listed: playwright.config.ts sets it on the Vite
       // webServer itself, either to the local Convex backend or to a

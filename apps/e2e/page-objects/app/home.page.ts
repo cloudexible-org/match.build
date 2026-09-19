@@ -1,15 +1,11 @@
 import type { Page } from "@playwright/test";
 
 /**
- * The `apps/app` home page — the Vite + React + Convex app served at `/`.
+ * `apps/app` home (`/app/`): the signed-in account's invitations, matchmaker
+ * profiles and joined matchmakers. Rendered by `apps/app/src/pages/home.tsx`.
  *
- * Locators here are verified against the real DOM rendered by
- * `apps/app/src/App.tsx`. Per `docs/e2e-architecture.md` §4, an unexecuted page
- * object states an intention, not the app: keep these in sync by running the
- * suite, not by reading it.
- *
- * These are synchronous — a Playwright locator is a lazy selector, not a query,
- * so there is nothing to await until it is acted on or asserted against.
+ * Sections are located by `data-testid`; rows by their visible text, which is
+ * what a person scans for.
  */
 export class HomePage {
   constructor(public readonly page: Page) {}
@@ -18,49 +14,40 @@ export class HomePage {
     await this.page.goto("/app/");
   }
 
-  getHeading() {
-    return this.page.getByRole("heading", { name: "Matchmaker", level: 1 });
+  getWelcomeHeading() {
+    return this.page.getByRole("heading", { level: 1, name: /^Welcome/ });
   }
 
-  getTagline() {
-    return this.page.getByText("Vite + React + Convex");
+  getAccountName() {
+    return this.page.getByTestId("header-account-name");
   }
 
-  getMessageInput() {
-    return this.page.getByLabel("Message");
+  getSignOutButton() {
+    return this.page.getByRole("button", { name: "Sign out" });
   }
 
-  getSendButton() {
-    return this.page.getByRole("button", { name: "Send", exact: true });
+  getInvitationsSection() {
+    return this.page.getByTestId("home-invitations");
   }
 
-  // --- Convex-backed surfaces ---------------------------------------------
-  //
-  // Only meaningful when the suite runs against a seeded local backend (the
-  // `app-convex` project). With the CI placeholder URL the query never
-  // resolves and the list stays on "Loading…" forever.
-
-  /** One `<li>` per message. Also matches the loading and empty placeholders. */
-  getMessageItems() {
-    return this.page.getByRole("listitem");
+  getMatchmakerProfilesSection() {
+    return this.page.getByTestId("home-matchmaker-profiles");
   }
 
-  /** A specific message by its exact body text. */
-  getMessage(body: string) {
-    return this.page.getByRole("listitem").filter({ hasText: body });
+  getCandidateProfilesSection() {
+    return this.page.getByTestId("home-candidate-profiles");
   }
 
-  getLoadingPlaceholder() {
-    return this.page.getByText("Loading…", { exact: true });
-  }
-
-  /**
-   * Sends a message and waits for the input to clear, which `App.tsx` does
-   * synchronously before awaiting the mutation — so this returns before the
-   * write has necessarily landed. Assert on the list, not on this.
-   */
-  async sendMessage(body: string) {
-    await this.getMessageInput().fill(body);
-    await this.getSendButton().click();
+  /** A row in one of the sections, by any text it contains. */
+  getRow(
+    section: "invitations" | "matchmakerProfiles" | "candidateProfiles",
+    text: string,
+  ) {
+    const root = {
+      invitations: this.getInvitationsSection(),
+      matchmakerProfiles: this.getMatchmakerProfilesSection(),
+      candidateProfiles: this.getCandidateProfilesSection(),
+    }[section];
+    return root.getByRole("listitem").filter({ hasText: text });
   }
 }

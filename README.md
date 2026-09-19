@@ -11,11 +11,11 @@ Built on [turbostack](https://github.com/cloudexible-org/turbostack).
 
 - **Monorepo:** [Turborepo](https://turbo.build/) + [pnpm](https://pnpm.io/)
 - **Backend:** [Convex](https://convex.dev/) (database, functions, scheduling, agents, HTTP actions)
-- **App:** [Vite](https://vite.dev/) + [React](https://react.dev/): the matchmaker and client app, served at `/app/`
+- **App:** [Vite](https://vite.dev/) + [React](https://react.dev/): the matchmaker and candidate app, served at `/app/`
 - **Marketing site:** [Next.js 16](https://nextjs.org/) as a static export, served at `/`
 - **Hosting:** both frontends are served from the Convex deployment (`https://<deployment>.convex.site`) by [`@convex-dev/static-hosting`](https://www.npmjs.com/package/@convex-dev/static-hosting)
-- **Email:** [Resend](https://resend.com/) via the Convex Resend component
-- **Auth:** [Clerk](https://clerk.com/) (optional; the stack runs auth-free when its env vars are unset)
+- **Email:** [Resend](https://resend.com/) for sign-in codes, invitations and notifications
+- **Auth:** [Convex Auth](https://labs.convex.dev/auth): email + one-time code
 - **UI:** Tailwind CSS v4, shadcn/ui, Base UI (no Radix)
 - **Tooling:** Biome, Playwright, Vitest + Storybook, lefthook + commitlint, PostHog (`@repo/analytics`)
 
@@ -95,16 +95,27 @@ pnpm ship:preview
 
 The static-hosting CLI builds each app with the target deployment's
 `VITE_CONVEX_URL` (mapped to `NEXT_PUBLIC_CONVEX_URL` for `www`) and, for the
-app, `STATIC_HOSTING_BASE_PATH=/app/`. Uploads publish atomically, so a failed
-upload leaves the previous version live.
+app, a fixed Vite `base` of `/app/` (see `apps/app/vite.config.ts`). Uploads
+publish atomically, so a failed upload leaves the previous version live.
 
-### Auth (Clerk)
+### Auth (Convex Auth)
 
-1. Clerk Dashboard → **JWT Templates** → **New** → **Convex**.
-2. Convex Dashboard → **Settings** → **Environment Variables** → set
-   `CLERK_JWT_ISSUER_DOMAIN` to the Clerk Frontend API URL (dev and prod).
-3. Add the provider in `packages/api/convex/auth.config.ts` (see the comment there).
-4. In Clerk → **Domains**, allow the `https://<deployment>.convex.site` origin.
+Sign-in is an email plus a six-digit code (`packages/api/convex/auth.ts`).
+Each deployment needs a signing key pair and the app's URL, set once:
+
+```bash
+pnpm --filter @repo/api auth:setup --site-url https://<deployment>.convex.site/app
+```
+
+Add `--prod` for the production deployment. Then set `RESEND_API_KEY` on the
+deployment to send real email. Without it, codes are printed to the Convex logs
+and written to the internal `emailOutbox` table. That's fine for development,
+and it's how the e2e suite signs in.
+
+Convex validates session tokens through the OpenID discovery document at
+`<site>/.well-known/openid-configuration`, so `convex/http.ts` owns the root of
+the URL space and registers the two static sites behind it (see
+`convex/convex.config.ts`).
 
 ## Contributing
 

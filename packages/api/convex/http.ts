@@ -1,15 +1,32 @@
+import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { httpRouter } from "convex/server";
+import { components } from "./_generated/api";
 import { httpAction } from "./_generated/server";
+import { auth } from "./auth";
 
-// App-owned HTTP actions. `convex.config.ts` mounts this router under /api/,
-// so the paths below are served at `https://<deployment>.convex.site/api/...`
-// (the static sites own `/` and `/app/`).
+/**
+ * Every HTTP route on the deployment's `.convex.site` origin (see
+ * convex.config.ts). Exact routes win over prefixes, and the longest prefix
+ * wins among those, so the static sites only receive what nothing else
+ * claims.
+ */
 const http = httpRouter();
 
+// Convex Auth: /.well-known/openid-configuration and /.well-known/jwks.json.
+// Convex validates session JWTs through this discovery document, which the
+// OpenID spec places at the issuer's root — hence this router owning `/`.
+auth.addHttpRoutes(http);
+
 http.route({
-  path: "/health",
+  path: "/api/health",
   method: "GET",
   handler: httpAction(async () => new Response("ok")),
 });
+
+// The product app under /app/ (SPA fallback, so deep links survive a reload),
+// then the marketing site for everything else. Keep APP_BASE_PATH in
+// apps/app/vite.config.ts in step with the prefix here.
+registerStaticRoutes(http, components.app, { pathPrefix: "/app/" });
+registerStaticRoutes(http, components.www, { pathPrefix: "/" });
 
 export default http;

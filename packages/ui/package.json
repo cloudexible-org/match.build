@@ -3,12 +3,16 @@
   "version": "4.5.0",
   "private": true,
   "exports": {
-    ".": "./src/index.tsx"
+    ".": "./src/index.tsx",
+    "./theme.css": "./src/styles/theme.css"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^5.3.1",

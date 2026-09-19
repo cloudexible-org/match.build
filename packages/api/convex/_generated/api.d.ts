@@ -8,10 +8,22 @@
  * @module
  */
 
+import type * as audit_helpers from "../audit/helpers.js";
+import type * as audit_rules from "../audit/rules.js";
+import type * as auth from "../auth.js";
+import type * as candidates_helpers from "../candidates/helpers.js";
+import type * as email_helpers from "../email/helpers.js";
+import type * as email_mutations from "../email/mutations.js";
+import type * as email_queries from "../email/queries.js";
+import type * as email_rules from "../email/rules.js";
 import type * as http from "../http.js";
-import type * as messages from "../messages.js";
+import type * as matchmakers_helpers from "../matchmakers/helpers.js";
 import type * as seed_e2e_fixture from "../seed/e2e/fixture.js";
 import type * as seed_e2e_mutations from "../seed/e2e/mutations.js";
+import type * as users_helpers from "../users/helpers.js";
+import type * as users_mutations from "../users/mutations.js";
+import type * as users_queries from "../users/queries.js";
+import type * as users_rules from "../users/rules.js";
 import type * as waitlist_helpers from "../waitlist/helpers.js";
 import type * as waitlist_mutations from "../waitlist/mutations.js";
 import type * as waitlist_queries from "../waitlist/queries.js";
@@ -24,10 +36,22 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "audit/helpers": typeof audit_helpers;
+  "audit/rules": typeof audit_rules;
+  auth: typeof auth;
+  "candidates/helpers": typeof candidates_helpers;
+  "email/helpers": typeof email_helpers;
+  "email/mutations": typeof email_mutations;
+  "email/queries": typeof email_queries;
+  "email/rules": typeof email_rules;
   http: typeof http;
-  messages: typeof messages;
+  "matchmakers/helpers": typeof matchmakers_helpers;
   "seed/e2e/fixture": typeof seed_e2e_fixture;
   "seed/e2e/mutations": typeof seed_e2e_mutations;
+  "users/helpers": typeof users_helpers;
+  "users/mutations": typeof users_mutations;
+  "users/queries": typeof users_queries;
+  "users/rules": typeof users_rules;
   "waitlist/helpers": typeof waitlist_helpers;
   "waitlist/mutations": typeof waitlist_mutations;
   "waitlist/queries": typeof waitlist_queries;

@@ -79,7 +79,7 @@ Empty state for a new account: a prompt to create a matchmaker profile, plus a l
    - a `candidates` row is created with `membership: "invited"` and `status: "active"`;
    - its `conversations` row is created;
    - the existing conversation, if any, is stored as a **private message** (`visibility: "matchmaker"`, `source: "imported"`) at the start of the thread;
-   - a `membershipRequests` row of kind `invite` is created, with a fresh invite token;
+   - the candidate row gets an open `invite` (a fresh link token's hash and its expiry);
    - the invitation email is scheduled (§8);
    - audit events are written for the candidate and the invite (§5).
 5. The matchmaker lands in the new candidate's conversation. They can work immediately: read the imported history, add notes. Nothing in the thread is visible to anyone else yet.
@@ -99,15 +99,15 @@ Two ways in, both ending at the same accept screen:
 The accept screen shows the matchmaker's display name, a short privacy notice (§9.3), and **Accept** / **Decline**. On accept:
 
 - the candidate record's `userId` is set to the accepting account and its `membership` becomes `joined`;
-- the membership request becomes `accepted`, recording who accepted and when;
+- the candidate's `invite` is cleared, so the link stops working; who accepted and when is recorded in the audit trail;
 - the candidate is taken to `/c/<matchmakerUsername>` with the conversation open;
 - the matchmaker is notified, and sees the accepting account's name and email. If it differs from the invited email, the candidate panel says so ("Accepted as other@example.com").
 
 The accept fails with a clear message, and the invite stays pending, if the accepting account is already a joined candidate of that matchmaker, or owns that matchmaker profile.
 
-**Invite management by the matchmaker**, while an invite is pending: **resend** the email (rate-limited, 3 per day), **copy** the link, **revoke** it, or **change the email** (revokes the old token and issues a new invite). Invites **expire after 30 days**; the matchmaker can reissue.
+**Invite management by the matchmaker**, while an invite is open: **resend** the email (rate-limited, 3 per day), **copy** the link, **revoke** it, or **change the email** (issues a new token, which replaces the old one and so invalidates the old link). Invites **expire after 30 days**: a scheduled job clears the candidate's `invite`, and the matchmaker can reissue. There is only ever one open invite per candidate, stored on the candidate row itself.
 
-**Decline** marks the request `declined` and the candidate's `membership` `declined`. The candidate stays in the matchmaker's book with a "Declined" marker, so the matchmaker can follow up off-platform and re-invite.
+**Decline** clears the `invite` and sets the candidate's `membership` to `declined`. The candidate stays in the matchmaker's book with a "Declined" marker, so the matchmaker can follow up off-platform and re-invite.
 
 Every step above is audited (§5).
 
@@ -232,6 +232,8 @@ Filters: All · Details · Invitations & membership · Notes.
 
 **Tenancy key.** Every row that belongs to a matchmaker carries `matchmakerId`. Every function that reads or writes such rows first establishes, on the server, that the caller may access that tenant (§9.2). Scheduled jobs are `internal`, receive `matchmakerId` as an argument, and are only scheduled by functions that already checked it.
 
+**The schema below is the design; `packages/api/convex/schema.ts` is the source of truth.** The code differs in small ways: index names follow Convex's `by_<field>_and_<field>` convention, creation times use the built-in `_creationTime` instead of `createdAt`, and audit actors have a third role, `account`, for changes a person makes to their own account.
+
 **Nothing is hard-deleted.** No function calls `ctx.db.delete` on these tables. Removed notes get `removedAt`; deleted accounts get `deletedAt`; departed candidates get a `membership` value. The only exception is auth plumbing (sessions and credentials of a deleted account, §3.5).
 
 ```ts
@@ -273,6 +275,9 @@ export default defineSchema({
     .index("by_owner", ["ownerUserId"])
     .index("by_usernameKey", ["usernameKey"]),
 
+  // A person's standing with ONE matchmaker: the matchmaker's record of them.
+  // Not the person (that's `users`). Exists before the person has an account;
+  // linked to a user once they join. Also carries the open invitation, if any.
   candidates: defineTable({
     matchmakerId: v.id("matchmakers"),
     userId: v.optional(v.id("users")), // set when an invitation is accepted
@@ -280,6 +285,7 @@ export default defineSchema({
     email: v.string(),                 // as invited, trimmed + lowercased
     socialHandles: v.array(v.object({ platform: socialPlatform, handle: v.string() })),
     // The person's side: are they connected to this matchmaker?
+    // Phase 3 adds "applied" for Discover-page applications.
     membership: v.union(
       v.literal("invited"),
       v.literal("declined"),
@@ -289,42 +295,21 @@ export default defineSchema({
     ),
     membershipChangedAt: v.number(),
     leaveReason: v.optional(v.string()),
+    // The open invitation. Absent once accepted, declined, revoked or expired.
+    invite: v.optional(v.object({
+      tokenHash: v.string(),                 // SHA-256 of the link's token; the raw token is never stored
+      expiresAt: v.number(),
+      lastSentAt: v.optional(v.number()),    // drives the resend rate limit
+    })),
     // The matchmaker's side: their own workflow label, independent of membership.
     status: v.union(v.literal("active"), v.literal("paused"), v.literal("archived")),
     createdAt: v.number(),
   })
     .index("by_matchmaker_status", ["matchmakerId", "status"])
     .index("by_matchmaker_email", ["matchmakerId", "email"])
-    .index("by_user", ["userId"])
-    .index("by_user_matchmaker", ["userId", "matchmakerId"]),
-
-  // Invitations now; candidate applications from the Discover page in phase 3.
-  // Rows are kept after they resolve, as history.
-  membershipRequests: defineTable({
-    matchmakerId: v.id("matchmakers"),
-    kind: v.union(v.literal("invite"), v.literal("application")),
-    candidateId: v.optional(v.id("candidates")), // invite: set at creation; application: set on approval
-    email: v.optional(v.string()),               // invite target, trimmed + lowercased
-    tokenHash: v.optional(v.string()),           // SHA-256 of the invite token; the raw token is never stored
-    requesterUserId: v.optional(v.id("users")),  // application (phase 3): who applied
-    message: v.optional(v.string()),             // application (phase 3): note to the matchmaker
-    status: v.union(
-      v.literal("pending"),
-      v.literal("accepted"),
-      v.literal("declined"),
-      v.literal("revoked"),
-      v.literal("expired"),
-    ),
-    respondedByUserId: v.optional(v.id("users")),
-    respondedAt: v.optional(v.number()),
-    lastSentAt: v.optional(v.number()),          // invite email; drives the resend rate limit
-    expiresAt: v.number(),
-    createdAt: v.number(),
-  })
-    .index("by_email_status", ["email", "status"])
-    .index("by_tokenHash", ["tokenHash"])
-    .index("by_matchmaker_status", ["matchmakerId", "status"])
-    .index("by_candidate", ["candidateId"]),
+    .index("by_user_matchmaker", ["userId", "matchmakerId"])
+    .index("by_email_membership", ["email", "membership"])  // home page invitations
+    .index("by_invite_tokenHash", ["invite.tokenHash"]),     // invite links
 
   conversations: defineTable({
     matchmakerId: v.id("matchmakers"),
@@ -379,7 +364,7 @@ export default defineSchema({
       // phase 2 adds { type: "agent", agent, model }
     ),
     action: v.string(),              // from the fixed list in convex/audit/rules.ts
-    entityTable: v.string(),         // "candidates" | "notes" | "membershipRequests" | "matchmakers" | "users"
+    entityTable: v.string(),         // "candidates" (incl. invitations) | "notes" | "matchmakers" | "users"
     entityId: v.string(),
     changes: v.optional(v.array(v.object({
       field: v.string(),
@@ -432,9 +417,9 @@ export default defineSchema({
 
 **Modelling notes:**
 
-- **Why the candidate row exists before acceptance.** The matchmaker needs to work on a candidate (read the imported history, write notes) before the person has signed up. The invitation is only the link between that record and an account. For phase-3 applications the direction reverses: the membership request comes first and the candidate row is created on approval.
+- **Why the candidate row exists before acceptance.** The matchmaker needs to work on a candidate (read the imported history, write notes) before the person has signed up. The invitation is only the link between that record and an account, so it lives on the candidate row rather than in a table of its own: there is never more than one open invite per candidate, and the audit trail already keeps the history of every invite sent, resent, revoked, expired, accepted or declined. Phase-3 applications fit the same row: a candidate with `membership: "applied"` and `userId` already set, which the matchmaker approves (`joined`) or declines.
 - **Two fields for candidate state.** `membership` is the person's side; `status` is the matchmaker's workflow. A candidate who left can still be archived; keeping them separate avoids a combined status explosion.
-- **Uniqueness is enforced in mutations**, since Convex has no unique constraints: one `usernameKey` across matchmakers; one candidate per `(matchmakerId, email)`; one candidate per `(matchmakerId, userId)`; one pending invite per candidate.
+- **Uniqueness is enforced in mutations**, since Convex has no unique constraints: one `usernameKey` across matchmakers; one candidate per `(matchmakerId, email)`; one candidate per `(matchmakerId, userId)`.
 - **Account deletion and Convex Auth.** Convex Auth links a new sign-in to an existing user with the same email by default. Override `createOrUpdateUser` so a user with `deletedAt` is never reused.
 - **Remove the template's demo `messages` table and `convex/messages.ts`** before this schema lands; they collide with the table above.
 - Phase 2 adds tables (`facts`, `replySuggestions`) and fields (voice profile, conversation summaries, the `ai_suggestion` message source, the `agent` audit actor). Adding them later is a non-breaking schema change.
@@ -445,7 +430,7 @@ export default defineSchema({
 
 Domains under `packages/api/convex/`, each split into `rules.ts` / `mutations.ts` / `queries.ts` / `helpers.ts` per `CLAUDE.md`:
 
-`users/`, `matchmakers/`, `candidates/`, `membershipRequests/`, `conversations/` (conversations + messages), `notes/`, `audit/`, `notifications/`.
+`users/`, `matchmakers/`, `candidates/` (including invitations), `conversations/` (conversations + messages), `notes/`, `audit/`, `notifications/`.
 
 ---
 
@@ -501,7 +486,7 @@ Every function derives access from one of these helpers, never from arguments al
 - `requireUser(ctx)` — the signed-in, non-deleted user, or throw.
 - `requireMatchmaker(ctx, matchmakerId)` — the user must own that matchmaker profile. Workspace functions take `matchmakerId` from the URL-selected workspace and pass it through this check.
 - `requireCandidateSelf(ctx, candidateId)` — the user must be that candidate's linked account and `membership` must be `joined`. Candidate-facing functions return only `visibility: "everyone"` messages (via the `by_conversation_visibility` index).
-- Any document loaded by id (candidate, conversation, note, membership request) must have its `matchmakerId` checked against the matchmaker the caller was authorised for.
+- Any document loaded by id (candidate, conversation, note) must have its `matchmakerId` checked against the matchmaker the caller was authorised for.
 - Scheduled jobs are `internal` and receive `matchmakerId` from an already-authorised caller.
 
 ### 9.3 Sensitive data
@@ -517,10 +502,10 @@ Candidate conversations include sexual orientation, religion, health and family 
 ## 10. Platform & hosting
 
 - **Frontends:** `app.matchmaker.io` (Vite app) and `www.matchmaker.io` (Next.js static export). The marketing site's CTAs link to the app.
-- **Auth:** Convex Auth (`@convex-dev/auth`) with the Resend OTP provider. Replaces turbostack's Clerk wiring; remove Clerk dependencies.
+- **Auth:** Convex Auth (`@convex-dev/auth`) with an email one-time-code provider. Replaces turbostack's Clerk wiring. Convex validates session tokens through the OpenID discovery document at `<site>/.well-known/openid-configuration`, which has to sit at the site root. So `convex/http.ts` owns the whole URL space: `/.well-known/…` for auth, `/api/…` for HTTP actions, then the static sites as catch-alls (`/app/…`, then `/`).
 - Nothing in `apps/www` may need a Node server at request time. All server logic lives in Convex.
-- **Hosting on two subdomains is an open decision.** `@convex-dev/static-hosting` mounts by path only (today: `www` at `/`, `app` at `/app/`), so pointing `app.` and `www.` at one deployment would serve the same paths on both. Options:
-  1. Host-aware routing in `convex/http.ts` dispatching on the `Host` header (verify against the component's API).
+- **Hosting on two subdomains is an open decision.** Static sites are routed by path only (today: `www` at `/`, `app` at `/app/`), so pointing `app.` and `www.` at one deployment would serve the same paths on both. Options:
+  1. Host-aware routing in `convex/http.ts` dispatching on the `Host` header. `http.ts` already registers the static sites itself (`registerStaticRoutes`), so this is a wrapper around those handlers.
   2. Host `www` separately (it only calls the waitlist mutation) and mount `app` at `/` on the main deployment.
   3. Keep path-based hosting on one domain.
 
@@ -530,7 +515,7 @@ Candidate conversations include sexual orientation, religion, health and family 
 
 ## 11. Build order
 
-1. **Auth & foundations:** Convex Auth with email OTP; `users` override with `deletedAt` and `createOrUpdateUser`; access helpers; `recordAudit` and the action list; schema; home page skeleton. Remove the demo `messages` table and Clerk.
+1. *Done.* **Auth & foundations:** Convex Auth with email OTP; `users` override with `deletedAt` and `createOrUpdateUser`; access helpers; `recordAudit` and the action list; schema; home page skeleton. Remove the demo `messages` table and Clerk.
 2. **Matchmaker profiles:** create (username rules, reserved list), workspace route, settings.
 3. **Onboarding:** Onboard form → candidate + conversation + private imported message + invitation.
 4. **Invitations:** invite email, `/invite/:token`, home-page invitations, accept/decline, resend/revoke/change email, expiry job.

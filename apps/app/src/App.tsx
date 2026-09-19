@@ -1,47 +1,21 @@
-import { api } from "@repo/api";
-import { useMutation, useQuery } from "convex/react";
-import { type FormEvent, useState } from "react";
-import "./App.css";
+import { Route, Routes } from "react-router";
+import { RequireAuth } from "./auth/require-auth";
+import { HomePage } from "./pages/home";
+import { NotFoundPage } from "./pages/not-found";
+import { SignInPage } from "./pages/sign-in";
 
-function App() {
-  const messages = useQuery(api.messages.list);
-  const sendMessage = useMutation(api.messages.send);
-  const [body, setBody] = useState("");
-
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    const text = body.trim();
-    if (!text) return;
-    setBody("");
-    await sendMessage({ author: "anon", body: text });
-  };
-
+/** Routes for prd/phase-1.md §4. Later steps add the workspaces. */
+export default function App() {
   return (
-    <main className="card">
-      <h1>Matchmaker</h1>
-      <p className="read-the-docs">Vite + React + Convex</p>
-
-      <form onSubmit={handleSubmit}>
-        <input
-          aria-label="Message"
-          value={body}
-          placeholder="Say something…"
-          onChange={(event) => setBody(event.target.value)}
-        />
-        <button type="submit">Send</button>
-      </form>
-
-      <ul>
-        {messages === undefined ? (
-          <li>Loading…</li>
-        ) : messages.length === 0 ? (
-          <li>No messages yet — send one above.</li>
-        ) : (
-          messages.map((message) => <li key={message._id}>{message.body}</li>)
-        )}
-      </ul>
-    </main>
+    <Routes>
+      <Route path="/sign-in" element={<SignInPage />} />
+      {/* Everything but sign-in needs an account, including unknown paths:
+          a signed-out visitor to a deep link signs in first, then lands on
+          it. */}
+      <Route element={<RequireAuth />}>
+        <Route index element={<HomePage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
   );
 }
-
-export default App;

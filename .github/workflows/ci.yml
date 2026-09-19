@@ -107,9 +107,9 @@ jobs:
           # docs/e2e-architecture.md is about — do that before writing any spec
           # that reads or writes messages.
           #
-          # The Clerk and PostHog keys are deliberately NOT set: both apps treat
-          # them as optional and skip those surfaces entirely when absent, and
-          # no spec may depend on them.
+          # The PostHog keys are deliberately NOT set: both apps treat them as
+          # optional and skip analytics entirely when absent, and no spec may
+          # depend on them.
           VITE_CONVEX_URL: https://ci-e2e-placeholder.convex.cloud
           NEXT_PUBLIC_CONVEX_URL: https://ci-e2e-placeholder.convex.cloud
 

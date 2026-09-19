@@ -14,7 +14,8 @@
     "preview:app": "static-hosting upload --component app --dist ../../apps/app/dist --build-command 'cd ../../apps/app && pnpm run build'",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "auth:setup": "node scripts/setup-auth.mjs"
   },
   "devDependencies": {
     "@repo/config": "workspace:*",
@@ -26,6 +27,8 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@auth/core": "^0.41.3",
+    "@convex-dev/auth": "^0.0.95",
     "@convex-dev/static-hosting": "^0.2.1"
   }
 }

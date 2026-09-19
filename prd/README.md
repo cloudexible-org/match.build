@@ -41,8 +41,7 @@ These matchmakers today run on a stack of: a marketing website with a contact fo
 |---|---|---|
 | **User / account** | One per verified email. Has no role of its own. | 1 |
 | **Matchmaker (profile)** | A tenant: one matchmaker's business and book of candidates. Owned by an account. | 1 |
-| **Candidate (profile)** | A person's membership in one matchmaker's book. (Earlier drafts called this a "client".) | 1 |
-| **Membership request** | A pending link between a person and a matchmaker: an invitation (phase 1) or an application (phase 3). | 1 / 3 |
+| **Candidate (profile)** | A person's standing with one matchmaker: that matchmaker's record of them. Exists before the person has an account and links to one when they join; one person can be a candidate of many matchmakers. Also carries the open invitation, if any. (Earlier drafts called this a "client".) | 1 |
 | **Conversation** | Exactly one per candidate. In-app chat. | 1 |
 | **Private message** | A message only the matchmaker sees, e.g. the imported prior conversation. | 1 |
 | **Audit event** | An immutable record of who changed what, when, from what to what. | 1 |

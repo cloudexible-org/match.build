@@ -12,8 +12,6 @@ export const env = createEnv({
   client: {
     // Required: the app mounts a Convex client from this at startup.
     VITE_CONVEX_URL: z.url(),
-    // Clerk is optional and not yet wired into this app.
-    VITE_CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
     // PostHog analytics — provider is skipped entirely when the key is absent.
     VITE_POSTHOG_KEY: z.string().min(1).optional(),
     VITE_POSTHOG_HOST: z.url().optional(),

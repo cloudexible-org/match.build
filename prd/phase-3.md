@@ -35,8 +35,8 @@ Columns: `Suggested` → `Reviewing` → `Introduced` → `Mutual interest` → 
 ## 3. Discover page and applications
 
 - A public directory of matchmakers a signed-in account can browse.
-- **Apply** creates a `membershipRequests` row with `kind: "application"`, `requesterUserId` and an optional `message` (the table already exists from phase 1).
-- The matchmaker sees applications in their workspace and approves or declines. Approval creates the `candidates` row (`membership: "joined"`) and its conversation.
+- **Apply** creates a `candidates` row in that matchmaker's book with `membership: "applied"`, `userId` set to the applicant, and an optional message (a new optional field). One row per (matchmaker, user) still holds, so a person can't apply twice.
+- The matchmaker sees applications in their workspace and approves (`joined`, and the conversation is created) or declines (`declined`). Both are audited.
 - Open: what a matchmaker's public profile contains, and whether matchmakers opt in to being listed.
 
 ## 4. Data model (proposed)

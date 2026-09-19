@@ -19,7 +19,7 @@ what would bring it back.
 | Project `www` | `apps/www` — Next.js — on a free port, `distDir` `.next-e2e` |
 | Project `app-convex` | `apps/app` against a real, seeded Convex local backend |
 | Backend | Convex (`packages/api/convex`), local deployment only |
-| Auth | None. `auth.config.ts` ships `providers: []` on purpose |
+| Auth | Convex Auth, email + one-time code. Keys set per run, codes read from `emailOutbox` (§1d) |
 | Page objects | `apps/e2e/page-objects/<app>/` |
 | Specs | `apps/e2e/specs/<app>/` |
 
@@ -226,6 +226,31 @@ the same moment could race on the download. If that happens, re-run.
 
 ---
 
+## 1d. Signing in
+
+Every page but sign-in requires an account, so most `app-convex` specs start by
+signing in. Nothing about that touches a real inbox or a cloud deployment:
+
+- **Keys, per run.** `fixtures/global-setup.ts` calls `configureAuthEnv`
+  (`auth-env.ts`), which generates a fresh RS256 pair and sets `JWT_PRIVATE_KEY`,
+  `JWKS` and `SITE_URL` on the local backend through its admin API. Old
+  sessions die with the old key; the reseed wipes their users anyway.
+- **Codes, from the outbox.** The local backend never has `RESEND_API_KEY`, so
+  `convex/email/helpers.ts` writes each sign-in email to the internal
+  `emailOutbox` table instead of sending it. `sign-in-codes.ts` reads it with the
+  admin key. Capture `latestSignInEmail(email)` *before* requesting a code and
+  pass it to `waitForSignInCode`, so a previous code is never mistaken for the
+  new one.
+- **One seeded user per signing-in spec.** Requesting a code replaces the
+  previous unused code for that address, so two specs signing in as the same
+  seeded user in parallel break each other. Sign-up specs use an address unique
+  to the run and test instead (see `specs/app-convex/sign-up.spec.ts`).
+- **The OTP field's label** names both the slot group and the first slot. Locate
+  the slot by role (`getByRole("textbox", { name: "Sign-in code" })`), as
+  `SignInPage.getCodeInput` does.
+
+---
+
 ## 2. Known defects — all fixed 2026-07-28
 
 Measured by running the suite on 2026-07-28, and fixed the same day. Kept here
@@ -264,8 +289,8 @@ the fix only holds while the reasoning is visible.
 **Standing constraint:** CI supplies `VITE_CONVEX_URL` as a *placeholder* that
 never connects, so every spec must pass with the backend unreachable — assert
 only on statically-rendered chrome. Pointing CI at a real deployment is a
-prerequisite for any spec that reads or writes messages, along with the
-namespacing rules in §8.
+prerequisite for moving any `app-convex` spec into CI, along with the
+isolation rules in §8.
 
 ---
 
@@ -421,23 +446,20 @@ explanation in it so the gap stays visible.
 ## 8. Parallel safety
 
 `fullyParallel: true` means spec **files** run concurrently, against **one
-Convex deployment**. Today `packages/api/convex/schema.ts` has a single
-`messages` table and `messages.list` returns the newest 50 rows globally — there
-is no tenant boundary to hide behind.
+Convex deployment**. Isolation comes from *whose* data a spec touches:
 
-So, for any spec that writes:
-
-- **Namespace the data you create** with something derived from the spec
-  filename, and assert only on rows carrying that namespace. Two files then
-  cannot collide by both picking `"hello"`.
-- **Never assert on a global count** (`messages.list` length). It is shared, and
-  another spec's writes will land in it.
+- **Own your account.** Sign up with an address unique to the run and test, or
+  sign in as a seeded user no other spec uses (§1d). Everything a signed-in
+  page shows is scoped to that account and its tenants, so another spec's
+  writes can't appear in it.
+- **Assert only on rows you own** — seeded rows named in `fixture.ts`, or rows
+  carrying a per-run token. Seeded display names start with `Seeded:` so they
+  can't collide with anything a spec creates.
+- **Never assert on a global count or an empty table.** Another spec's writes
+  land in the same database.
 - **`test.describe.configure({ mode: "serial" })`** is right for a spec whose
-  steps build on each other. The namespace is what keeps it safe from *other*
+  steps build on each other. Ownership is what keeps it safe from *other*
   files.
-
-This is the minimum that the current data model requires. A real seeding tier
-comes later — see below.
 
 ---
 
@@ -542,7 +564,7 @@ assumed. Listed with the trigger that would make each relevant again.
 | Two-tier seeding (shared read-only base + per-spec tenant fixtures) | The schema grows a top-level tenant/org entity that specs can own |
 | Namespaced fixture manifests, accessors that throw on a miss | There is a fixture large enough that hard-coded IDs hurt |
 | A meta-test for the seeding mechanism | A seeder exists at all |
-| Clerk `storageState` setup project, testing tokens, `+clerk_test` identities | `auth.config.ts` gets a provider and `apps/app` gates on sign-in |
+| A `storageState` setup project that signs in once and reuses the session | Sign-in becomes the slow part of the suite. Today it's two HTTP round-trips, so each spec signs in itself (§1d) |
 | `ConvexHttpClient.setAdminAuth` for HTTP-speed seeding | Per-spec seeding exists **and** is slow. Note this method is absent from Convex's public typings and would need a cast — which collides with `CLAUDE.md` §4 (no `any`). Decide deliberately, don't inherit it |
 | Auth-provider redirect-URI allow-lists constraining `baseURL` | The suite targets an app behind an OAuth provider |
 
@@ -558,7 +580,7 @@ assumed. Listed with the trigger that would make each relevant again.
 | "A local backend is still running on port …" | The Convex CLI was started on its *recorded* port, held by a sibling worktree (§1c) |
 | Every spec fails `ERR_CONNECTION_REFUSED`, each on a *different* port | Ports allocated per worker instead of per run (§1b) |
 | "Another next dev server is already running" | The suite lost its own `distDir`; the lock is `<distDir>/lock` (§1b) |
-| Test passes alone, fails in parallel | Shared `messages` rows (§8) |
+| Test passes alone, fails in parallel | Two specs signing in as one seeded user, or asserting on rows they don't own (§1d, §8) |
 | Everything green but proving nothing | Reused dev server on a different `VITE_CONVEX_URL` (§3) |
 | `getByLabel` finds nothing | Labels not associated with inputs (§6) |
 | Row counts are exactly double | Nested identical roles (§6) |

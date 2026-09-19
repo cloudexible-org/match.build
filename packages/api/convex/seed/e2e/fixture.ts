@@ -2,46 +2,101 @@
  * The world the e2e suite starts from.
  *
  * Deliberately plain data with no Convex imports, so `apps/e2e` can import this
- * file directly and assert against the same constants the seed writes. A test
- * that hard-codes `"Seeded: first message"` and a fixture that writes something
- * else fail as a mystery; sharing the definition makes that impossible.
+ * file directly and assert against the same constants the seed writes.
  *
- * Keep it small. This is a template repo's demo backend — one `messages` table
- * — and the fixture exists to prove the harness works end to end, not to model
- * a product.
+ * ─── One seeded user per signing-in spec ────────────────────────────────────
+ *
+ * Requesting a sign-in code replaces any earlier unused code for the same
+ * address, so two specs signing in as one seeded user in parallel would
+ * invalidate each other's codes. Give every spec that signs in its own user.
+ * Specs that sign *up* use a fresh address per run instead (see
+ * `apps/e2e/specs/app-convex/`).
+ *
+ * All addresses use the reserved `.test` TLD, so nothing can ever be mailed.
  */
 
-export type SeedMessage = {
-  /** Stable handle used by tests to look a row up in the manifest. */
+export type SeedUser = {
   slug: string;
-  author: string;
-  body: string;
+  email: string;
+  name: string;
 };
 
-/**
- * Bodies are distinctive on purpose. `apps/app` renders every message in one
- * flat list with no filtering, so a test asserting on "hello" would match any
- * row a developer left behind; these will not collide by accident.
- */
-export const SEED_MESSAGES: SeedMessage[] = [
+export type SeedMatchmaker = {
+  slug: string;
+  ownerSlug: string;
+  username: string;
+  displayName: string;
+};
+
+/** A person who has joined a matchmaker's book. */
+export type SeedMembership = {
+  matchmakerSlug: string;
+  userSlug: string;
+};
+
+/** A pending invitation to an email address. */
+export type SeedInvite = {
+  slug: string;
+  matchmakerSlug: string;
+  email: string;
+};
+
+export const SEED_USERS: SeedUser[] = [
+  // Signs in in `home.spec.ts`: owns a matchmaker profile, has joined another
+  // matchmaker, and has a pending invitation from a third.
   {
-    slug: "first",
-    author: "seed-author-a",
-    body: "Seeded message: the first one",
+    slug: "returning",
+    email: "returning.member@matchmaker-e2e.test",
+    name: "Rowan Seedling",
+  },
+  // Own the other profiles; never sign in.
+  {
+    slug: "owner-b",
+    email: "owner.b@matchmaker-e2e.test",
+    name: "Bea Owner",
   },
   {
-    slug: "second",
-    author: "seed-author-b",
-    body: "Seeded message: the second one",
+    slug: "owner-c",
+    email: "owner.c@matchmaker-e2e.test",
+    name: "Cal Owner",
+  },
+];
+
+export const SEED_MATCHMAKERS: SeedMatchmaker[] = [
+  {
+    slug: "own",
+    ownerSlug: "returning",
+    username: "rowan.matches",
+    displayName: "Seeded: Rowan Matches",
   },
   {
-    slug: "third",
-    author: "seed-author-a",
-    body: "Seeded message: the third one",
+    slug: "joined",
+    ownerSlug: "owner-b",
+    username: "bea.introductions",
+    displayName: "Seeded: Bea Introductions",
+  },
+  {
+    slug: "inviting",
+    ownerSlug: "owner-c",
+    username: "cal.connections",
+    displayName: "Seeded: Cal Connections",
+  },
+];
+
+export const SEED_MEMBERSHIPS: SeedMembership[] = [
+  { matchmakerSlug: "joined", userSlug: "returning" },
+];
+
+export const SEED_INVITES: SeedInvite[] = [
+  {
+    slug: "for-returning",
+    matchmakerSlug: "inviting",
+    email: "returning.member@matchmaker-e2e.test",
   },
 ];
 
 /** Slug → document id, returned by `apply` so tests never hard-code an id. */
 export type SeedManifest = {
-  messages: Record<string, string>;
+  users: Record<string, string>;
+  matchmakers: Record<string, string>;
 };

@@ -48,7 +48,8 @@ This document defines the core standards and automated workflows that any AI age
 * **Conventional Commits:** All commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat: add user login`, `fix: resolve crash on startup`).
 
 ## 8. Convex Backend Layout
-* **One directory per domain:** backend code lives in `packages/api/convex/<domain>/` (e.g. `convex/waitlist/`), never as loose files at the `convex/` root. Only `schema.ts`, `http.ts`, `convex.config.ts`, `auth.config.ts` and `crons.ts` stay at the root.
+* **One directory per domain:** backend code lives in `packages/api/convex/<domain>/` (e.g. `convex/waitlist/`), never as loose files at the `convex/` root. Only `schema.ts`, `http.ts`, `convex.config.ts`, `auth.config.ts`, `auth.ts` and `crons.ts` stay at the root (`auth.ts` because Convex Auth's client calls it as `auth:signIn`).
+* **Access helpers:** every function derives who the caller is and which tenant they may touch from `requireUser` (`users/helpers.ts`), `requireMatchmaker` (`matchmakers/helpers.ts`) or `requireCandidateSelf` (`candidates/helpers.ts`), never from arguments alone. Any change to audited state calls `recordAudit` (`audit/helpers.ts`) in the same mutation. See `prd/phase-1.md` §5 and §9.
 * **Four files per domain, split by role:**
     * `rules.ts` — pure validation, normalisation and limits. No Convex imports, so frontends can import it through `@repo/api` and validate exactly as the server does.
     * `mutations.ts` — `mutation` / `internalMutation` definitions only.

@@ -1,7 +1,9 @@
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { AnalyticsProvider } from "@repo/analytics";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexReactClient } from "convex/react";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router";
 import "./index.css";
 import App from "./App.tsx";
 // Validates environment variables at startup (see ./env.ts).
@@ -34,9 +36,12 @@ createRoot(rootElement).render(
       apiKey={env.VITE_POSTHOG_KEY}
       apiHost={env.VITE_POSTHOG_HOST}
     >
-      <ConvexProvider client={convex}>
-        <App />
-      </ConvexProvider>
+      <ConvexAuthProvider client={convex}>
+        {/* The app is mounted under Vite's `base` (/app/ today). */}
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <App />
+        </BrowserRouter>
+      </ConvexAuthProvider>
     </AnalyticsProvider>
   </StrictMode>,
 );
