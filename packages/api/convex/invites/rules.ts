@@ -26,15 +26,16 @@ export function invitePath(token: string): string {
 }
 
 /**
- * The invite email's sender: the matchmaker's name on the verified sending
- * domain (`aileenlancif.com`, prd §10, like the sign-in codes). The name is
+ * The invite email's sender: the matchmaker's display name (prd §8) on the
+ * verified sending domain (`aileenlancif.com`, prd §10, like the sign-in
+ * codes). The name is
  * the matchmaker's own text, so anything that could break out of the quoted
  * display name is dropped.
  */
 export function inviteFrom(matchmakerName: string): string {
   const name =
     matchmakerName.replace(/["<>\\\r\n]/g, "").trim() || "Your matchmaker";
-  return `"${name} via Matchmaker" <invites@aileenlancif.com>`;
+  return `"${name}" <invites@aileenlancif.com>`;
 }
 
 const MONTHS = [

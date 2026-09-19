@@ -4,13 +4,13 @@ import { formatEmailDate, inviteEmail, inviteFrom } from "./rules";
 describe("the invite email", () => {
   test("the sender is the matchmaker's name, unable to break out of its quotes", () => {
     expect(inviteFrom("Maya's Matches")).toBe(
-      '"Maya\'s Matches via Matchmaker" <invites@aileenlancif.com>',
+      '"Maya\'s Matches" <invites@aileenlancif.com>',
     );
     expect(inviteFrom('Evil" <x@evil.test>\r\nBcc: y')).toBe(
-      '"Evil x@evil.testBcc: y via Matchmaker" <invites@aileenlancif.com>',
+      '"Evil x@evil.testBcc: y" <invites@aileenlancif.com>',
     );
     expect(inviteFrom(' "" ')).toBe(
-      '"Your matchmaker via Matchmaker" <invites@aileenlancif.com>',
+      '"Your matchmaker" <invites@aileenlancif.com>',
     );
   });
 
