@@ -15,7 +15,7 @@ import { v } from "convex/values";
  * ever deleted.
  */
 
-const socialPlatform = v.union(
+export const socialPlatform = v.union(
   v.literal("instagram"),
   v.literal("whatsapp"),
   v.literal("tiktok"),
@@ -102,6 +102,11 @@ export default defineSchema({
     invite: v.optional(
       v.object({
         tokenHash: v.string(), // SHA-256 of the link's token; the raw token is never stored
+        // Random per issue. The token is derived from it with a deployment
+        // secret (invites/helpers.ts), so the owner can copy the same link
+        // again without the token ever being stored. Absent on invites
+        // written before links were copyable (seeds); those can't be copied.
+        nonce: v.optional(v.string()),
         expiresAt: v.number(),
         lastSentAt: v.optional(v.number()), // drives the resend rate limit
       }),

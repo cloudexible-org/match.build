@@ -20,6 +20,10 @@ const app = defineApp({
     RESEND_API_KEY: v.optional(v.string()),
     // The app's URL, which Convex Auth redirects back to. Set by `auth:setup`.
     SITE_URL: v.optional(v.string()),
+    // HMAC key that invite-link tokens are derived from (invites/helpers.ts).
+    // Set by `invites:setup`, and by the e2e suite on its own backend.
+    // Rotating it breaks every open invite link.
+    INVITE_LINK_SECRET: v.optional(v.string()),
   },
 });
 app.use(staticHosting, { name: "www" });

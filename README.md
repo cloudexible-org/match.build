@@ -173,6 +173,19 @@ deployment to send real email. Without it, codes are printed to the Convex logs
 and written to the internal `emailOutbox` table. That's fine for development,
 and it's how the e2e suite signs in.
 
+### Invite links
+
+Invite-link tokens are derived from a per-deployment secret, so the database
+alone can't produce a working link (`packages/api/convex/invites/helpers.ts`).
+Each deployment needs it set once, before anyone onboards a candidate:
+
+```bash
+pnpm --filter @repo/api invites:setup
+```
+
+Add `--prod` for the production deployment. Rotating it (`--force`) breaks
+every open invite link; the candidates can be re-invited.
+
 Convex validates session tokens through the OpenID discovery document at
 `<site>/.well-known/openid-configuration`, so `convex/http.ts` owns the root of
 the URL space and registers the two static sites behind it (see

@@ -16,6 +16,7 @@
     "lint": "biome check .",
     "test": "vitest run",
     "auth:setup": "node scripts/setup-auth.mjs",
+    "invites:setup": "node scripts/setup-invites.mjs",
     "seed:dev": "convex run --push seed/dev/mutations:apply",
     "seed:dev:code": "node scripts/sign-in-code.mjs"
   },
