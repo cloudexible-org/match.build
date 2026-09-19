@@ -18,6 +18,8 @@ import type * as email_queries from "../email/queries.js";
 import type * as email_rules from "../email/rules.js";
 import type * as http from "../http.js";
 import type * as matchmakers_helpers from "../matchmakers/helpers.js";
+import type * as seed_dev_fixture from "../seed/dev/fixture.js";
+import type * as seed_dev_mutations from "../seed/dev/mutations.js";
 import type * as seed_e2e_fixture from "../seed/e2e/fixture.js";
 import type * as seed_e2e_mutations from "../seed/e2e/mutations.js";
 import type * as users_helpers from "../users/helpers.js";
@@ -46,6 +48,8 @@ declare const fullApi: ApiFromModules<{
   "email/rules": typeof email_rules;
   http: typeof http;
   "matchmakers/helpers": typeof matchmakers_helpers;
+  "seed/dev/fixture": typeof seed_dev_fixture;
+  "seed/dev/mutations": typeof seed_dev_mutations;
   "seed/e2e/fixture": typeof seed_e2e_fixture;
   "seed/e2e/mutations": typeof seed_e2e_mutations;
   "users/helpers": typeof users_helpers;

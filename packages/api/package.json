@@ -15,7 +15,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "test": "vitest run",
-    "auth:setup": "node scripts/setup-auth.mjs"
+    "auth:setup": "node scripts/setup-auth.mjs",
+    "seed:dev": "convex run --push seed/dev/mutations:apply",
+    "seed:dev:code": "node scripts/sign-in-code.mjs"
   },
   "devDependencies": {
     "@repo/config": "workspace:*",
