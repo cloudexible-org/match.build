@@ -1,8 +1,9 @@
 # Matchmaker
 
-The operating system for independent human matchmakers: a unified client inbox
-(email + in-app chat), AI-drafted replies in the matchmaker's voice, and an
-AI-enriched client profile. See [PRD.md](./PRD.md) for the product spec.
+The operating system for independent human matchmakers: invite candidates from
+Instagram/WhatsApp into an in-app chat, with AI-drafted replies in the
+matchmaker's voice and an AI-enriched candidate profile coming in later phases.
+See [prd/](./prd/README.md) for the product spec.
 
 Built on [turbostack](https://github.com/cloudexible-org/turbostack).
 
