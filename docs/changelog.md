@@ -52,6 +52,7 @@ The monorepo was bootstrapped from [turbostack](https://github.com/cloudexible-o
 - **`apps/app` uses `@vitejs/plugin-react` instead of `@vitejs/plugin-react-swc`:** *Why:* Vite 8 (Rolldown) warns that the SWC plugin is slower when no SWC plugins are configured, and none are; `plugin-react` does Fast Refresh through Oxc there. Build, typecheck and e2e unchanged.
 
 ### Fixed
+- **Blank page at `/app` without a trailing slash in production:** the app's router basename was `/app/`, which the bare `/app` doesn't match, and production serves that path without redirecting (dev redirects it, so this only showed up in prod). The basename is now `/app`, which matches both.
 - **`convex dev` / `convex deploy` failed typechecking `convex/auth.config.ts`** (`Cannot find name 'process'`). Convex typechecks `convex/` without Node's types, so the file now reads `CONVEX_SITE_URL` through the generated, typed `env` from `_generated/server` (which is `process.env` at runtime), like the rest of the backend.
 
 ### Removed

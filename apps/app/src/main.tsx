@@ -37,8 +37,11 @@ createRoot(rootElement).render(
       apiHost={env.VITE_POSTHOG_HOST}
     >
       <ConvexAuthProvider client={convex}>
-        {/* The app is mounted under Vite's `base` (/app/ today). */}
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
+        {/* The app is mounted under Vite's `base` (/app/ today). The basename
+            drops the trailing slash: "/app/" does not match a visit to the
+            bare "/app", which production serves without redirecting, and the
+            page would render nothing. "/app" matches both. */}
+        <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <App />
         </BrowserRouter>
       </ConvexAuthProvider>
