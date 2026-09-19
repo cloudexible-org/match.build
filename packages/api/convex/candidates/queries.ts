@@ -38,6 +38,8 @@ export const list = query({
       email: v.string(),
       membership,
       lastMessageAt: v.number(),
+      /** Messages this matchmaker hasn't read, of any visibility. */
+      unread: v.number(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -67,21 +69,18 @@ export const list = query({
         email: candidate.email,
         membership: candidate.membership,
         lastMessageAt: conversation.lastMessageAt,
+        unread: conversation.lastSeq - conversation.matchmakerLastReadSeq,
       });
     }
     return rows;
   },
 });
 
-// The newest messages the conversation view loads. Scrollback paging arrives
-// with chat (step 5).
-const MAX_MESSAGES = 100;
-
 /**
- * One candidate's conversation as the matchmaker sees it: the candidate's
- * details and invite state, and the latest messages of every visibility,
- * oldest first. Private messages are the matchmaker's own; nothing here is
- * ever returned to a candidate.
+ * One candidate's conversation as the matchmaker sees it: who they are, and
+ * where their membership and invitation stand. The thread itself is paged
+ * separately (`messages.queries.thread`), so a new message doesn't re-send
+ * the candidate's details.
  *
  * `candidateId` comes from the URL, so it is taken as a string: a malformed
  * id, an unknown one and another tenant's all answer `null` alike.
@@ -115,25 +114,6 @@ export const conversation = query({
         // ("Accepted as other@example.com", prd §3.2).
         acceptedAs: v.optional(v.string()),
       }),
-      messages: v.array(
-        v.object({
-          _id: v.id("messages"),
-          seq: v.number(),
-          author: v.union(
-            v.literal("matchmaker"),
-            v.literal("candidate"),
-            v.literal("system"),
-          ),
-          visibility: v.union(v.literal("everyone"), v.literal("matchmaker")),
-          source: v.union(
-            v.literal("typed"),
-            v.literal("imported"),
-            v.literal("system"),
-          ),
-          body: v.string(),
-          sentAt: v.number(),
-        }),
-      ),
     }),
   ),
   handler: async (ctx, args) => {
@@ -144,21 +124,6 @@ export const conversation = query({
     if (candidate === null || candidate.matchmakerId !== matchmaker._id) {
       return null;
     }
-
-    const conversation = await ctx.db
-      .query("conversations")
-      .withIndex("by_candidateId", (q) => q.eq("candidateId", candidate._id))
-      .unique();
-    const messages =
-      conversation === null
-        ? []
-        : await ctx.db
-            .query("messages")
-            .withIndex("by_conversationId_and_seq", (q) =>
-              q.eq("conversationId", conversation._id),
-            )
-            .order("desc")
-            .take(MAX_MESSAGES);
 
     const account =
       candidate.userId === undefined
@@ -186,15 +151,6 @@ export const conversation = query({
             ? account.email
             : undefined,
       },
-      messages: messages.reverse().map((message) => ({
-        _id: message._id,
-        seq: message.seq,
-        author: message.author,
-        visibility: message.visibility,
-        source: message.source,
-        body: message.body,
-        sentAt: message.sentAt,
-      })),
     };
   },
 });

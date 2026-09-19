@@ -128,7 +128,12 @@ describe("candidates.conversation", () => {
       membership: "invited",
       invite: { copyable: true },
     });
-    expect(view?.messages).toMatchObject([
+    const thread = await asOwner.query(api.messages.queries.thread, {
+      matchmakerId,
+      candidateId,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(thread.page).toMatchObject([
       {
         seq: 1,
         visibility: "matchmaker",

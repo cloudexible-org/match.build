@@ -78,9 +78,15 @@ describe("seed.e2e.scenario", () => {
       candidateId: world.candidates.member.id,
     });
     expect(view?.candidate.membership).toBe("joined");
-    expect(view?.messages.map((message) => message.visibility)).toEqual([
-      "everyone",
+    const thread = await asMaya.query(api.messages.queries.thread, {
+      matchmakerId: world.matchmakers.book.id as never,
+      candidateId: world.candidates.member.id as never,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    // Newest first, so the private history the seed wrote second leads.
+    expect(thread.page.map((item) => item.visibility)).toEqual([
       "matchmaker",
+      "everyone",
     ]);
 
     const history = await asMaya.query(api.matchmakers.queries.profileHistory, {
