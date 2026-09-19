@@ -528,6 +528,22 @@ in one worker; different **files** run in parallel. So:
 one long file sets the suite's floor; split by flow (`invitations`,
 `invite-management`, `onboarding`), not by count.
 
+### Watching a run
+
+`pnpm test:e2e:observe` runs the suite headed, in one worker, with a 500 ms
+pause between actions, so you can follow what a spec does. The timeouts are
+stretched to match. Narrow it down the usual Playwright ways, and change the
+pause with the environment variable:
+
+```bash
+pnpm test:e2e:observe specs/app-convex/invitations.spec.ts
+pnpm test:e2e:observe --project app-convex -g "declining"
+E2E_SLOW_MO=1000 pnpm test:e2e:observe
+```
+
+`pnpm --filter e2e test:ui` (Playwright's UI mode) is the other way in: no
+pauses, but time-travel over each step.
+
 ### Signing in
 
 `signInAs(page, email)` (`apps/e2e/session.ts`) runs the real Convex Auth

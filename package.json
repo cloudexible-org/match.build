@@ -13,6 +13,7 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test --filter=!e2e",
     "test:e2e": "turbo test --filter=e2e",
+    "test:e2e:observe": "pnpm --filter e2e test:observe",
     "format": "biome format . --write",
     "check": "biome check .",
     "storybook": "pnpm --filter @repo/ui storybook",

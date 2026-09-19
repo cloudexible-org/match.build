@@ -83,6 +83,8 @@ at `https://www.matchmaker.localhost` and `https://admin.matchmaker.localhost`.
 - `pnpm typecheck`
 - `pnpm test`: Storybook component tests
 - `pnpm test:e2e`: Playwright (runs its own servers and a local Convex backend)
+- `pnpm test:e2e:observe`: the same suite headed, one worker, 500 ms between
+  actions, so you can watch it (`E2E_SLOW_MO=1000` to slow it further)
 - `pnpm build`
 
 ## Deploying

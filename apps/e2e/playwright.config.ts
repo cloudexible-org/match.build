@@ -21,6 +21,16 @@ import { ensureLocalDeployment, localBackendUrl } from "./local-backend";
 const WITH_CONVEX = convexEnabled();
 
 /**
+ * Watching a run: `pnpm test:e2e:observe` sets this (and `--headed`), so the
+ * browser pauses between actions and you can follow what a spec does.
+ * Override the pause with `E2E_SLOW_MO=1000 pnpm test:e2e:observe`.
+ *
+ * It also forces one worker and stretches the timeouts, since every click now
+ * costs half a second and the defaults would expire mid-test.
+ */
+const SLOW_MO = Number(process.env.E2E_SLOW_MO ?? 0);
+
+/**
  * Every server this run starts listens on a port the OS hands us, never a
  * fixed or recorded one. That is what lets any number of runs — one per git
  * worktree, alongside each worktree's `pnpm dev` — share a machine: nothing is
@@ -128,12 +138,15 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI || SLOW_MO ? 1 : undefined,
+  timeout: SLOW_MO ? 300_000 : 30_000,
+  expect: { timeout: SLOW_MO ? 15_000 : 5_000 },
   // `open: "never"` — the default ("on-failure") serves the report and blocks
   // the process, which hangs any non-interactive run (CI, agents, `&&` chains).
   reporter: [["html", { open: "never" }], ["list"]],
   use: {
     trace: "on-first-retry",
+    launchOptions: { slowMo: SLOW_MO },
   },
   projects,
   webServer: [
