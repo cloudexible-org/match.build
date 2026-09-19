@@ -25,9 +25,12 @@ import { v } from "convex/values";
 import type { Id } from "../../_generated/dataModel";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import {
+  SEED_ADMINS,
+  SEED_CODE_TARGET,
   SEED_INVITES,
   SEED_MATCHMAKERS,
   SEED_MEMBERSHIPS,
+  SEED_NOT_ADMIN,
   SEED_USERS,
 } from "./fixture";
 
@@ -126,7 +129,12 @@ export const apply = internalMutation({
 
     // Verified accounts with no `authAccounts` row yet: the first sign-in
     // links to them by email, exactly as for any existing user.
-    for (const user of SEED_USERS) {
+    for (const user of [
+      ...SEED_USERS,
+      ...SEED_ADMINS,
+      SEED_CODE_TARGET,
+      SEED_NOT_ADMIN,
+    ]) {
       users[user.slug] = await ctx.db.insert("users", {
         email: user.email,
         name: user.name,
@@ -135,11 +143,25 @@ export const apply = internalMutation({
     }
 
     for (const profile of SEED_MATCHMAKERS) {
-      matchmakers[profile.slug] = await ctx.db.insert("matchmakers", {
+      const matchmakerId = await ctx.db.insert("matchmakers", {
         ownerUserId: users[profile.ownerSlug],
         username: profile.username,
         usernameKey: profile.username.replaceAll(".", ""),
         displayName: profile.displayName,
+      });
+      matchmakers[profile.slug] = matchmakerId;
+      // As `matchmakers.create` records it, so the admin trail has one event
+      // per profile to filter by.
+      await ctx.db.insert("auditEvents", {
+        matchmakerId,
+        actor: {
+          type: "user",
+          userId: users[profile.ownerSlug],
+          role: "matchmaker",
+        },
+        action: "matchmaker.created",
+        entityTable: "matchmakers",
+        entityId: matchmakerId,
       });
     }
 

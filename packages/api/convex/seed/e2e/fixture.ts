@@ -62,6 +62,41 @@ export const SEED_USERS: SeedUser[] = [
   },
 ];
 
+/**
+ * Platform admins for `apps/admin` specs, one per signing-in spec. The e2e
+ * harness lists them in `PLATFORM_ADMIN_EMAILS` (apps/e2e/auth-env.ts).
+ */
+export const SEED_ADMINS: SeedUser[] = [
+  {
+    slug: "admin-audit",
+    email: "admin.audit@matchmaker-e2e.test",
+    name: "Ada Audit",
+  },
+  {
+    slug: "admin-codes",
+    email: "admin.codes@matchmaker-e2e.test",
+    name: "Cody Codes",
+  },
+];
+
+/**
+ * An ordinary account a platform admin issues a sign-in code for in
+ * `specs/admin-convex/sign-in-codes.spec.ts`, then signs in as. Never signs in
+ * any other way.
+ */
+export const SEED_CODE_TARGET: SeedUser = {
+  slug: "code-target",
+  email: "code.target@matchmaker-e2e.test",
+  name: "Tess Target",
+};
+
+/** Signs in to apps/admin in `specs/admin-convex/` and is turned away. */
+export const SEED_NOT_ADMIN: SeedUser = {
+  slug: "not-admin",
+  email: "not.admin@matchmaker-e2e.test",
+  name: "Nora Nonadmin",
+};
+
 export const SEED_MATCHMAKERS: SeedMatchmaker[] = [
   {
     slug: "own",

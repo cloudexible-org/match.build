@@ -16,8 +16,10 @@ what would bring it back.
 |---|---|
 | Runner | Playwright (`apps/e2e`, package name `e2e`) |
 | Project `app` | `apps/app` — Vite + React — on a free port |
+| Project `admin` | `apps/admin` — Vite + React, the platform admin app — on a free port |
 | Project `www` | `apps/www` — Next.js — on a free port, `distDir` `.next-e2e` |
 | Project `app-convex` | `apps/app` against a real, seeded Convex local backend |
+| Project `admin-convex` | `apps/admin` against the same backend (it also drives `apps/app` in a second context, see below) |
 | Backend | Convex (`packages/api/convex`), local deployment only |
 | Auth | Convex Auth, email + one-time code. Keys set per run, codes read from `emailOutbox` (§1d) |
 | Page objects | `apps/e2e/page-objects/<app>/` |
@@ -248,6 +250,17 @@ signing in. Nothing about that touches a real inbox or a cloud deployment:
 - **The OTP field's label** names both the slot group and the first slot. Locate
   the slot by role (`getByRole("textbox", { name: "Sign-in code" })`), as
   `SignInPage.getCodeInput` does.
+- **Platform admins** are the `SEED_ADMINS` addresses, which `configureAuthEnv`
+  puts in `PLATFORM_ADMIN_EMAILS`. One per signing-in spec, for the same reason
+  as any other seeded user.
+- **Codes a platform admin issues** (`specs/admin-convex/sign-in-codes.spec.ts`)
+  never reach the outbox: the admin app returns them instead of mailing them.
+  Spend one through "I already have a code" on the app's sign-in page —
+  requesting a fresh code would replace it.
+- **Two apps in one spec.** A spec's `baseURL` is its project's app. To drive
+  another app, open a context for it explicitly
+  (`browser.newContext({ baseURL: http://127.0.0.1:${process.env.E2E_APP_PORT} })`),
+  as the sign-in-codes spec does, and close it in a `finally`.
 
 ---
 

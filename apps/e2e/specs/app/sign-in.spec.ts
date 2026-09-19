@@ -38,3 +38,23 @@ test("rejects a malformed email without leaving the email step", async ({
   await expect(signIn.getError("Enter a valid email address.")).toBeVisible();
   await expect(signIn.getCodeForm()).toBeHidden();
 });
+
+test("'I already have a code' goes to the code step without sending one", async ({
+  page,
+}) => {
+  const signIn = new SignInPage(page);
+  await signIn.goto();
+
+  await signIn.getHaveCodeButton().click();
+  await expect(signIn.getError("Enter your email address.")).toBeVisible();
+
+  // No backend here: reaching the code step proves no request was needed.
+  await signIn.useExistingCode("Jane@Example.com");
+  await expect(signIn.getCodeForm()).toBeVisible();
+  await expect(
+    page.getByText("Enter the 6-digit code for jane@example.com"),
+  ).toBeVisible();
+
+  await signIn.getUseDifferentEmailButton().click();
+  await expect(signIn.getEmailForm()).toBeVisible();
+});

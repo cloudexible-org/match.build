@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { AdminSignInPage } from "./page-objects/admin/sign-in.page";
 import { CreateMatchmakerPage } from "./page-objects/app/matchmaker.page";
 import {
   CompleteProfilePage,
@@ -56,4 +57,16 @@ export async function signUpAsMatchmaker(page: Page, label: string) {
   await create.create({ username, displayName: "Maya Matches" });
   await page.waitForURL(new RegExp(`/app/mm/${username}$`));
   return { username };
+}
+
+/**
+ * Signs in to apps/admin with an emailed code. Admin or not: the page the
+ * account lands on is the caller's to assert.
+ */
+export async function signInToAdmin(page: Page, email: string) {
+  const signIn = new AdminSignInPage(page);
+  await signIn.goto();
+  const before = await latestSignInEmail(email);
+  await signIn.requestCode(email);
+  await signIn.enterCode(await waitForSignInCode(email, before));
 }

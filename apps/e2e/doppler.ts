@@ -26,7 +26,7 @@
 
 const DOPPLER_PROJECT = "matchmaker";
 
-export type DopplerApp = "app" | "www";
+export type DopplerApp = "app" | "admin" | "www";
 
 export function dopplerEnabled(): boolean {
   return process.env.E2E_DOPPLER !== "0";

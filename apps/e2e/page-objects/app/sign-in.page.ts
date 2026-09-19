@@ -34,6 +34,19 @@ export class SignInPage {
     await this.getSendCodeButton().click();
   }
 
+  getHaveCodeButton() {
+    return this.page.getByRole("button", { name: "I already have a code" });
+  }
+
+  /**
+   * Goes to the code step without sending one — for a code issued by a
+   * platform admin, which a "send" would replace.
+   */
+  async useExistingCode(email: string) {
+    await this.getEmailInput().fill(email);
+    await this.getHaveCodeButton().click();
+  }
+
   // --- Code step -----------------------------------------------------------
 
   getCodeForm() {
@@ -51,7 +64,10 @@ export class SignInPage {
     });
   }
 
-  /** "We sent a 6-digit code to …" — names the address the code went to. */
+  /**
+   * "We sent a 6-digit code to …" — names the address the code went to. After
+   * "I already have a code" it reads "…code for …" instead.
+   */
   getCodeSentTo(email: string) {
     return this.page.getByText(`code to ${email}`);
   }

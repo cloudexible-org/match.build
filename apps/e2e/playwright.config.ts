@@ -5,12 +5,13 @@ import { stablePorts } from "./free-port";
 import { ensureLocalDeployment, localBackendUrl } from "./local-backend";
 
 /**
- * Three suites, two apps, up to three servers.
+ * Five suites, three apps, up to four servers.
  *
- * `specs/app` drives `apps/app` (Vite) and `specs/www` drives `apps/www`
- * (Next.js), both asserting only on statically-rendered chrome and client-side
- * behaviour. `specs/app-convex` drives `apps/app` against a real, seeded Convex
- * local backend.
+ * `specs/app` drives `apps/app` (Vite), `specs/admin` drives `apps/admin`
+ * (Vite) and `specs/www` drives `apps/www` (Next.js), all asserting only on
+ * statically-rendered chrome and client-side behaviour. `specs/app-convex` and
+ * `specs/admin-convex` drive `apps/app` and `apps/admin` against a real, seeded
+ * Convex local backend.
  *
  * Each project pins its own `baseURL` rather than inheriting a shared one, so a
  * spec cannot silently assert against the wrong app — the defect recorded as
@@ -35,13 +36,16 @@ const WITH_CONVEX = convexEnabled();
  * every worker process; see `free-port.ts` for why allocating directly here
  * makes every spec fail with `ERR_CONNECTION_REFUSED` at a different port.
  */
-const [APP_PORT, WWW_PORT, CONVEX_PORT, CONVEX_SITE_PORT] = stablePorts([
-  "E2E_APP_PORT",
-  "E2E_WWW_PORT",
-  "E2E_CONVEX_PORT",
-  "E2E_CONVEX_SITE_PORT",
-]);
+const [APP_PORT, ADMIN_PORT, WWW_PORT, CONVEX_PORT, CONVEX_SITE_PORT] =
+  stablePorts([
+    "E2E_APP_PORT",
+    "E2E_ADMIN_PORT",
+    "E2E_WWW_PORT",
+    "E2E_CONVEX_PORT",
+    "E2E_CONVEX_SITE_PORT",
+  ]);
 const APP_URL = `http://127.0.0.1:${APP_PORT}`;
+const ADMIN_URL = `http://127.0.0.1:${ADMIN_PORT}`;
 const WWW_URL = `http://127.0.0.1:${WWW_PORT}`;
 
 // Provision this worktree's local deployment up front (a no-op once it
@@ -82,6 +86,11 @@ const projects: Project[] = [
     use: { ...devices["Desktop Chrome"], baseURL: APP_URL },
   },
   {
+    name: "admin",
+    testDir: "./specs/admin",
+    use: { ...devices["Desktop Chrome"], baseURL: ADMIN_URL },
+  },
+  {
     name: "www",
     testDir: "./specs/www",
     use: { ...devices["Desktop Chrome"], baseURL: WWW_URL },
@@ -93,6 +102,13 @@ if (WITH_CONVEX) {
     name: "app-convex",
     testDir: "./specs/app-convex",
     use: { ...devices["Desktop Chrome"], baseURL: APP_URL },
+  });
+  // Also signs in to apps/app with an issued code, in a second browser
+  // context pointed at APP_URL (see `appContext` in the spec).
+  projects.push({
+    name: "admin-convex",
+    testDir: "./specs/admin-convex",
+    use: { ...devices["Desktop Chrome"], baseURL: ADMIN_URL },
   });
 }
 
@@ -157,6 +173,23 @@ export default defineConfig({
       reuseExistingServer: false,
       // Overrides whatever apps/app/.env.local says. This is the whole reason
       // running the suite cannot disturb your dev setup, and vice versa.
+      env: APP_ENV,
+      timeout: 120_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      // The admin app, a direct child for the same teardown reason, with the
+      // same env as apps/app: it talks to the same backend.
+      command: withDoppler(
+        "admin",
+        `pnpm exec vite --port ${ADMIN_PORT} --strictPort`,
+        APP_ENV,
+      ),
+      cwd: "../admin",
+      // Mounted at /admin/ (vite `base`).
+      url: `${ADMIN_URL}/admin/`,
+      reuseExistingServer: false,
       env: APP_ENV,
       timeout: 120_000,
       stdout: "ignore",
