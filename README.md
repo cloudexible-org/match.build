@@ -105,27 +105,59 @@ publish atomically, so a failed upload leaves the previous version live.
 
 Production is served at **https://www.aileenlancif.com** (interim, until a
 product domain is bought). DNS is on Cloudflare; custom domains need the
-Convex Pro plan.
+Convex Pro plan. The production deployment has two custom domains:
 
-1. Convex Dashboard → production deployment → **Settings** → **Custom Domains**
-   → add `www.aileenlancif.com` **for HTTP actions** (the `.convex.site` side,
-   which serves `/`, `/app/` and `/api/`).
+| Domain | Convex side | Serves |
+| --- | --- | --- |
+| `www.aileenlancif.com` | HTTP actions (`.convex.site`), overrides `CONVEX_SITE_URL` | `/` (www), `/app/` (app), `/api/`, `/.well-known/` (auth) |
+| `api.aileenlancif.com` | API (`.convex.cloud`), overrides `CONVEX_CLOUD_URL` | The WebSocket/HTTP client API. The sites are built against it, so removing it breaks them until they are rebuilt. |
+
+The apex `aileenlancif.com` redirects to `www`. Nothing is hosted on Vercel.
+
+To set it up again, or to move to a new domain:
+
+1. Convex Dashboard → **production** deployment → **Settings** → **Custom
+   Domains** → add `www.<domain>` **for HTTP actions** and `api.<domain>` for
+   the API.
 2. In Cloudflare DNS, create exactly the records the dashboard shows (a CNAME
-   for `www` plus a TXT verification record). Set the CNAME to **DNS only**
-   (grey cloud) so Convex can issue the certificate.
-3. Redirect the apex to `www` with a Cloudflare redirect rule
-   (`aileenlancif.com/*` → `https://www.aileenlancif.com/${1}`, 301). The apex
-   needs a proxied placeholder record, e.g. `A @ 192.0.2.1` (orange cloud).
-4. Once the dashboard shows the domain verified, override the production
-   `CONVEX_SITE_URL` to `https://www.aileenlancif.com` (same settings page), so
-   links that functions generate use the custom domain. No rebuild is needed:
-   the sites talk to the `.convex.cloud` API URL, which is unchanged.
-5. Point sign-in at the new origin. On a production deployment without auth
+   to `convex.domains` for each, plus any TXT verification record). Set the
+   CNAMEs to **DNS only** (grey cloud) so Convex can issue the certificates.
+   Remove any older records for those names first (e.g. a previous host's
+   CNAME). Until Convex has verified a domain, requests to it return
+   Cloudflare **error 1014**.
+3. Redirect the apex to `www`: add a proxied placeholder record `A @ 192.0.2.1`
+   (orange cloud), then a Cloudflare redirect rule from the **"Redirect from
+   root to WWW"** template (`https://<domain>/*` → `https://www.<domain>/${1}`,
+   301, query string preserved). Not "WWW to root", which is the opposite. If
+   Cloudflare warns that the rule may not apply to `www`, the rule is backwards.
+   Don't fix it by proxying `www`.
+4. Once both domains show as verified, set the overrides on the same settings
+   page: `CONVEX_SITE_URL` → `https://www.<domain>` and `CONVEX_CLOUD_URL` →
+   `https://api.<domain>`. Make sure each one is saved.
+5. **Redeploy the backend and rebuild both sites** (`pnpm ship`). Convex Auth
+   stamps tokens with `CONVEX_SITE_URL` at runtime, but `convex/auth.config.ts`
+   only picks up the domain to trust on a push. Until you redeploy, every
+   sign-in fails. The site builds embed the client API URL, so they need the
+   rebuild to switch to the new `api.` domain. To check, open
+   `https://www.<domain>/.well-known/openid-configuration`: its `issuer` should
+   be the new origin.
+6. Point sign-in at the new origin. On a production deployment without auth
    keys yet, run
-   `pnpm --filter @repo/api auth:setup --prod --site-url https://www.aileenlancif.com/app`
+   `pnpm --filter @repo/api auth:setup --prod --site-url https://www.<domain>/app`
    (see *Auth* below). If the keys already exist, change only the URL, since
    rotating the keys signs everyone out:
-   `npx convex env set SITE_URL https://www.aileenlancif.com/app --prod`
+   `npx convex env set SITE_URL https://www.<domain>/app --prod`
+7. Email: verify the domain in Resend, set `RESEND_API_KEY` on production,
+   and make sure `SIGN_IN_FROM` in `packages/api/convex/email/rules.ts` uses
+   that domain (today `no-reply@aileenlancif.com`). Resend refuses to send from
+   an unverified domain.
+8. Only then remove any old custom domain: in the Convex dashboard first, then
+   its DNS record.
+
+`pnpm ship` asks for confirmation before `convex deploy`, so run it from an
+interactive terminal. It stops at the first failure. If an upload fails on a
+network error, the backend is already deployed, so re-run only the upload that
+failed (`pnpm --filter @repo/api run ship:www` or `ship:app`).
 
 ### Auth (Convex Auth)
 
