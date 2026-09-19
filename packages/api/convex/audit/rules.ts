@@ -13,6 +13,8 @@ export const AUDIT_ACTIONS = [
   // person has joined, as a separate event in that matchmaker's trail.
   "account.created",
   "account.name_changed",
+  // A platform admin issued a sign-in code for the account (apps/admin).
+  "account.sign_in_code_issued",
 
   // Matchmaker profile. Shown in profile settings, not a candidate's trail.
   "matchmaker.created",

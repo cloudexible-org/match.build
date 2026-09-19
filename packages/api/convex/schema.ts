@@ -33,6 +33,8 @@ export const auditActor = v.union(
       v.literal("account"),
       v.literal("matchmaker"),
       v.literal("candidate"),
+      // Someone listed in PLATFORM_ADMIN_EMAILS, acting from apps/admin.
+      v.literal("platform_admin"),
     ),
   }),
   // A scheduled job, e.g. "invite_expiry".
@@ -198,7 +200,15 @@ export default defineSchema({
   })
     .index("by_candidateId", ["candidateId"])
     .index("by_matchmakerId", ["matchmakerId"])
-    .index("by_entityTable_and_entityId", ["entityTable", "entityId"]),
+    .index("by_entityTable_and_entityId", ["entityTable", "entityId"])
+    // The platform admin's filters (admin/queries.ts): one per combination it
+    // offers, so no filter has to scan. A system actor has no `userId`, so its
+    // events index under a missing value.
+    .index("by_candidateId_and_action", ["candidateId", "action"])
+    .index("by_matchmakerId_and_action", ["matchmakerId", "action"])
+    .index("by_actor_userId", ["actor.userId"])
+    .index("by_actor_userId_and_action", ["actor.userId", "action"])
+    .index("by_action", ["action"]),
 
   pushSubscriptions: defineTable({
     userId: v.id("users"),

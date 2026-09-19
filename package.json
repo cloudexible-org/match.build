@@ -7,7 +7,7 @@
     "prepare": "lefthook install",
     "build": "turbo build",
     "ship": "pnpm --filter @repo/api run ship",
-    "ship:preview": "pnpm --filter @repo/api run preview:www && pnpm --filter @repo/api run preview:app",
+    "ship:preview": "pnpm --filter @repo/api run preview:www && pnpm --filter @repo/api run preview:app && pnpm --filter @repo/api run preview:admin",
     "dev": "turbo dev --ui tui",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

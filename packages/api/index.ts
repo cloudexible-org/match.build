@@ -1,5 +1,6 @@
 export * from "./convex/_generated/api";
 export type * from "./convex/_generated/dataModel";
+export * from "./convex/admin/rules";
 export * from "./convex/audit/rules";
 export * from "./convex/candidates/rules";
 export * from "./convex/email/rules";

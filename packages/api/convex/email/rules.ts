@@ -3,6 +3,12 @@
  * Convex imports.
  */
 
+/**
+ * Convex Auth's id for the email-code provider (auth.ts). The client passes it
+ * to `signIn`, and codes and accounts are stored under it.
+ */
+export const SIGN_IN_PROVIDER_ID = "email-code";
+
 export const SIGN_IN_CODE_LENGTH = 6;
 
 /** How long a sign-in code stays valid. */

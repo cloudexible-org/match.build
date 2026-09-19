@@ -23,10 +23,12 @@ http.route({
   handler: httpAction(async () => new Response("ok")),
 });
 
-// The product app under /app/ (SPA fallback, so deep links survive a reload),
-// then the marketing site for everything else. Keep APP_BASE_PATH in
-// apps/app/vite.config.ts in step with the prefix here.
+// The product app under /app/ and the platform admin app under /admin/ (SPA
+// fallback, so deep links survive a reload), then the marketing site for
+// everything else. Keep APP_BASE_PATH / ADMIN_BASE_PATH in each app's
+// vite.config.ts in step with the prefixes here.
 registerStaticRoutes(http, components.app, { pathPrefix: "/app/" });
+registerStaticRoutes(http, components.admin, { pathPrefix: "/admin/" });
 registerStaticRoutes(http, components.www, { pathPrefix: "/" });
 
 export default http;

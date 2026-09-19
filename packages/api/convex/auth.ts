@@ -2,7 +2,11 @@ import { Email } from "@convex-dev/auth/providers/Email";
 import { convexAuth } from "@convex-dev/auth/server";
 import type { MutationCtx } from "./_generated/server";
 import { sendSignInCode } from "./email/helpers";
-import { generateSignInCode, SIGN_IN_CODE_TTL_SECONDS } from "./email/rules";
+import {
+  generateSignInCode,
+  SIGN_IN_CODE_TTL_SECONDS,
+  SIGN_IN_PROVIDER_ID,
+} from "./email/rules";
 import { upsertAuthUser } from "./users/helpers";
 
 /**
@@ -21,7 +25,7 @@ import { upsertAuthUser } from "./users/helpers";
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Email({
-      id: "email-code",
+      id: SIGN_IN_PROVIDER_ID,
       maxAge: SIGN_IN_CODE_TTL_SECONDS,
       generateVerificationToken: async () => generateSignInCode(),
       // Convex Auth passes the action ctx as a second argument, which its
