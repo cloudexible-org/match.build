@@ -501,7 +501,8 @@ Candidate conversations include sexual orientation, religion, health and family 
 
 ## 10. Platform & hosting
 
-- **Frontends:** `app.matchmaker.io` (Vite app) and `www.matchmaker.io` (Next.js static export). The marketing site's CTAs link to the app.
+- **Domain (interim): `aileenlancif.com`.** Until a neutral product domain is bought, the production deployment is served at `https://www.aileenlancif.com` with path-based hosting (option 3 below): the marketing site at `/`, the app at `/app/`, HTTP actions at `/api/`. The apex redirects to `www`. This is a stopgap — a matchmaker's personal name is the wrong long-term domain for a multi-matchmaker product. `aileenlancif.com` can later become Aileen's own custom domain (see backlog).
+- **Frontends (target):** `app.<product-domain>` (Vite app) and `www.<product-domain>` (Next.js static export). `matchmaker.io`, `.app` and `.co` are all taken; candidates checked 2026-09-19 include `usematchmaker.com` and `introdesk.app`. The marketing site's CTAs link to the app.
 - **Auth:** Convex Auth (`@convex-dev/auth`) with an email one-time-code provider. Replaces turbostack's Clerk wiring. Convex validates session tokens through the OpenID discovery document at `<site>/.well-known/openid-configuration`, which has to sit at the site root. So `convex/http.ts` owns the whole URL space: `/.well-known/…` for auth, `/api/…` for HTTP actions, then the static sites as catch-alls (`/app/…`, then `/`).
 - Nothing in `apps/www` may need a Node server at request time. All server logic lives in Convex.
 - **Hosting on two subdomains is an open decision.** Static sites are routed by path only (today: `www` at `/`, `app` at `/app/`), so pointing `app.` and `www.` at one deployment would serve the same paths on both. Options:
@@ -530,6 +531,6 @@ Candidate conversations include sexual orientation, religion, health and family 
 
 ## 12. Open decisions (phase 1)
 
-- **Hosting on two subdomains** (§10). Needed before the first production deploy.
+- **Hosting on two subdomains** (§10). Deferred: the interim domain uses path-based hosting on one origin. Revisit when the product domain is bought.
 - **Erasure requests.** "Nothing is deleted" conflicts with a GDPR right-to-erasure request. Proposed: an admin-only process that anonymises the person's data on request. Needs legal review before real candidates are onboarded.
 - **Notification delays.** 30 s push / 5 min email are starting points; tune with the first matchmaker.

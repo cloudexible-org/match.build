@@ -98,6 +98,32 @@ The static-hosting CLI builds each app with the target deployment's
 app, a fixed Vite `base` of `/app/` (see `apps/app/vite.config.ts`). Uploads
 publish atomically, so a failed upload leaves the previous version live.
 
+### Custom domain
+
+Production is served at **https://www.aileenlancif.com** (interim, until a
+product domain is bought). DNS is on Cloudflare; custom domains need the
+Convex Pro plan.
+
+1. Convex Dashboard → production deployment → **Settings** → **Custom Domains**
+   → add `www.aileenlancif.com` **for HTTP actions** (the `.convex.site` side,
+   which serves `/`, `/app/` and `/api/`).
+2. In Cloudflare DNS, create exactly the records the dashboard shows (a CNAME
+   for `www` plus a TXT verification record). Set the CNAME to **DNS only**
+   (grey cloud) so Convex can issue the certificate.
+3. Redirect the apex to `www` with a Cloudflare redirect rule
+   (`aileenlancif.com/*` → `https://www.aileenlancif.com/${1}`, 301). The apex
+   needs a proxied placeholder record, e.g. `A @ 192.0.2.1` (orange cloud).
+4. Once the dashboard shows the domain verified, override the production
+   `CONVEX_SITE_URL` to `https://www.aileenlancif.com` (same settings page), so
+   links that functions generate use the custom domain. No rebuild is needed:
+   the sites talk to the `.convex.cloud` API URL, which is unchanged.
+5. Point sign-in at the new origin. On a production deployment without auth
+   keys yet, run
+   `pnpm --filter @repo/api auth:setup --prod --site-url https://www.aileenlancif.com/app`
+   (see *Auth* below). If the keys already exist, change only the URL, since
+   rotating the keys signs everyone out:
+   `npx convex env set SITE_URL https://www.aileenlancif.com/app --prod`
+
 ### Auth (Convex Auth)
 
 Sign-in is an email plus a six-digit code (`packages/api/convex/auth.ts`).
