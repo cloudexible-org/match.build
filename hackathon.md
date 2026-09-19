@@ -3,16 +3,16 @@
 - **Project:** matchmaker
 - **Event:** Convex All Gas Hackathon
 - **What it does:** An operating system for independent human matchmakers: invite candidates from Instagram/WhatsApp into an in-app chat, with AI-drafted replies and an AI-enriched candidate profile planned for later phases.
-- **Live app:** not deployed
+- **Live app:** https://www.aileenlancif.com (app at /app/)
 - **Repo:** https://github.com/cloudexible-org/matchmaker
 - **Frontend:** Convex static hosting
-- **Convex deployment:** not deployed
-- **Components:** @convex-dev/static-hosting (two instances: `www`, `app`)
-- **Convex features:** schema, tables, indexes, queries, mutations, actions, internal functions, pagination, HTTP actions, realtime queries, typed env vars
+- **Convex deployment:** https://api.aileenlancif.com (CONVEX_CLOUD_URL custom domain)
+- **Components:** @convex-dev/static-hosting (three instances: `www`, `app`, `admin`)
+- **Convex features:** schema, tables, indexes, queries, mutations, actions, internal functions, scheduled functions, pagination, paginated queries, HTTP actions, realtime queries, typed env vars
 - **Auth:** Convex Auth
 - **AI models:** none
 - **Started:** 2026-09-19T15:37:25Z
-- **Last updated:** 2026-09-19T18:32:22Z
+- **Last updated:** 2026-09-19T21:42:04Z
 
 ## Log
 
@@ -95,3 +95,61 @@ serves both sites from one origin, with the Vite server proxying everything
 outside `/app` to Next, mirroring production. `auth.config.ts` reads the site
 URL through the generated typed env so `convex dev` typechecks
 (`apps/app/vite.config.ts`, `packages/api/convex/auth.config.ts`).
+
+### 2026-09-19 - 18f403b
+Seeded the dev deployment with six test accounts — a matchmaker, joined
+candidates, an invited person, a blank account — so each flow has an account in
+the right state. The seed only adds what is missing, and refuses to run unless
+the site URL is on `.localhost` and no Resend key is set, so it can never touch
+production (`packages/api/convex/seed/dev/`).
+
+### 2026-09-19 - 1df4681
+Production went live on the interim domain: the marketing site at `/`, the app
+at `/app/`, auth discovery and HTTP actions on the same origin, with a second
+custom domain for the client API. Sign-in codes now come from the verified
+domain, and the app renders at the bare `/app` path, which production serves
+without a redirect (`README.md`, `apps/app/src/main.tsx`).
+
+### 2026-09-19 - 7002ca9
+Phase 1 step 2: any account can create a matchmaker profile and open its
+workspace. Usernames are validated by shared rules — 6–30 characters, no doubled
+or edge periods, reserved names refused — and uniqueness is on a canonical key
+with dots removed, so `jane.smith` is taken once `janesmith` exists. Profile and
+workspace queries answer `null` alike for "not yours" and "does not exist", so
+the URL cannot be used to probe for usernames. Convex features: mutations,
+queries, indexes (`packages/api/convex/matchmakers/`).
+
+### 2026-09-19 - b9fc40e
+Phase 1 step 3: onboarding a candidate. One mutation writes the candidate, their
+conversation, the pasted DM history as a private first message, an open invite
+and the audit events, so a half-onboarded candidate cannot exist. Invite links
+are HMAC-SHA256 of a per-invite nonce under a deployment secret, so only the
+nonce and the token's hash are stored yet the matchmaker can copy the same link
+again at any time (`packages/api/convex/candidates/mutations.ts`,
+`packages/api/convex/invites/helpers.ts`).
+
+### 2026-09-19 - 73d043d
+Phase 1 step 4: invitations end to end. The invite email goes out from a
+scheduled action through Resend, or to the internal outbox without a key, and
+re-derives its token from the nonce so no token sits in the scheduler's stored
+arguments. The candidate accepts or declines by link or from their home page;
+accepting links the account and opens the chat. Accepting is refused, with the
+invite left open, for the profile's owner, an existing member, or someone who
+already left that book. Each invite schedules its own 30-day expiry, hopping at
+most 20 days at a time to stay under the timer limit. The matchmaker can resend
+(3 a day, counted from the audit trail), change the address or revoke. Convex
+features: scheduled functions, actions, mutations (`packages/api/convex/invites/`).
+
+### 2026-09-19 - 5c4c8b9
+A third frontend: the platform admin app at `/admin/`, on the same deployment
+and origin. It has the platform-wide audit trail — filtered by matchmaker, by
+one of its candidates, by the account that acted, or by action, with the filters
+in the URL — and a page that issues a sign-in code for any account, so support
+can sign in to the app as someone to reproduce a problem. The code is shown to
+the admin, never emailed to the account's owner, and issuing it is audited. Who
+gets in comes from the deployment: every `convex/admin/` function starts with
+`requirePlatformAdmin`, which checks the caller's verified address against the
+`PLATFORM_ADMIN_EMAILS` env var. Each filter combination has its own index on
+`auditEvents`, so no filter scans the table. Convex features: paginated queries,
+indexes, queries, mutations, registered component
+(`packages/api/convex/admin/`, `apps/admin/`).
