@@ -15,12 +15,20 @@ export class CandidatePanelPage {
     return this.page.getByTestId("toggle-candidate-panel");
   }
 
-  getTab(name: "Details" | "Notes" | "History") {
-    return this.page.getByRole("tab", { name });
+  /**
+   * Each section's header button. By test id, not by name: "Notes" also
+   * labels a filter inside the History section.
+   */
+  getSection(name: "Details" | "Notes" | "History") {
+    return this.page.getByTestId(`accordion-${name.toLowerCase()}`);
   }
 
-  async openTab(name: "Details" | "Notes" | "History") {
-    await this.getTab(name).click();
+  /** Expands a section, unless it is already open. */
+  async openSection(name: "Details" | "Notes" | "History") {
+    const header = this.getSection(name);
+    if ((await header.getAttribute("aria-expanded")) !== "true") {
+      await header.click();
+    }
   }
 
   // --- Details -------------------------------------------------------------

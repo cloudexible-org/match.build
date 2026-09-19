@@ -11,16 +11,14 @@ import {
   type SocialPlatform,
 } from "@repo/api";
 import {
+  Accordion,
+  AccordionSection,
   Button,
   Field,
   FieldError,
   FieldLabel,
   Input,
   NativeSelect,
-  Tabs,
-  TabsList,
-  TabsPanel,
-  TabsTab,
   Textarea,
 } from "@repo/ui";
 import { useMutation, useQuery } from "convex/react";
@@ -58,9 +56,8 @@ export function CandidatePanel({
   onClose: () => void;
 }) {
   return (
-    <Tabs
-      defaultValue="details"
-      className="h-full min-h-0 w-full"
+    <div
+      className="flex h-full min-h-0 w-full flex-col"
       data-testid="candidate-panel"
     >
       <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4 lg:hidden">
@@ -76,21 +73,20 @@ export function CandidatePanel({
           Close
         </Button>
       </div>
-      <TabsList>
-        <TabsTab value="details">Details</TabsTab>
-        <TabsTab value="notes">Notes</TabsTab>
-        <TabsTab value="history">History</TabsTab>
-      </TabsList>
-      <TabsPanel value="details" className="p-4">
-        <Details candidate={candidate} />
-      </TabsPanel>
-      <TabsPanel value="notes" className="p-4">
-        <Notes candidateId={candidate.candidateId} />
-      </TabsPanel>
-      <TabsPanel value="history" className="p-4">
-        <CandidateHistory candidateId={candidate.candidateId} />
-      </TabsPanel>
-    </Tabs>
+      {/* Sections rather than tabs: a matchmaker reading a thread wants the
+          details and their notes at once, not one at a time. */}
+      <Accordion defaultValue={["details"]} className="overflow-y-auto">
+        <AccordionSection value="details" title="Details">
+          <Details candidate={candidate} />
+        </AccordionSection>
+        <AccordionSection value="notes" title="Notes">
+          <Notes candidateId={candidate.candidateId} />
+        </AccordionSection>
+        <AccordionSection value="history" title="History">
+          <CandidateHistory candidateId={candidate.candidateId} />
+        </AccordionSection>
+      </Accordion>
+    </div>
   );
 }
 

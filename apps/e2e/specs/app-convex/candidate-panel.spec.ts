@@ -5,8 +5,8 @@ import { type Scenario, seedScenario } from "../../scenario";
 import { signInAs } from "../../session";
 
 /**
- * The candidate panel (prd/phase-1.md §4.1, §5.2): Details, Notes and the
- * History tab over the audit trail.
+ * The candidate panel (prd/phase-1.md §4.1, §5.2): the Details, Notes and
+ * History sections, the last one over the audit trail.
  *
  * One seeded candidate per test that writes, so an edit in one test can't
  * change what another sees.
@@ -102,7 +102,7 @@ test("status moves the candidate between the list's filters", async ({
 
 test("Notes are added, edited and removed", async ({ page }) => {
   const panel = await openPanel(page, "notes");
-  await panel.openTab("Notes");
+  await panel.openSection("Notes");
 
   await panel.addNote("Prefers mornings.");
   await expect(panel.getNotes()).toHaveCount(1);
@@ -126,14 +126,14 @@ test("Notes are added, edited and removed", async ({ page }) => {
 
 test("an empty note is refused", async ({ page }) => {
   const panel = await openPanel(page, "notes");
-  await panel.openTab("Notes");
+  await panel.openSection("Notes");
   await page.getByRole("button", { name: "Add note" }).click();
   await expect(page.getByText("Write something first.")).toBeVisible();
 });
 
 test("History reads the trail, and filters it", async ({ page }) => {
   const panel = await openPanel(page, "history");
-  await panel.openTab("History");
+  await panel.openSection("History");
 
   // Newest first: they accepted after the matchmaker onboarded them.
   const entries = panel.getHistoryEntries();
@@ -143,9 +143,9 @@ test("History reads the trail, and filters it", async ({ page }) => {
   await expect(entries.last()).toContainText("You ·");
 
   // A change made now appears at the top, attributed and explained.
-  await panel.openTab("Notes");
+  await panel.openSection("Notes");
   await panel.addNote("A note for the trail");
-  await panel.openTab("History");
+  await panel.openSection("History");
   await expect(entries.first()).toContainText("Added a note");
   await expect(entries.first()).toContainText("A note for the trail");
 

@@ -2,6 +2,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { Button, cn } from "@repo/ui";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { ThemeToggle } from "./theme-toggle";
 
 /**
  * Top bar for signed-in pages: brand, who's signed in, and sign out.
@@ -28,13 +29,15 @@ export function AppHeader({
           !wide && "max-w-3xl",
         )}
       >
-        <div className="flex min-w-0 items-center gap-3">
-          <Link to="/" className="shrink-0 font-display text-xl">
+        {/* The brand and workspace name give way; the controls on the right
+            can't shrink, and at 380px something has to. */}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <Link to="/" className="truncate font-display text-xl">
             Matchmaker
           </Link>
           {nav}
         </div>
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <span
             className={cn(
               "truncate text-sm text-muted-foreground",
@@ -44,6 +47,7 @@ export function AppHeader({
           >
             {name}
           </span>
+          <ThemeToggle />
           <Button variant="outline" size="sm" onClick={() => void signOut()}>
             Sign out
           </Button>

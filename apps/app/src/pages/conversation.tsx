@@ -67,8 +67,10 @@ function Conversation({
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const name = candidateDisplayName(candidate);
+  // `min-w-0`: without it this flex row can grow past a phone's viewport and
+  // the whole page scrolls sideways.
   return (
-    <div className="flex min-h-0 flex-1" data-testid="conversation">
+    <div className="flex min-h-0 min-w-0 flex-1" data-testid="conversation">
       <div
         className={cn(
           "min-w-0 flex-1 flex-col",

@@ -1,3 +1,7 @@
+export {
+  Accordion,
+  AccordionSection,
+} from "./components/accordion";
 export { Button, type ButtonProps, buttonVariants } from "./components/button";
 export {
   Card,
@@ -15,11 +19,5 @@ export {
   Input,
 } from "./components/field";
 export { NativeSelect } from "./components/native-select";
-export {
-  Tabs,
-  TabsList,
-  TabsPanel,
-  TabsTab,
-} from "./components/tabs";
 export { Textarea } from "./components/textarea";
 export { cn } from "./lib/cn";

@@ -5,6 +5,20 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Matchmaker</title>
+    <script>
+      // Before first paint: a stored theme choice, applied as the class the
+      // tokens key off (src/theme/theme.ts). Without this, a dark-theme user
+      // gets a flash of the light palette on every load.
+      var stored = null;
+      try {
+        stored = localStorage.getItem("matchmaker-theme");
+      } catch {
+        // Blocked storage: fall back to following the device.
+      }
+      if (stored === "dark" || stored === "light") {
+        document.documentElement.classList.add(stored);
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

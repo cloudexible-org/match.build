@@ -11,8 +11,10 @@
  * ivory ground, ink-plum text, a claret primary. The two files are separate
  * for now; consolidating www onto this one is a follow-up.
  *
- * Dark mode follows the OS by default and can be forced with a `.dark` class
- * on <html>.
+ * Dark mode follows the OS by default, and is forced either way with a
+ * `.dark` or `.light` class on <html> (apps/app writes one from the theme
+ * control). The dark values live once, as `--dark-*`; the selectors below
+ * decide when they apply.
  */
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -68,30 +70,76 @@
   --input: oklch(0.88 0.015 50);
   --ring: oklch(0.5 0.15 12 / 60%);
   --radius: 0.75rem;
+
+  /* The dark palette's values, in one place. Which selector below applies
+     them is what makes the theme follow the OS or a chosen override. */
+  --dark-background: oklch(0.17 0.012 20);
+  --dark-foreground: oklch(0.95 0.01 60);
+  --dark-card: oklch(0.21 0.014 20);
+  --dark-card-foreground: oklch(0.95 0.01 60);
+  --dark-popover: oklch(0.21 0.014 20);
+  --dark-popover-foreground: oklch(0.95 0.01 60);
+  --dark-primary: oklch(0.74 0.12 14);
+  --dark-primary-foreground: oklch(0.2 0.03 12);
+  --dark-secondary: oklch(0.26 0.014 20);
+  --dark-secondary-foreground: oklch(0.95 0.01 60);
+  --dark-muted: oklch(0.25 0.012 20);
+  --dark-muted-foreground: oklch(0.72 0.015 40);
+  --dark-accent: oklch(0.3 0.05 14);
+  --dark-accent-foreground: oklch(0.92 0.03 20);
+  --dark-destructive: oklch(0.704 0.191 22.216);
+  --dark-destructive-foreground: oklch(0.985 0 0);
+  --dark-border: oklch(1 0 0 / 10%);
+  --dark-input: oklch(1 0 0 / 15%);
+  --dark-ring: oklch(0.74 0.12 14 / 60%);
 }
 
+/* Dark, when the device asks for it and no light override is set. */
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --background: oklch(0.17 0.012 20);
-    --foreground: oklch(0.95 0.01 60);
-    --card: oklch(0.21 0.014 20);
-    --card-foreground: oklch(0.95 0.01 60);
-    --popover: oklch(0.21 0.014 20);
-    --popover-foreground: oklch(0.95 0.01 60);
-    --primary: oklch(0.74 0.12 14);
-    --primary-foreground: oklch(0.2 0.03 12);
-    --secondary: oklch(0.26 0.014 20);
-    --secondary-foreground: oklch(0.95 0.01 60);
-    --muted: oklch(0.25 0.012 20);
-    --muted-foreground: oklch(0.72 0.015 40);
-    --accent: oklch(0.3 0.05 14);
-    --accent-foreground: oklch(0.92 0.03 20);
-    --destructive: oklch(0.704 0.191 22.216);
-    --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.74 0.12 14 / 60%);
+    --background: var(--dark-background);
+    --foreground: var(--dark-foreground);
+    --card: var(--dark-card);
+    --card-foreground: var(--dark-card-foreground);
+    --popover: var(--dark-popover);
+    --popover-foreground: var(--dark-popover-foreground);
+    --primary: var(--dark-primary);
+    --primary-foreground: var(--dark-primary-foreground);
+    --secondary: var(--dark-secondary);
+    --secondary-foreground: var(--dark-secondary-foreground);
+    --muted: var(--dark-muted);
+    --muted-foreground: var(--dark-muted-foreground);
+    --accent: var(--dark-accent);
+    --accent-foreground: var(--dark-accent-foreground);
+    --destructive: var(--dark-destructive);
+    --destructive-foreground: var(--dark-destructive-foreground);
+    --border: var(--dark-border);
+    --input: var(--dark-input);
+    --ring: var(--dark-ring);
   }
+}
+
+/* Dark, chosen explicitly in the app (src/theme/), whatever the device says. */
+:root.dark {
+  --background: var(--dark-background);
+  --foreground: var(--dark-foreground);
+  --card: var(--dark-card);
+  --card-foreground: var(--dark-card-foreground);
+  --popover: var(--dark-popover);
+  --popover-foreground: var(--dark-popover-foreground);
+  --primary: var(--dark-primary);
+  --primary-foreground: var(--dark-primary-foreground);
+  --secondary: var(--dark-secondary);
+  --secondary-foreground: var(--dark-secondary-foreground);
+  --muted: var(--dark-muted);
+  --muted-foreground: var(--dark-muted-foreground);
+  --accent: var(--dark-accent);
+  --accent-foreground: var(--dark-accent-foreground);
+  --destructive: var(--dark-destructive);
+  --destructive-foreground: var(--dark-destructive-foreground);
+  --border: var(--dark-border);
+  --input: var(--dark-input);
+  --ring: var(--dark-ring);
 }
 
 @layer base {
