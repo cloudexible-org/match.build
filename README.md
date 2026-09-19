@@ -45,16 +45,21 @@ The mounts are configured in `packages/api/convex/convex.config.ts`.
 
 ## Getting started
 
-Prerequisites: Node.js 26 (`nvm use`), pnpm, a [Convex](https://convex.dev/) account.
+Prerequisites: Node.js 26 (`nvm use`), pnpm, a [Convex](https://convex.dev/) account,
+and the [Doppler CLI](https://docs.doppler.com/docs/install-cli) with access to the
+`matchmaker_app` and `matchmaker_www` projects.
 
 ```bash
 pnpm install
-pnpm setup:envs                  # copies every .env.example to .env.local
+doppler login                     # once per machine
+doppler setup --no-interactive    # binds apps/app and apps/www via doppler.yaml
 cd packages/api && npx convex dev # links a Convex deployment, writes .env.local
 ```
 
-Copy the deployment URL into `apps/app/.env.local` (`VITE_CONVEX_URL`) and
-`apps/www/.env.local` (`NEXT_PUBLIC_CONVEX_URL`), then from the root:
+The app dev scripts run under `doppler run`, so `VITE_CONVEX_URL`,
+`NEXT_PUBLIC_CONVEX_URL` and friends come from each project's `dev` config.
+Doppler binds by absolute path, so run `doppler setup` again in every new
+checkout or worktree. Doppler values override any `.env.local`. Then from the root:
 
 ```bash
 pnpm dev

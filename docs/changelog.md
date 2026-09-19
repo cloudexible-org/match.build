@@ -11,6 +11,7 @@ The monorepo was bootstrapped from [turbostack](https://github.com/cloudexible-o
 ## [Unreleased]
 
 ### Added
+- **Doppler for app env vars:** a root `doppler.yaml` binds `apps/app` to the `matchmaker_app` project and `apps/www` to `matchmaker_www` (`dev` config), and both `dev` scripts now run under `doppler run --`. *Why:* secrets live in one place instead of hand-copied `.env.local` files. The e2e suite starts Vite/Next directly and is unaffected.
 - **Monorepo from turbostack 4.5.0:** Turborepo + pnpm with `apps/www` (Next.js marketing site), `apps/app` (Vite React app), `apps/e2e` (Playwright), and `packages/{api,ui,analytics,config}`. Renamed to `matchmaker` throughout (package name, portless hosts `www.matchmaker.localhost` / `app.matchmaker.localhost`, page titles, e2e selectors).
 - **Hosting on Convex (`.convex.site`) via `@convex-dev/static-hosting`:** two component instances in `packages/api/convex/convex.config.ts` — `www` mounted at `/` and `app` at `/app/` — with the app's own HTTP actions under `/api/` (`convex/http.ts`, starting with `GET /api/health`). `pnpm ship` deploys the backend and uploads both sites; `pnpm ship:preview` uploads both to the dev deployment for a hosted smoke test. *Why:* one origin and one deploy target for backend and both frontends, instead of Vercel. Verified against a local backend: `/`, `/app/`, deep links under `/app/…` (SPA fallback), `/app/assets/*`, and `/api/health` all resolve; unknown top-level paths 404.
 

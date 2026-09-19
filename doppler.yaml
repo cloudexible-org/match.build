@@ -1,0 +1,11 @@
+# Doppler scopes per app. Run `doppler setup --no-interactive` once from the
+# repo root to bind each directory; `pnpm dev` then injects secrets through
+# `doppler run`. Switch a directory to your personal config with
+# `doppler setup -p <project> -c dev_personal` inside it.
+setup:
+  - project: matchmaker_app
+    config: dev
+    path: apps/app/
+  - project: matchmaker_www
+    config: dev
+    path: apps/www/
