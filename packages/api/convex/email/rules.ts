@@ -8,7 +8,11 @@ export const SIGN_IN_CODE_LENGTH = 6;
 /** How long a sign-in code stays valid. */
 export const SIGN_IN_CODE_TTL_SECONDS = 10 * 60;
 
-export const SIGN_IN_FROM = "Matchmaker <no-reply@matchmaker.io>";
+/**
+ * Must be on a domain verified in Resend. `aileenlancif.com` is the interim
+ * production domain (prd/phase-1.md §10) until a product domain is bought.
+ */
+export const SIGN_IN_FROM = "Matchmaker <no-reply@aileenlancif.com>";
 
 const CODE_SPACE = 10 ** SIGN_IN_CODE_LENGTH;
 // The largest multiple of CODE_SPACE that fits in a uint32. Values at or above
