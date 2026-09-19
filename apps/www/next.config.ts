@@ -23,6 +23,8 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   transpilePackages: ["@repo/ui", "@repo/api"],
   // `pnpm dev` serves this app through portless at https://www.matchmaker.localhost,
+  // and the app's Vite server proxies to it from https://matchmaker.localhost
+  // (see apps/app/vite.config.ts),
   // which Next treats as cross-origin: it blocks /_next dev resources (including the
   // HMR client) from any unlisted host, so the page ships HTML but never hydrates.
   // Dev-only — Next ignores this in production builds.
@@ -30,7 +32,12 @@ const nextConfig: NextConfig = {
   // apps/e2e/playwright.config.ts). Without it Next blocks every /_next dev
   // chunk from that host, so the page ships HTML and never hydrates — which
   // reads as "every animation is broken" rather than as a blocked request.
-  allowedDevOrigins: ["*.matchmaker.localhost", "127.0.0.1", "localhost"],
+  allowedDevOrigins: [
+    "matchmaker.localhost",
+    "*.matchmaker.localhost",
+    "127.0.0.1",
+    "localhost",
+  ],
   // NOTE: `experimental.useTypeScriptCli` used to be set here. TypeScript 7 dropped
   // the JS Compiler API that Next's built-in type-checking loaded, so on Next 16.2
   // the flag was required to make Next shell out to the `tsc` binary instead.

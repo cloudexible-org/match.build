@@ -66,8 +66,11 @@ checkout or worktree. Doppler values override any `.env.local`. Then from the ro
 pnpm dev
 ```
 
-Portless serves `https://www.matchmaker.localhost` and
-`https://app.matchmaker.localhost/app/`.
+Open **`https://matchmaker.localhost`**: the marketing site at `/` and the app
+at `/app/`, on one origin as in production. Portless routes by hostname only,
+so the app's Vite server is the front door and proxies every path outside
+`/app/` to the Next dev server, which portless also serves directly at
+`https://www.matchmaker.localhost`.
 
 ## Development
 
