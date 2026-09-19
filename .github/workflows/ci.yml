@@ -94,6 +94,10 @@ jobs:
           # behaviour — and the `app-convex` project, which needs real seeded
           # data, is not registered at all. Run it locally with `pnpm test:e2e`.
           E2E_CONVEX: "0"
+          # No Doppler token in CI, so the app servers run bare instead of
+          # under `doppler run` (apps/e2e/doppler.ts); the placeholders below
+          # are their whole environment.
+          E2E_DOPPLER: "0"
           # Placeholders, not secrets — same rationale as the build job above.
           # `apps/app` validates VITE_CONVEX_URL at startup and `apps/www`'s
           # env.ts requires a well-formed NEXT_PUBLIC_CONVEX_URL, so the shape

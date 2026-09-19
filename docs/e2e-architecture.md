@@ -39,6 +39,7 @@ Run it:
 pnpm test:e2e                              # every project
 pnpm --filter e2e exec playwright test --project=www
 E2E_CONVEX=0 pnpm test:e2e                 # skip the backend (how CI runs)
+E2E_DOPPLER=0 pnpm test:e2e                # app servers without Doppler (how CI runs)
 pnpm --filter e2e convex:local             # just the backend, for poking at data
 ```
 
@@ -60,26 +61,26 @@ CI sets it: provisioning a backend on a cold runner for every push is not worth
 it, and the `app` and `www` projects assert only statically-rendered chrome and
 client-side behaviour, so they still run there.
 
-### The port is not 3210, and assuming it is can wipe another project
+### The port is chosen per run, never 3210 or the recorded one
 
-Convex allocates a `(cloud, site)` port pair **per local deployment** and
-records it in that deployment's own `.convex/local/default/config.json`.
-Whoever boots first keeps 3210; the second Convex project on the machine gets
-3212/3213, the third 3214/3215.
+Convex records a `(cloud, site)` port pair in each local deployment's own
+`.convex/local/default/config.json` and retries it on every start. Whoever
+boots first keeps 3210; the next gets 3212/3213, and so on. Neither 3210 nor
+the recorded pair is safe to assume:
 
-Hard-coding 3210 is a data-loss bug, not a shortcut. Playwright's
-`webServer.url` health check only asks *"is something answering here?"* — it
-cannot tell one Convex backend from another. So: the other project's backend
-answers on 3210 → `reuseExistingServer` sees a live server, so ours never
-starts → the app under test is handed that URL → global setup wipes the
-database to seed it. Every step succeeds, and the run goes green while pointed
-at, and destroying, the wrong database.
+- **Hard-coding 3210 is a data-loss bug.** Playwright's `webServer.url` health
+  check only asks *"is something answering here?"*. Another project's backend
+  answers on 3210 → the app under test is handed that URL → global setup wipes
+  the database to seed it. Every step succeeds and the run goes green.
+- **The recorded pair goes stale once there are worktrees.** See §1c.
 
-`apps/e2e/local-backend.ts` therefore reads the port from `config.json` and is
-the single place that does. `CONVEX_URL` overrides it but has **no default** —
-a default in a `.env` is what let the right answer and the wrong one coexist in
-the project this pattern came from, and `apps/e2e/.env` is not even loaded when
-Playwright evaluates its config.
+So `playwright.config.ts` allocates the pair fresh each run, alongside the app
+ports, and passes it to `scripts/convex-local.mjs` as `E2E_CONVEX_PORT` /
+`E2E_CONVEX_SITE_PORT`. `local-backend.ts` is the single place that turns it
+into a URL; the recorded pair is only a fallback for tools run outside the
+suite. `CONVEX_URL` overrides both but has **no default** — a default in a
+`.env` is what let the right answer and the wrong one coexist in the project
+this pattern came from.
 
 ### Two guards, because a name is not enough
 
@@ -168,6 +169,60 @@ Verified on 2026-08-07 by running the full suite with `pnpm dev` up: 15/15
 passed, Vite kept serving 200 on 5173, `packages/api/.env.local` was
 byte-identical and still selected the cloud deployment, `convex dev` logged no
 errors, and `convex/_generated/` had no uncommitted churn.
+
+## 1c. Several worktrees at once
+
+Parallel agents each work in their own git worktree and may all run the suite
+at the same time, next to each worktree's `pnpm dev`. Each run brings up its own
+Vite, Next and Convex backend, and none of them may collide.
+
+| Shared thing | Per worktree? | How collisions are avoided |
+|---|---|---|
+| Convex data (SQLite, storage) | Yes | `packages/api/.convex/local/default/` is inside the checkout |
+| Convex ports | No — machine-wide | Fresh pair per run, pinned with `--local-cloud-port` / `--local-site-port` |
+| Vite / Next ports | No | Fresh per run, from outside the OS's ephemeral range |
+| Next dev lock | Yes | `.next-e2e` is inside the checkout |
+| `packages/api/.env.local` | Yes | Snapshot + watch + restore (§1a) |
+| Convex backend binary cache | No — `~/.cache/convex` | Read-only once downloaded (see below) |
+
+Three things had to change for this, and each one was an observed failure:
+
+- **The recorded Convex port is not trusted.** A worktree records whatever port
+  was free when it last ran, and a sibling's backend may hold it now. Every
+  anonymous agent-mode deployment is named `anonymous-agent`, so the Convex CLI
+  cannot tell that sibling from its own backend. It waits for the port to free
+  up and then exits with *"A local backend is still running on port …"*. So
+  `convex-local.mjs` writes this run's pair into `config.json` before starting
+  the CLI. That rewrite is safe because of the lock below.
+- **Ports come from 20000–32000, not `listen(0)`.** Port 0 draws from the
+  ephemeral range (49152+ on macOS), which is also where every outgoing
+  connection gets its local port. When two suites ran at once, `next dev` hit
+  `EADDRINUSE` on a port the allocator had just released. The OS never assigns
+  ports in 20000–32000 on its own, so only another explicit bind could take
+  one. `scripts/pick-ports.mjs` also checks each port on both `127.0.0.1` and
+  `::`.
+- **One backend per worktree, enforced.** `convex-local.mjs` holds
+  `packages/api/.convex/e2e-backend.lock`. Two backends on one SQLite file would
+  corrupt it, and a second suite in the *same* worktree would reseed (wipe) the
+  database mid-run. So a second run in one checkout fails straight away with
+  *"This worktree's e2e backend is already running"*. Runs in other worktrees
+  are unaffected. Playwright kills the webServer process group without letting
+  it clean up, so a stale lock after a run is normal. The next run takes it over
+  once the holder's pid is dead and no backend of ours still answers on the
+  recorded port.
+
+Verified 2026-09-19 with two worktrees, including one with no deployment yet:
+three rounds of both suites at once, 21/21 each time. Also tested:
+
+- **Both worktrees recording the same port (3210):** both passed.
+- **Two runs in one worktree:** the second was refused with the message above
+  while the first passed.
+- **After each run:** no orphaned processes, and `packages/api/.env.local`
+  still pointed at the cloud deployment.
+
+**Not covered:** the first run after a Convex CLI upgrade downloads a new
+backend binary into the shared `~/.cache/convex`. Two worktrees doing that at
+the same moment could race on the download. If that happens, re-run.
 
 ---
 
@@ -498,7 +553,9 @@ assumed. Listed with the trigger that would make each relevant again.
 | Symptom | Likely cause |
 |---|---|
 | Suite hangs after the last test passes | Orphaned webServer process tree (§3) |
-| `EADDRINUSE` on the suite's port | Orphan from a previous run (§3) |
+| `EADDRINUSE` on the suite's port | Orphan from a previous run (§3), or a port picked from the ephemeral range (§1c) |
+| "This worktree's e2e backend is already running" | A second run in the same checkout — wait for the first (§1c) |
+| "A local backend is still running on port …" | The Convex CLI was started on its *recorded* port, held by a sibling worktree (§1c) |
 | Every spec fails `ERR_CONNECTION_REFUSED`, each on a *different* port | Ports allocated per worker instead of per run (§1b) |
 | "Another next dev server is already running" | The suite lost its own `distDir`; the lock is `<distDir>/lock` (§1b) |
 | Test passes alone, fails in parallel | Shared `messages` rows (§8) |

@@ -6,12 +6,8 @@
  * is already used" — and stopping your dev server to run tests is a tax on
  * every run. Asking the OS for a free port removes the collision entirely.
  *
- * ─── Why this shells out ────────────────────────────────────────────────────
- *
- * Playwright evaluates `playwright.config.ts` synchronously — the config module
- * cannot `await` — but every Node API for finding a free port is asynchronous
- * (`server.listen(0)` then read `server.address()`). Running that in a child
- * process is the one way to get the answer before `defineConfig` needs it.
+ * The picking itself lives in `scripts/pick-ports.mjs` — including why it
+ * avoids `listen(0)`, which collided once several worktrees ran at once.
  *
  * ─── The race, and why it is acceptable ─────────────────────────────────────
  *
@@ -24,37 +20,18 @@
  */
 
 import { execFileSync } from "node:child_process";
+import * as path from "node:path";
+
+/** Shared with `convex-local.mjs`; see it for how ports are chosen. */
+const PICKER = path.join(__dirname, "scripts", "pick-ports.mjs");
 
 /**
- * Asks the OS for `count` distinct free ports.
- *
- * All sockets are held open until every port has been allocated, so the same
- * port is never handed out twice in one call.
+ * `count` distinct free ports, from a range the OS never assigns on its own.
+ * Synchronous because `playwright.config.ts` cannot `await`, hence the child
+ * process.
  */
 export function freePorts(count: number): number[] {
-  const script = `
-    const net = require("node:net");
-    const servers = [];
-    let remaining = ${count};
-    const ports = [];
-    const next = () => {
-      if (remaining-- === 0) {
-        // Only release the sockets once every port is decided.
-        for (const s of servers) s.close();
-        process.stdout.write(JSON.stringify(ports));
-        return;
-      }
-      const server = net.createServer();
-      servers.push(server);
-      server.listen(0, "127.0.0.1", () => {
-        ports.push(server.address().port);
-        next();
-      });
-    };
-    next();
-  `;
-
-  const out = execFileSync(process.execPath, ["-e", script], {
+  const out = execFileSync(process.execPath, [PICKER, String(count)], {
     encoding: "utf-8",
   });
   const ports: number[] = JSON.parse(out);
