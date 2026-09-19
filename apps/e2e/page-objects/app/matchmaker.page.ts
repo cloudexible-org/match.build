@@ -81,6 +81,23 @@ export class WorkspacePage {
     return this.page.getByRole("link", { name: "Settings" });
   }
 
+  getOnboardLink() {
+    return this.page.getByTestId("workspace-onboard");
+  }
+
+  getSearchInput() {
+    return this.page.getByLabel("Search candidates");
+  }
+
+  getStatusFilter(label: "Active" | "Paused" | "Archived") {
+    return this.getCandidates().getByRole("button", { name: label });
+  }
+
+  /** A row in the candidate list, by any text it contains. */
+  getCandidateRow(text: string) {
+    return this.getCandidates().getByRole("listitem").filter({ hasText: text });
+  }
+
   getNotFound() {
     return this.page.getByRole("heading", { name: "Page not found" });
   }
@@ -134,5 +151,100 @@ export class MatchmakerSettingsPage {
   /** History entries, newest first. */
   getHistoryEntries() {
     return this.page.getByTestId("profile-history").getByRole("listitem");
+  }
+}
+
+/**
+ * `/app/mm/:username/onboard`: the Onboard form. Rendered by
+ * `apps/app/src/pages/onboard.tsx`.
+ */
+export class OnboardPage {
+  constructor(public readonly page: Page) {}
+
+  getForm() {
+    return this.page.getByTestId("onboard-form");
+  }
+
+  getEmailInput() {
+    return this.getForm().getByLabel("Email");
+  }
+
+  getNameInput() {
+    return this.getForm().getByLabel("Name (optional)");
+  }
+
+  getHistoryInput() {
+    return this.getForm().getByLabel("Existing conversation (optional)");
+  }
+
+  getAddHandleButton() {
+    return this.page.getByRole("button", { name: "Add a handle" });
+  }
+
+  /** Handle rows, in order. */
+  getHandleRows() {
+    return this.page.getByTestId("onboard-handle");
+  }
+
+  /** Adds a handle row and fills it in. */
+  async addHandle(platform: string, handle: string) {
+    await this.getAddHandleButton().click();
+    const row = this.getHandleRows().last();
+    await row.getByRole("combobox").selectOption({ label: platform });
+    await row.getByRole("textbox").fill(handle);
+  }
+
+  getSubmitButton() {
+    return this.page.getByRole("button", { name: "Onboard", exact: true });
+  }
+
+  /** "You already have a candidate with this email", with its link. */
+  getDuplicateNotice() {
+    return this.page.getByTestId("onboard-duplicate");
+  }
+
+  /** A validation or server error, by its text. */
+  getError(text: string | RegExp) {
+    return this.getForm().getByText(text);
+  }
+}
+
+/**
+ * `/app/mm/:username/c/:candidateId`: one candidate's conversation in the
+ * workspace. Rendered by `apps/app/src/pages/conversation.tsx`.
+ */
+export class ConversationPage {
+  constructor(public readonly page: Page) {}
+
+  getRoot() {
+    return this.page.getByTestId("conversation");
+  }
+
+  getCandidateName() {
+    return this.page.getByTestId("conversation-candidate-name");
+  }
+
+  getMessages() {
+    return this.page.getByTestId("conversation-message");
+  }
+
+  getInviteBanner() {
+    return this.page.getByTestId("invite-banner");
+  }
+
+  getInviteLink() {
+    return this.page.getByTestId("invite-link");
+  }
+
+  getCopyInviteLinkButton() {
+    return this.page.getByRole("button", { name: /Copy invite link|Copied/ });
+  }
+
+  getBackLink() {
+    return this.page.getByRole("link", { name: "Back to candidates" });
+  }
+
+  getNotFound() {
+    return this.page.getByText("Conversation not found");
   }
 }

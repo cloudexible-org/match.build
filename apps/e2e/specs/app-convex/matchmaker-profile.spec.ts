@@ -1,16 +1,12 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { SEED_MATCHMAKERS } from "../../../../packages/api/convex/seed/e2e/fixture";
+import { signUp, uniqueUsername } from "../../accounts";
 import { HomePage } from "../../page-objects/app/home.page";
 import {
   CreateMatchmakerPage,
   MatchmakerSettingsPage,
   WorkspacePage,
 } from "../../page-objects/app/matchmaker.page";
-import {
-  CompleteProfilePage,
-  SignInPage,
-} from "../../page-objects/app/sign-in.page";
-import { latestSignInEmail, waitForSignInCode } from "../../sign-in-codes";
 
 /**
  * Creating a matchmaker profile, opening its workspace and editing it
@@ -19,20 +15,6 @@ import { latestSignInEmail, waitForSignInCode } from "../../sign-in-codes";
  * Parallel-safe: each test signs up a fresh account, and the profile it
  * creates has a username unique to this run.
  */
-
-function unique(label: string): string {
-  return `${label}.${process.pid}.${Date.now()}`;
-}
-
-async function signUp(page: Page, label: string, name: string) {
-  const email = `new.${unique(label)}@matchmaker-e2e.test`;
-  const signIn = new SignInPage(page);
-  await signIn.goto();
-  const before = await latestSignInEmail(email);
-  await signIn.requestCode(email);
-  await signIn.enterCode(await waitForSignInCode(email, before));
-  await new CompleteProfilePage(page).submitName(name);
-}
 
 const seeded = (slug: string) => {
   const found = SEED_MATCHMAKERS.find((m) => m.slug === slug);
@@ -44,8 +26,7 @@ test("a new account creates a matchmaker profile, opens it, and edits it", async
   page,
 }) => {
   await signUp(page, "mmcreate", "Maya Maker");
-  // Lowercase letters and digits only: a valid username, short enough.
-  const username = `e2e.${Date.now().toString(36)}${process.pid}`;
+  const username = uniqueUsername();
 
   const home = new HomePage(page);
   await home.getCreateMatchmakerLink().click();
