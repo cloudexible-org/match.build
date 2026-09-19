@@ -1,15 +1,19 @@
 import { api, type Id } from "@repo/api";
-import { buttonVariants, cn } from "@repo/ui";
+import { Button, buttonVariants, cn } from "@repo/ui";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Composer } from "../chat/composer";
-import { Thread } from "../chat/thread";
+import { Thread as MessageThread } from "../chat/thread";
 import { useMarkRead } from "../chat/use-mark-read";
 import {
   candidateDisplayName,
   type Membership,
 } from "../workspace/candidate-labels";
+import {
+  CandidatePanel,
+  type PanelCandidate,
+} from "../workspace/candidate-panel";
 import { MembershipBanner } from "../workspace/membership-banner";
 import { useWorkspace } from "../workspace/workspace-layout";
 
@@ -17,10 +21,8 @@ import { useWorkspace } from "../workspace/workspace-layout";
 const PAGE_SIZE = 30;
 
 /**
- * One candidate's conversation in the workspace's centre column
- * (prd/phase-1.md §3.3, §4.1): who they are, their invite while it's open,
- * the thread including the matchmaker's private messages, and the composer —
- * which only opens while they're a member.
+ * One candidate's conversation in the workspace (prd/phase-1.md §3.3, §4.1):
+ * the thread in the centre and the candidate panel on the right.
  */
 export function ConversationPage() {
   const workspace = useWorkspace();
@@ -48,64 +50,108 @@ export function ConversationPage() {
       </div>
     );
   }
+  return <Conversation candidate={view.candidate} base={base} />;
+}
 
-  const { candidate } = view;
+/**
+ * The thread beside the candidate panel. The panel sits alongside from `lg`
+ * up and can be collapsed; on anything narrower it takes the whole column
+ * while it's open, which is what makes the workspace usable on a phone.
+ */
+function Conversation({
+  candidate,
+  base,
+}: {
+  candidate: PanelCandidate & { name?: string };
+  base: string;
+}) {
+  const [panelOpen, setPanelOpen] = useState(false);
   const name = candidateDisplayName(candidate);
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="conversation">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
-        <Link
-          to={base}
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "md:hidden",
-          )}
-          aria-label="Back to candidates"
-        >
-          ←
-        </Link>
-        <div className="flex min-w-0 flex-col">
-          <h2
-            className="truncate font-medium"
-            data-testid="conversation-candidate-name"
+    <div className="flex min-h-0 flex-1" data-testid="conversation">
+      <div
+        className={cn(
+          "min-w-0 flex-1 flex-col",
+          panelOpen ? "hidden lg:flex" : "flex",
+        )}
+      >
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
+          <Link
+            to={base}
+            className={cn(
+              buttonVariants({ variant: "ghost", size: "sm" }),
+              "md:hidden",
+            )}
+            aria-label="Back to candidates"
           >
-            {name}
-          </h2>
-          {(candidate.name !== undefined ||
-            candidate.acceptedAs !== undefined) && (
-            <span
-              className="truncate text-xs text-muted-foreground"
-              data-testid="conversation-candidate-email"
+            ←
+          </Link>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h2
+              className="truncate font-medium"
+              data-testid="conversation-candidate-name"
             >
-              {candidate.acceptedAs !== undefined
-                ? `Invited as ${candidate.email} · Accepted as ${candidate.acceptedAs}`
-                : candidate.email}
-            </span>
-          )}
-        </div>
-      </header>
+              {name}
+            </h2>
+            {(candidate.name !== undefined ||
+              candidate.acceptedAs !== undefined) && (
+              <span
+                className="truncate text-xs text-muted-foreground"
+                data-testid="conversation-candidate-email"
+              >
+                {candidate.acceptedAs !== undefined
+                  ? `Invited as ${candidate.email} · Accepted as ${candidate.acceptedAs}`
+                  : candidate.email}
+              </span>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            aria-expanded={panelOpen}
+            data-testid="toggle-candidate-panel"
+            onClick={() => setPanelOpen((open) => !open)}
+          >
+            Details
+          </Button>
+        </header>
 
-      <MembershipBanner
-        candidateId={candidate.candidateId}
-        name={name}
-        email={candidate.email}
-        membership={candidate.membership}
-        membershipChangedAt={candidate.membershipChangedAt}
-        invite={candidate.invite}
-      />
+        <MembershipBanner
+          candidateId={candidate.candidateId}
+          name={name}
+          email={candidate.email}
+          membership={candidate.membership}
+          membershipChangedAt={candidate.membershipChangedAt}
+          invite={candidate.invite}
+        />
 
-      {/* Keyed by candidate: opening another one starts its paging fresh. */}
-      <Conversation
-        key={candidate.candidateId}
-        candidateId={candidate.candidateId}
-        name={name}
-        membership={candidate.membership}
-      />
+        {/* Keyed by candidate: opening another starts its paging fresh. */}
+        <Thread
+          key={candidate.candidateId}
+          candidateId={candidate.candidateId}
+          name={name}
+          membership={candidate.membership}
+        />
+      </div>
+
+      <aside
+        aria-label={`About ${name}`}
+        className={cn(
+          "min-w-0 flex-1 border-border lg:flex lg:max-w-sm lg:border-l",
+          panelOpen ? "flex" : "hidden",
+        )}
+      >
+        <CandidatePanel
+          candidate={candidate}
+          onClose={() => setPanelOpen(false)}
+        />
+      </aside>
     </div>
   );
 }
 
-function Conversation({
+/** The thread and composer for one candidate. */
+function Thread({
   candidateId,
   name,
   membership,
@@ -124,8 +170,6 @@ function Conversation({
   const send = useMutation(api.messages.mutations.send);
   const markReadMutation = useMutation(api.messages.mutations.markRead);
 
-  // The query pages newest-first; a thread reads oldest-first.
-  const messages = [...results].reverse();
   const markRead = useCallback(
     (seq: number) => markReadMutation({ ...args, seq }),
     [markReadMutation, args.matchmakerId, args.candidateId],
@@ -142,8 +186,9 @@ function Conversation({
 
   return (
     <>
-      <Thread
-        messages={messages}
+      <MessageThread
+        // The query pages newest-first; a thread reads oldest-first.
+        messages={[...results].reverse()}
         mine="matchmaker"
         emptyState={`Nothing here yet. Say hello to ${name}.`}
         canLoadOlder={status === "CanLoadMore"}

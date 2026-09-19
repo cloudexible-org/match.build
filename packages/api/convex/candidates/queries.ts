@@ -102,6 +102,7 @@ export const conversation = query({
         ),
         membership,
         membershipChangedAt: v.number(),
+        status: candidateStatus,
         invite: v.union(
           v.null(),
           v.object({
@@ -138,6 +139,7 @@ export const conversation = query({
         socialHandles: candidate.socialHandles,
         membership: candidate.membership,
         membershipChangedAt: candidate.membershipChangedAt,
+        status: candidate.status,
         invite:
           candidate.invite === undefined
             ? null

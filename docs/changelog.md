@@ -11,6 +11,13 @@ The monorepo was bootstrapped from [turbostack](https://github.com/cloudexible-o
 ## [Unreleased]
 
 ### Added
+- **The candidate panel (phase 1 step 6):** the workspace's right-hand column, with Details, Notes and History (`apps/app/src/workspace/candidate-panel.tsx`). It sits beside the thread from `lg` up and takes the column on anything narrower, with its own Close button — the thread's header, which holds the toggle, is hidden while it's open. *Why:* everything the matchmaker knows about a candidate that isn't the conversation.
+  - **Details:** the matchmaker's own label for them and their social handles, saved with the server's rules; their email, how they accepted, and their membership; and the status (active, paused, archived) that drives the list's filters. Their email isn't editable here — while invited it belongs to the invitation, and once joined it's the address they accepted with.
+  - **Notes:** add, edit and remove, each audited. Removing is soft, like everything else.
+  - **History:** the audit trail, newest first, paged, with the spec's filters (All · Details · Invitations & membership · Notes). Sentences come from `audit/rules.ts`, so what is shown is what was recorded, and each entry names who did it — "You", the candidate, System, or a platform admin.
+  - **Seeded worlds now carry their membership history** (invitation created, then accepted, declined or left), so a seeded candidate's History reads like a real one's.
+  - `Tabs` in `packages/ui`, on Base UI. The selected tab is marked `data-active`, not `data-selected` — worth knowing, since the wrong one fails silently.
+  - **Tests:** convex-test for notes, details, status and the history query (including its filters and refusals), and `specs/app-convex/candidate-panel.spec.ts` for the three tabs, validation, and the panel collapsing on a phone.
 - **Chat (phase 1 step 5):** both sides now hold one conversation, live. *Why:* this is the product — everything before it was getting a candidate into a thread.
   - **Real-time both ways** through Convex subscriptions: a message appears on the other side with no refresh, proven in the e2e suite by driving two browser sessions at once.
   - **One sequence per conversation**, allocated server-side (`messages/helpers.ts`), so ordering can't race. Sending moves `lastSeq`, `lastPublicSeq` (only for messages the candidate can see), `lastMessageAt`, and the sender's own read marker.

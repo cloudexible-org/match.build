@@ -23,6 +23,7 @@ test.beforeAll(async () => {
     users: [
       { key: "maya", name: "Maya Maker" },
       { key: "live", name: "Liv Live" },
+      { key: "bump", name: "Bree Bump" },
       { key: "unread", name: "Uma Unread" },
       { key: "private", name: "Pat Private" },
       { key: "long", name: "Lou Long" },
@@ -88,6 +89,13 @@ test.beforeAll(async () => {
         name: "Gus Gone",
         membershipChangedDaysAgo: 7,
         messages: [{ author: "matchmaker", body: "Take care, Gus." }],
+      },
+      {
+        key: "bump",
+        matchmakerKey: "book",
+        userKey: "bump",
+        membership: "joined",
+        name: "Bree Bump",
       },
       { key: "invited", matchmakerKey: "book", name: "Ivy Invited" },
     ],
@@ -204,13 +212,15 @@ test("a reply arriving while the list is open bumps the unread count", async ({
   await signInAs(page, world.email("maya"));
   const workspace = new WorkspacePage(page);
   await workspace.goto(world.username("book"));
-  const row = workspace.getCandidateRow("Liv Live");
+  // Its own candidate: another test's pending read marker must not be able
+  // to change this count (see docs/e2e-architecture.md §8).
+  const row = workspace.getCandidateRow("Bree Bump");
   await expect(row).toBeVisible();
 
   const { page: candidatePage, chat } = await asCandidate(
     browser,
     baseURL,
-    "live",
+    "bump",
   );
   await chat.send("One more thing…");
 

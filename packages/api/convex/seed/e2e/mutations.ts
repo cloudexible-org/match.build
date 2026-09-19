@@ -485,6 +485,40 @@ export const scenario = internalMutation({
           entityId: candidateId,
         });
       }
+      // How they got to this membership, as the product would have recorded
+      // it: an invitation, then their answer to it.
+      const answered: Partial<
+        Record<
+          typeof membership,
+          "invite.accepted" | "invite.declined" | "membership.left"
+        >
+      > = {
+        joined: "invite.accepted",
+        declined: "invite.declined",
+        left: "membership.left",
+      };
+      const answer = answered[membership];
+      if (answer !== undefined) {
+        await ctx.db.insert("auditEvents", {
+          matchmakerId,
+          candidateId,
+          actor: byMatchmaker,
+          action: "invite.created",
+          entityTable: "candidates",
+          entityId: candidateId,
+        });
+        await ctx.db.insert("auditEvents", {
+          matchmakerId,
+          candidateId,
+          actor:
+            userId === undefined
+              ? byMatchmaker
+              : { type: "user", userId, role: "candidate" },
+          action: answer,
+          entityTable: "candidates",
+          entityId: candidateId,
+        });
+      }
 
       // Invite emails already recorded as sent, for the limits that count
       // them (three a day). Left to the spec, so a seeded invite is "not

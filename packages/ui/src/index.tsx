@@ -15,5 +15,11 @@ export {
   Input,
 } from "./components/field";
 export { NativeSelect } from "./components/native-select";
+export {
+  Tabs,
+  TabsList,
+  TabsPanel,
+  TabsTab,
+} from "./components/tabs";
 export { Textarea } from "./components/textarea";
 export { cn } from "./lib/cn";
