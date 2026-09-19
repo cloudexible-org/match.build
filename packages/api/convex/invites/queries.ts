@@ -36,6 +36,14 @@ export const preview = query({
   args: {
     token: v.optional(v.string()),
     candidateId: v.optional(v.string()),
+    /**
+     * The viewer's clock, for display only. A query may not read the clock
+     * (it wouldn't re-run as time passed), so without this an invite that
+     * expired before its scheduled job ran would still offer Accept. Nothing
+     * is authorised on it: `accept` and `decline` check the server's own
+     * clock, so a wound-back `now` only shows a screen that then refuses.
+     */
+    now: v.optional(v.number()),
   },
   returns: v.union(
     v.object({ state: v.literal("invalid") }),
@@ -55,6 +63,12 @@ export const preview = query({
     if (user === null) return { state: "invalid" as const };
     const candidate = await resolveInvite(ctx, user, args);
     if (candidate === null) return { state: "invalid" as const };
+    if (
+      args.now !== undefined &&
+      (candidate.invite?.expiresAt ?? 0) <= args.now
+    ) {
+      return { state: "invalid" as const };
+    }
     const matchmaker = await ctx.db.get("matchmakers", candidate.matchmakerId);
     if (matchmaker === null) return { state: "invalid" as const };
     return {

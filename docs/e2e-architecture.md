@@ -456,23 +456,102 @@ explanation in it so the gap stays visible.
 
 ---
 
-## 8. Parallel safety
+## 8. Test data: baseline, scenarios, and parallel safety
 
-`fullyParallel: true` means spec **files** run concurrently, against **one
-Convex deployment**. Isolation comes from *whose* data a spec touches:
+The suite runs against **one** Convex deployment, so isolation is about
+*whose rows* a spec touches. There are two kinds of data, and a spec should
+almost always want the second.
 
-- **Own your account.** Sign up with an address unique to the run and test, or
-  sign in as a seeded user no other spec uses (§1d). Everything a signed-in
-  page shows is scoped to that account and its tenants, so another spec's
-  writes can't appear in it.
-- **Assert only on rows you own** — seeded rows named in `fixture.ts`, or rows
-  carrying a per-run token. Seeded display names start with `Seeded:` so they
-  can't collide with anything a spec creates.
-- **Never assert on a global count or an empty table.** Another spec's writes
-  land in the same database.
-- **`test.describe.configure({ mode: "serial" })`** is right for a spec whose
-  steps build on each other. Ownership is what keeps it safe from *other*
-  files.
+### The baseline seed — shared, read-only
+
+`packages/api/convex/seed/e2e/fixture.ts` is rebuilt before every run
+(`fixtures/global-setup.ts`). It holds the few accounts that exist for the
+whole suite: the platform admins the `admin-convex` specs sign in as, and a
+handful of matchmaker profiles. **Nothing may change it.** A spec that writes
+to a baseline row breaks whichever other spec reads it next, and the failure
+surfaces somewhere unrelated.
+
+### Scenarios — one world per spec file
+
+Everything else comes from `seedScenario()` (`apps/e2e/scenario.ts`), called
+once in a file's `beforeAll`. It asks the backend
+(`seed/e2e/mutations:scenario`) for accounts, profiles, candidates, threads
+and invites under a **namespace unique to that file and run**, and hands back
+a manifest of what it wrote:
+
+```ts
+let world: Scenario;
+
+test.beforeAll(async () => {
+  world = await seedScenario({
+    users: [{ key: "maya" }, { key: "jane" }],
+    matchmakers: [{ key: "book", ownerKey: "maya" }],
+    candidates: [
+      { key: "jane", matchmakerKey: "book", userKey: "jane",
+        membership: "joined", messages: [{ author: "candidate", body: "hi" }] },
+      { key: "lapsed", matchmakerKey: "book", membership: "left",
+        membershipChangedDaysAgo: 30 },
+    ],
+  });
+});
+
+test("…", async ({ page }) => {
+  await signInAs(page, world.email("maya"));
+  await page.goto(`/app/mm/${world.username("book")}`);
+});
+```
+
+Emails and usernames carry the namespace, so two files — and two runs of the
+same file — can never write the same rows. Scenario rows are wiped by the
+next run's reset, not after the file, so a failed run can be inspected.
+
+It also reaches states the UI can't reach quickly, or at all: an invite that
+has **expired** or been revoked (with a real, openable link token), a
+candidate who **left** a month ago, an invitation already **emailed three
+times today** (`invitesSentToday`, for the resend limit), private imported
+history, notes. Seeded rows carry the audit events the product would have
+written, so History reads the same as it would for real data.
+
+### Scheduling
+
+`fullyParallel: false`. Tests inside a file run **one at a time, in order**,
+in one worker; different **files** run in parallel. So:
+
+- Tests in a file may share what the file seeded — nothing else runs
+  alongside them.
+- A test that *changes* something should still own its rows (its own
+  candidate, or its own matchmaker). It keeps a failure from cascading into
+  the next test in the file, and it keeps each test readable on its own.
+- Files are independent by construction, so their order never matters.
+
+**Keep a spec file under ~10 tests.** The file is the unit of parallelism, so
+one long file sets the suite's floor; split by flow (`invitations`,
+`invite-management`, `onboarding`), not by count.
+
+### Signing in
+
+`signInAs(page, email)` (`apps/e2e/session.ts`) runs the real Convex Auth
+email-code flow over HTTP and writes the session into `localStorage` once,
+before the page loads the app. It is about ten times faster than typing an
+email and a code, and there is no inbox polling to flake.
+
+Use the UI instead only where the sign-in screens are the subject
+(`specs/app-convex/sign-up.spec.ts`, `specs/admin-convex/`), through
+`signUp` / `signInToAdmin` in `apps/e2e/accounts.ts`.
+
+The session is written, not injected on every navigation, so **signing out
+really signs out** and a test can prove it.
+
+### Rules that still hold
+
+- **Never assert on a global count or an empty table.** Another file's rows
+  are in the same database.
+- **Assert on rows you own** — from your scenario's manifest, never by
+  guessing at a name another spec might also use.
+- **Never sign in as an account another file also uses.** Requesting a
+  sign-in code invalidates the previous one, so two files sharing an account
+  race. Scenario accounts are unique by construction; baseline accounts are
+  one per spec by hand.
 
 ---
 

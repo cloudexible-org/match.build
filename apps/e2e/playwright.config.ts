@@ -116,7 +116,16 @@ export default defineConfig({
   testDir: "./specs",
   // Proves the backend is ours, then reseeds. No-ops when E2E_CONVEX=0.
   globalSetup: "./fixtures/global-setup.ts",
-  fullyParallel: true,
+  /**
+   * Tests within a file run one at a time, in order; different files run in
+   * parallel across workers. That is what lets a file's tests share the world
+   * it seeded in `beforeAll` (see `scenario.ts`) without racing each other,
+   * while files stay independent because each seeds its own namespace.
+   *
+   * Keep a spec file under ~10 tests: it is the unit of parallelism, so one
+   * long file sets the suite's wall-clock floor.
+   */
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,

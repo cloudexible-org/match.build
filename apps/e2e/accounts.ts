@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 import { AdminSignInPage } from "./page-objects/admin/sign-in.page";
-import { CreateMatchmakerPage } from "./page-objects/app/matchmaker.page";
 import {
   CompleteProfilePage,
   SignInPage,
@@ -8,7 +7,9 @@ import {
 import { latestSignInEmail, waitForSignInCode } from "./sign-in-codes";
 
 /**
- * Account set-up shared by `app-convex` specs.
+ * Signing *up* through the UI, for the specs that are about that flow.
+ * Everywhere else, seed the account (`scenario.ts`) and sign in over HTTP
+ * (`session.ts`): it is an order of magnitude faster.
  *
  * Every call uses an address unique to this run and label, so specs never
  * share an account or a pending sign-in code (see the note in
@@ -46,17 +47,6 @@ export async function signUp(
   await signIn.enterCode(await waitForSignInCode(email, before));
   await new CompleteProfilePage(page).submitName(name);
   return { email };
-}
-
-/** Signs up and creates a matchmaker profile; ends in its workspace. */
-export async function signUpAsMatchmaker(page: Page, label: string) {
-  await signUp(page, label, "Maya Maker");
-  const username = uniqueUsername();
-  const create = new CreateMatchmakerPage(page);
-  await create.goto();
-  await create.create({ username, displayName: "Maya Matches" });
-  await page.waitForURL(new RegExp(`/app/mm/${username}$`));
-  return { username };
 }
 
 /**

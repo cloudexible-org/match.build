@@ -394,6 +394,19 @@ export const scenario = internalMutation({
       });
       matchmakerIds[profile.key] = id;
       matchmakers[profile.key] = { id, username, displayName };
+      // The events the product would have written, so History reads the same
+      // as it would for a profile created through the UI.
+      await ctx.db.insert("auditEvents", {
+        matchmakerId: id,
+        actor: { type: "user", userId: ownerUserId, role: "matchmaker" },
+        action: "matchmaker.created",
+        entityTable: "matchmakers",
+        entityId: id,
+        changes: [
+          { field: "username", after: JSON.stringify(username) },
+          { field: "displayName", after: JSON.stringify(displayName) },
+        ],
+      });
     }
 
     const candidates: ScenarioManifest["candidates"] = {};
@@ -443,8 +456,39 @@ export const scenario = internalMutation({
         });
       }
 
-      // Audit events the app would have written, so limits that count them
-      // (three invite emails a day) behave as they would in the product.
+      const ownerUserId = (await ctx.db.get("matchmakers", matchmakerId))
+        ?.ownerUserId;
+      if (ownerUserId === undefined) {
+        throw new Error(`Scenario "${ns}": matchmaker vanished`);
+      }
+      const byMatchmaker = {
+        type: "user",
+        userId: ownerUserId,
+        role: "matchmaker",
+      } as const;
+      await ctx.db.insert("auditEvents", {
+        matchmakerId,
+        candidateId,
+        actor: byMatchmaker,
+        action: "candidate.created",
+        entityTable: "candidates",
+        entityId: candidateId,
+        changes: [{ field: "email", after: JSON.stringify(email) }],
+      });
+      if (inviteToken !== null) {
+        await ctx.db.insert("auditEvents", {
+          matchmakerId,
+          candidateId,
+          actor: byMatchmaker,
+          action: "invite.created",
+          entityTable: "candidates",
+          entityId: candidateId,
+        });
+      }
+
+      // Invite emails already recorded as sent, for the limits that count
+      // them (three a day). Left to the spec, so a seeded invite is "not
+      // emailed yet" unless it asks otherwise.
       for (let i = 0; i < (spec.invitesSentToday ?? 0); i++) {
         await ctx.db.insert("auditEvents", {
           matchmakerId,
@@ -483,7 +527,7 @@ export const scenario = internalMutation({
             message.author === "candidate"
               ? userId
               : message.author === "matchmaker"
-                ? (await ctx.db.get("matchmakers", matchmakerId))?.ownerUserId
+                ? ownerUserId
                 : undefined,
           visibility,
           source:

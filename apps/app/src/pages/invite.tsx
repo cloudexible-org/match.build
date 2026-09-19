@@ -36,7 +36,11 @@ const PROBLEMS = {
 export function InvitePage() {
   const { token, candidateId } = useParams();
   const ref = token !== undefined ? { token } : { candidateId };
-  const preview = useQuery(api.invites.queries.preview, ref);
+  // Read once, on mount: an invite that expired before its scheduled job ran
+  // should read as invalid rather than offering Accept (the server checks its
+  // own clock when answering).
+  const [now] = useState(() => Date.now());
+  const preview = useQuery(api.invites.queries.preview, { ...ref, now });
   const accept = useMutation(api.invites.mutations.accept);
   const decline = useMutation(api.invites.mutations.decline);
   const navigate = useNavigate();

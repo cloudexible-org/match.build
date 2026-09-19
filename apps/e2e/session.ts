@@ -14,9 +14,11 @@ import { latestSignInEmail, waitForSignInCode } from "./sign-in-codes";
  *
  * The session lives in `localStorage` under the keys `@convex-dev/auth`'s
  * React client reads (`__convexAuthJWT_<namespace>`, namespace = the
- * deployment URL with non-alphanumerics stripped). Set through
- * `addInitScript`, so it is in place before the app boots and the app sees a
- * signed-in user on its first render — no sign-in redirect to wait out.
+ * deployment URL with non-alphanumerics stripped). It is written **once**,
+ * from the sign-in page (which needs no session), rather than through
+ * `addInitScript`: an init script re-runs on every navigation, so signing out
+ * and reloading would silently sign the page back in and no test could ever
+ * prove sign-out works.
  */
 
 type Tokens = { token: string; refreshToken: string };
@@ -55,8 +57,10 @@ export async function fetchSession(email: string): Promise<Tokens> {
  */
 export async function signInAs(page: Page, email: string): Promise<void> {
   const tokens = await fetchSession(email);
-  const url = localBackendUrl();
-  await page.addInitScript(
+  // Any page on the app's origin will do; sign-in is the one that renders
+  // without a session.
+  await page.goto("/app/sign-in");
+  await page.evaluate(
     ([namespace, jwt, refresh]) => {
       window.localStorage.setItem(`__convexAuthJWT_${namespace}`, jwt);
       window.localStorage.setItem(
@@ -64,6 +68,10 @@ export async function signInAs(page: Page, email: string): Promise<void> {
         refresh,
       );
     },
-    [storageNamespace(url), tokens.token, tokens.refreshToken] as const,
+    [
+      storageNamespace(localBackendUrl()),
+      tokens.token,
+      tokens.refreshToken,
+    ] as const,
   );
 }
