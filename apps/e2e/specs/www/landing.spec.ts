@@ -4,11 +4,9 @@ import { LandingPage } from "../../page-objects/www/landing.page";
 /**
  * Coverage for the `apps/www` marketing site.
  *
- * Asserts only on statically-rendered chrome and on client-side animation
- * state — never on backend data. `NEXT_PUBLIC_CONVEX_URL` is a placeholder in
- * CI that never connects, and Clerk is optional (`apps/www/env.ts` marks the
- * publishable key optional, and the nav/hero auth buttons render only when it
- * is set), so nothing here may depend on either being configured.
+ * Asserts only on statically-rendered chrome, client-side validation and
+ * animation state — never on backend data. `NEXT_PUBLIC_CONVEX_URL` is a
+ * placeholder in CI that never connects, so nothing here may depend on it.
  */
 test.describe("landing chrome", () => {
   test("renders the hero", async ({ page }) => {
@@ -17,10 +15,33 @@ test.describe("landing chrome", () => {
 
     await expect(landing.getHeading()).toBeVisible();
     await expect(landing.getTagline()).toBeVisible();
-    await expect(landing.getGithubLink()).toHaveAttribute(
+    await expect(landing.getHeroWaitlistLink()).toHaveAttribute(
       "href",
-      "https://github.com/cloudexible-org/turbostack",
+      "#waitlist",
     );
+    await expect(landing.getHeroHowItWorksLink()).toHaveAttribute(
+      "href",
+      "#how-it-works",
+    );
+  });
+
+  /**
+   * The product still is an illustration: its fake buttons ("Send", "Undo")
+   * must not reach assistive technology as controls, and its figcaption is
+   * the single description of it.
+   */
+  test("the product mock is described once, not read out", async ({ page }) => {
+    const landing = new LandingPage(page);
+    await landing.goto();
+
+    const mock = landing.getConversationMock();
+    await expect(mock).toBeVisible();
+    await expect(mock.locator("figcaption")).toContainText("suggested");
+    // Role queries honour `aria-hidden`, so the mock's pretend controls are
+    // absent from the accessibility tree even though they render.
+    await expect(mock.getByText("Send", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Undo" })).toHaveCount(0);
   });
 
   /**
@@ -30,29 +51,22 @@ test.describe("landing chrome", () => {
    * stamps `role="button"` over the anchor's implicit link role — so assistive
    * technology announces a navigating link as a button. Base UI's own docs say
    * links "should not be rendered as buttons through the `render` prop".
-   *
-   * `getByRole("link", { exact: true })` fails on both halves of the old bug:
-   * the overridden role, and the doubled accessible name ("GitHub GitHub") that
-   * an `aria-label`led icon produced next to identical visible text.
    */
-  test("button-styled links keep link semantics and a single name", async ({
-    page,
-  }) => {
+  test("button-styled links keep link semantics", async ({ page }) => {
     const landing = new LandingPage(page);
     await landing.goto();
 
-    for (const link of [landing.getGithubLink(), landing.getStarLink()]) {
+    for (const [link, href] of [
+      [landing.getHeroWaitlistLink(), "#waitlist"],
+      [landing.getHeroHowItWorksLink(), "#how-it-works"],
+      [landing.getNavWaitlistLink(), "#waitlist"],
+      [landing.getSignInLink(), "/app/"],
+    ] as const) {
       await expect(link).toHaveCount(1);
-      await expect(link).toHaveAttribute(
-        "href",
-        "https://github.com/cloudexible-org/turbostack",
-      );
+      await expect(link).toHaveAttribute("href", href);
       // A link, never a button — and never both.
       await expect(link).not.toHaveAttribute("role", "button");
     }
-
-    // The decorative icon must not contribute a second "GitHub" to the name.
-    await expect(page.getByRole("img", { name: "GitHub" })).toHaveCount(0);
   });
 
   /**
@@ -61,9 +75,7 @@ test.describe("landing chrome", () => {
    * returns them where they were (WCAG 3.2.5).
    *
    * Asserted as an invariant over the whole page rather than link by link, so a
-   * new external link added later cannot quietly skip the hint — that is the
-   * failure this is really guarding against, since every individual link here
-   * already passes.
+   * new external link added later cannot quietly skip the hint.
    */
   test("every link that opens a new tab announces it", async ({ page }) => {
     const landing = new LandingPage(page);
@@ -91,14 +103,18 @@ test.describe("landing chrome", () => {
     await landing.goto();
 
     for (const name of [
-      "stack-marquee",
-      "showcase",
-      "built-with",
-      "cta",
+      "problem",
+      "how-it-works",
+      "principles",
+      "privacy",
+      "faq",
+      "waitlist",
     ] as const) {
       await expect(landing.getSection(name)).toBeAttached();
     }
-    await expect(landing.getFeatureCards()).toHaveCount(9);
+    await expect(landing.getSteps()).toHaveCount(3);
+    await expect(landing.getFeatureCards()).toHaveCount(6);
+    await expect(landing.getFaqItems()).toHaveCount(7);
   });
 
   test("theme toggle switches the document theme", async ({ page }) => {
@@ -108,6 +124,110 @@ test.describe("landing chrome", () => {
     const before = await landing.themeClass();
     await landing.getThemeToggle().click();
     await expect.poll(() => landing.themeClass()).not.toBe(before);
+  });
+});
+
+test.describe("faq", () => {
+  test("a question expands to its answer and collapses again", async ({
+    page,
+  }) => {
+    const landing = new LandingPage(page);
+    await landing.goto();
+
+    const question = landing.getFaqQuestion("Is this a dating app?");
+    const answer = page.getByText("Your clients never browse or swipe");
+
+    await expect(question).toHaveAttribute("aria-expanded", "false");
+    await expect(answer).toBeHidden();
+
+    await question.click();
+    await expect(question).toHaveAttribute("aria-expanded", "true");
+    await expect(answer).toBeVisible();
+
+    await question.click();
+    await expect(question).toHaveAttribute("aria-expanded", "false");
+    await expect(answer).toBeHidden();
+  });
+});
+
+/**
+ * The waitlist form validates with the same rules the `waitlist.mutations.join`
+ * mutation enforces (`packages/api/convex/waitlist/rules.ts`, re-exported from
+ * `@repo/api`). Only the client half is asserted here: this project's Convex
+ * URL is a placeholder that never connects, so nothing may reach the backend.
+ * The server half is covered by `convex/waitlist/mutations.test.ts`.
+ */
+test.describe("waitlist", () => {
+  test("an empty submit asks for an email", async ({ page }) => {
+    const landing = new LandingPage(page);
+    await landing.goto();
+
+    await landing.getWaitlistSubmit().click();
+    await expect(
+      landing.getWaitlistForm().getByText("Enter your email address."),
+    ).toBeVisible();
+    await expect(landing.getWaitlistField("Email")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+  });
+
+  test("a malformed email and handle are rejected on Enter", async ({
+    page,
+  }) => {
+    const landing = new LandingPage(page);
+    await landing.goto();
+
+    await landing.getWaitlistField("Instagram").fill("not a handle!");
+    await landing.getWaitlistField("Email").fill("ada@example");
+    await landing.getWaitlistField("Email").press("Enter");
+
+    const form = landing.getWaitlistForm();
+    await expect(form.getByText("Enter a valid email address.")).toBeVisible();
+    await expect(
+      form.getByText("That doesn't look like an Instagram handle."),
+    ).toBeVisible();
+    await expect(landing.getWaitlistSuccess()).toHaveCount(0);
+  });
+
+  test("errors clear once the input is fixed", async ({ page }) => {
+    const landing = new LandingPage(page);
+    await landing.goto();
+
+    const email = landing.getWaitlistField("Email");
+    await email.fill("ada@example");
+    await landing.getWaitlistSubmit().click();
+    const error = landing
+      .getWaitlistForm()
+      .getByText("Enter a valid email address.");
+    await expect(error).toBeVisible();
+
+    // After a submit, Base UI re-validates on change.
+    await email.fill("ada@example.com");
+    await expect(error).toBeHidden();
+  });
+
+  /**
+   * The honeypot is the one path that shows success without the backend, so it
+   * is how the success state gets exercised here.
+   */
+  test("a filled honeypot short-circuits to the success state", async ({
+    page,
+  }) => {
+    const landing = new LandingPage(page);
+    await landing.goto();
+
+    await landing.getWaitlistField("Email").fill("bot@example.com");
+    await landing
+      .getWaitlistForm()
+      .locator('input[name="website"]')
+      .fill("https://spam.example", { force: true });
+    await landing.getWaitlistSubmit().click();
+
+    await expect(landing.getWaitlistSuccess()).toBeVisible();
+    await expect(landing.getWaitlistSuccess()).toContainText(
+      "You're on the list.",
+    );
   });
 });
 
@@ -129,13 +249,13 @@ test.describe("motion", () => {
     const landing = new LandingPage(page);
     await landing.goto();
 
-    // Feature cards live ~1.5 viewports down and are staggered children of a
-    // `whileInView` group, so they must start fully transparent.
-    const firstCard = landing.getFeatureCards().first();
-    await expect(firstCard).toHaveCSS("opacity", "0");
+    // The how-it-works steps live ~2 viewports down and are staggered children
+    // of a `whileInView` group, so they must start fully transparent.
+    const firstStep = landing.getSteps().first();
+    await expect(firstStep).toHaveCSS("opacity", "0");
 
-    await landing.wheel(8);
-    await expect(firstCard).toHaveCSS("opacity", "1");
+    await landing.wheel(16);
+    await expect(firstStep).toHaveCSS("opacity", "1");
   });
 
   test("the hero drifts as it scrolls away", async ({ page }) => {
@@ -182,7 +302,7 @@ test.describe("motion", () => {
 
     expect(await landing.scrollY()).toBe(0);
 
-    await landing.wheel(32);
+    await landing.wheel(60);
     expect(await landing.scrollY()).toBeGreaterThan(1000);
 
     // Every reveal on the page should have fired by the time we are at the end.
@@ -212,7 +332,7 @@ test.describe("reduced motion", () => {
     expect(await landing.hasLenis()).toBe(false);
     await expect(landing.getHeading()).toBeVisible();
 
-    await landing.wheel(8);
-    await expect(landing.getFeatureCards().first()).toHaveCSS("opacity", "1");
+    await landing.wheel(16);
+    await expect(landing.getSteps().first()).toHaveCSS("opacity", "1");
   });
 });

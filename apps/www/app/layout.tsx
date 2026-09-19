@@ -1,6 +1,6 @@
 import { AnalyticsProvider } from "@repo/analytics";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { MotionProvider } from "@/components/motion-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { env } from "@/env";
@@ -18,10 +18,26 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+});
+
+const DESCRIPTION =
+  "One workspace for independent matchmakers: every client conversation in one thread, a profile that builds itself as they talk, and replies drafted in your voice for you to approve.";
+
 export const metadata: Metadata = {
   title: "Matchmaker — the matchmaker's operating system",
-  description:
-    "Tools that help an independent matchmaker carry a bigger book without losing the curation.",
+  description: DESCRIPTION,
+  openGraph: {
+    title: "Matchmaker — the matchmaker's operating system",
+    description: DESCRIPTION,
+    type: "website",
+    siteName: "Matchmaker",
+  },
+  twitter: { card: "summary", title: "Matchmaker", description: DESCRIPTION },
 };
 
 export default function RootLayout({
@@ -30,10 +46,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>): React.ReactNode {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    // Font variables go on <html>, not <body>: the `@theme` tokens that
+    // reference them (`--font-display` etc.) are declared on `:root`, and a
+    // custom property resolves `var()` where it is declared — so a variable
+    // defined only on <body> is invisible to them.
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable}`}
+    >
+      <body className="antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

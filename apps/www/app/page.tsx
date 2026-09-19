@@ -1,12 +1,13 @@
-import { BuiltWith } from "@/components/landing/built-with";
-import { Cta } from "@/components/landing/cta";
+import { Faq } from "@/components/landing/faq";
 import { Features } from "@/components/landing/features";
 import { Hero } from "@/components/landing/hero";
-import { Showcase } from "@/components/landing/showcase";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { Principles } from "@/components/landing/principles";
+import { Privacy } from "@/components/landing/privacy";
+import { Problem } from "@/components/landing/problem";
+import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteNav } from "@/components/landing/site-nav";
-import { StackMarquee } from "@/components/landing/stack-marquee";
-import { NewTabHint } from "@/components/ui/new-tab-hint";
-import { Typography } from "@/components/ui/typography";
+import { Waitlist } from "@/components/landing/waitlist";
 
 export default function Home(): React.ReactNode {
   return (
@@ -15,27 +16,16 @@ export default function Home(): React.ReactNode {
 
       <main className="flex flex-1 flex-col items-center">
         <Hero />
-        <StackMarquee />
+        <Problem />
+        <HowItWorks />
         <Features />
-        <Showcase />
-        <BuiltWith />
-        <Cta />
+        <Principles />
+        <Privacy />
+        <Faq />
+        <Waitlist />
       </main>
 
-      <footer className="border-border/40 border-t py-8 text-center">
-        <Typography variant="muted">
-          Built with ❤️ by{" "}
-          <a
-            href="https://cloudexible.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-foreground hover:underline"
-          >
-            Cloudexible
-            <NewTabHint />
-          </a>
-        </Typography>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

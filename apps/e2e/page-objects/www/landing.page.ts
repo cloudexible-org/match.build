@@ -32,6 +32,18 @@ export class LandingPage {
     return this.getNav().getByRole("link", { name: "Matchmaker" });
   }
 
+  /** Sign-in lives in the Vite app; the marketing site only links to it. */
+  getSignInLink() {
+    return this.getNav().getByRole("link", { name: "Sign in", exact: true });
+  }
+
+  getNavWaitlistLink() {
+    return this.getNav().getByRole("link", {
+      name: "Join the waitlist",
+      exact: true,
+    });
+  }
+
   getThemeToggle() {
     return this.page.getByRole("button", { name: "Toggle theme" });
   }
@@ -48,36 +60,33 @@ export class LandingPage {
 
   getHeading() {
     return this.page.getByRole("heading", {
-      name: "The Modern Monorepo",
+      name: "Carry a bigger book. Keep the curation.",
       level: 1,
     });
   }
 
   getTagline() {
-    return this.page.getByText("The ultimate type-safe, full-stack monorepo", {
-      exact: false,
-    });
+    return this.page.getByTestId("hero-tagline");
   }
 
-  /**
-   * The hero's GitHub CTA — a `ButtonLink`, i.e. a real `<a href>` that keeps
-   * its implicit link role. It is addressed by role on purpose: routing it
-   * through `<Button render={<a />} />` would stamp `role="button"` on it and
-   * this locator would stop matching, which is the regression to catch.
-   */
-  getGithubLink() {
-    return this.page.getByRole("link", {
-      name: "GitHub (opens in a new tab)",
+  /** The hero's primary CTA — a `ButtonLink`, so it must stay a link. */
+  getHeroWaitlistLink() {
+    return this.getHeroContent().getByRole("link", {
+      name: "Join the waitlist",
       exact: true,
     });
   }
 
-  /** The closing CTA's GitHub link — same component, different label. */
-  getStarLink() {
-    return this.page.getByRole("link", {
-      name: "Star on GitHub (opens in a new tab)",
+  getHeroHowItWorksLink() {
+    return this.getHeroContent().getByRole("link", {
+      name: "See how it works",
       exact: true,
     });
+  }
+
+  /** The illustrative product still. Decorative; described by its caption. */
+  getConversationMock() {
+    return this.page.getByTestId("conversation-mock");
   }
 
   /** Every link that opens a new tab, by DOM attribute. */
@@ -97,6 +106,10 @@ export class LandingPage {
 
   // --- Sections -----------------------------------------------------------
 
+  getSteps() {
+    return this.page.getByTestId("step");
+  }
+
   getFeatureCards() {
     return this.page.getByTestId("feature-card");
   }
@@ -106,13 +119,50 @@ export class LandingPage {
   }
 
   getSection(
-    name: "stack-marquee" | "showcase" | "built-with" | "cta",
+    name:
+      | "problem"
+      | "how-it-works"
+      | "principles"
+      | "privacy"
+      | "faq"
+      | "waitlist",
   ): Locator {
     return this.page.getByTestId(name);
   }
 
   getFooterLink() {
-    return this.page.getByRole("link", { name: "Cloudexible" });
+    return this.page.getByRole("link", { name: /^Cloudexible/ });
+  }
+
+  // --- FAQ ----------------------------------------------------------------
+
+  getFaqItems() {
+    return this.page.getByTestId("faq-item");
+  }
+
+  /** An accordion trigger — a real button carrying `aria-expanded`. */
+  getFaqQuestion(question: string) {
+    return this.getSection("faq").getByRole("button", { name: question });
+  }
+
+  // --- Waitlist -----------------------------------------------------------
+
+  getWaitlistForm() {
+    return this.page.getByTestId("waitlist-form");
+  }
+
+  getWaitlistField(label: "Email" | "Name" | "Instagram") {
+    return this.getWaitlistForm().getByLabel(label);
+  }
+
+  getWaitlistSubmit() {
+    return this.getWaitlistForm().getByRole("button", {
+      name: "Join the waitlist",
+    });
+  }
+
+  getWaitlistSuccess() {
+    return this.page.getByTestId("waitlist-success");
   }
 
   // --- Scrolling ----------------------------------------------------------

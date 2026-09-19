@@ -3,10 +3,9 @@
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { motion, useScroll, useTransform } from "motion/react";
 import * as React from "react";
-import { GithubIcon } from "@/components/landing/github-icon";
+import { ConversationMock } from "@/components/landing/conversation-mock";
 import { EASE_OUT, revealGroup, revealItem } from "@/components/landing/reveal";
 import { ButtonLink } from "@/components/ui/button";
-import { NewTabHint } from "@/components/ui/new-tab-hint";
 import { Typography } from "@/components/ui/typography";
 
 export function Hero(): React.ReactNode {
@@ -25,68 +24,79 @@ export function Hero(): React.ReactNode {
     <section
       ref={sectionRef}
       id="top"
-      className="relative flex min-h-[calc(100svh-4rem)] w-full items-center justify-center overflow-hidden px-6 py-24"
+      className="relative flex min-h-[calc(100svh-4rem)] w-full items-center justify-center overflow-hidden px-4 py-20 sm:px-6"
     >
       <BackdropGlow />
 
       <motion.div
         data-testid="hero-content"
         style={{ y, opacity }}
-        variants={revealGroup}
-        initial="hidden"
-        animate="visible"
-        className="relative flex max-w-4xl flex-col items-center gap-6 text-center"
+        className="relative mx-auto grid w-full max-w-6xl items-center gap-14 lg:grid-cols-[1.05fr_1fr] lg:gap-16"
       >
-        <motion.div variants={revealItem}>
-          <Typography
-            variant="small"
-            className="inline-block rounded-full bg-primary/10 px-4 py-1.5 font-semibold text-primary shadow-sm ring-1 ring-primary/20"
-          >
-            Production Ready Template
-          </Typography>
-        </motion.div>
-
-        <motion.div variants={revealItem}>
-          <Typography
-            variant="h1"
-            className="bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text pb-2 text-transparent lg:text-7xl"
-          >
-            The Modern Monorepo
-          </Typography>
-        </motion.div>
-
-        <motion.div variants={revealItem}>
-          <Typography variant="lead" className="max-w-2xl leading-relaxed">
-            The ultimate type-safe, full-stack monorepo for Web, App, and
-            Native. Turbostack is powered by the best-in-class tools for 2026.
-          </Typography>
-        </motion.div>
-
         <motion.div
-          variants={revealItem}
-          className="flex flex-wrap items-center justify-center gap-4"
+          variants={revealGroup}
+          initial="hidden"
+          animate="visible"
+          className="flex flex-col items-center gap-6 text-center lg:items-start lg:text-left"
         >
-          <ButtonLink
-            size="lg"
-            className="group h-12 rounded-full px-8 text-base"
-            href="/app/"
+          <motion.div variants={revealItem}>
+            <Typography
+              variant="small"
+              className="inline-block rounded-full bg-accent px-4 py-1.5 font-semibold text-accent-foreground ring-1 ring-primary/15"
+            >
+              For independent matchmakers
+            </Typography>
+          </motion.div>
+
+          <motion.div variants={revealItem}>
+            <Typography
+              variant="h1"
+              className="font-display font-normal text-5xl leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl"
+            >
+              Carry a bigger book.{" "}
+              <em className="text-primary">Keep the curation.</em>
+            </Typography>
+          </motion.div>
+
+          <motion.div variants={revealItem}>
+            <Typography
+              variant="lead"
+              data-testid="hero-tagline"
+              className="max-w-xl text-lg leading-relaxed sm:text-xl"
+            >
+              Your business runs on DMs, a spreadsheet and your memory.
+              Matchmaker puts every client in one thread, builds their profile
+              as they talk, and drafts replies in your voice. You approve every
+              word.
+            </Typography>
+          </motion.div>
+
+          <motion.div
+            variants={revealItem}
+            className="flex flex-wrap items-center justify-center gap-3 lg:justify-start"
           >
-            Get Started
-            <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-          </ButtonLink>
-          <ButtonLink
-            variant="outline"
-            size="lg"
-            className="h-12 rounded-full px-8 text-base shadow-sm"
-            href="https://github.com/cloudexible-org/turbostack"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <GithubIcon className="mr-2 h-5 w-5" />
-            GitHub
-            <NewTabHint />
-          </ButtonLink>
+            <ButtonLink
+              size="lg"
+              className="group h-12 rounded-full px-7 text-base"
+              href="#waitlist"
+            >
+              Join the waitlist
+              <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+            </ButtonLink>
+            <ButtonLink
+              variant="outline"
+              size="lg"
+              className="h-12 rounded-full px-7 text-base"
+              href="#how-it-works"
+            >
+              See how it works
+            </ButtonLink>
+          </motion.div>
         </motion.div>
+
+        <div className="mx-auto w-full max-w-md lg:max-w-none">
+          <ConversationMock />
+        </div>
       </motion.div>
 
       <ScrollCue />
@@ -111,7 +121,7 @@ function BackdropGlow(): React.ReactNode {
           repeat: Number.POSITIVE_INFINITY,
           ease: "easeInOut",
         }}
-        className="-translate-x-1/2 absolute top-[-10%] left-1/2 h-[32rem] w-[32rem] rounded-full bg-primary/20 blur-[120px]"
+        className="absolute top-[-10%] left-[10%] h-[32rem] w-[32rem] rounded-full bg-primary/15 blur-[120px]"
       />
       <motion.div
         animate={{ x: [0, -50, 0], y: [0, 40, 0], scale: [1, 1.15, 1] }}
@@ -120,7 +130,7 @@ function BackdropGlow(): React.ReactNode {
           repeat: Number.POSITIVE_INFINITY,
           ease: "easeInOut",
         }}
-        className="absolute right-[5%] bottom-[-15%] h-[28rem] w-[28rem] rounded-full bg-accent/20 blur-[120px]"
+        className="absolute right-[5%] bottom-[-15%] h-[28rem] w-[28rem] rounded-full bg-chart-1/30 blur-[120px]"
       />
     </div>
   );
@@ -132,7 +142,7 @@ function ScrollCue(): React.ReactNode {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 1.2, duration: 0.6, ease: EASE_OUT }}
-      className="-translate-x-1/2 absolute bottom-8 left-1/2"
+      className="-translate-x-1/2 absolute bottom-6 left-1/2 hidden lg:block"
     >
       <motion.div
         animate={{ y: [0, 8, 0] }}

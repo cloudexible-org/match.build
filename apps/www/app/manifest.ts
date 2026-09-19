@@ -10,8 +10,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "The operating system for independent matchmakers",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#000000",
+    background_color: "#fcf9f5",
+    theme_color: "#8f2239",
     icons: [
       {
         src: "/icon-192x192.png",
