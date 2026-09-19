@@ -24,6 +24,7 @@
 import { v } from "convex/values";
 import type { Id } from "../../_generated/dataModel";
 import { internalMutation, internalQuery } from "../../_generated/server";
+import { inviteTokenFor, newInvite } from "../../invites/helpers";
 import {
   SEED_ADMINS,
   SEED_CODE_TARGET,
@@ -33,6 +34,13 @@ import {
   SEED_NOT_ADMIN,
   SEED_USERS,
 } from "./fixture";
+import {
+  NS_PATTERN,
+  type ScenarioManifest,
+  scenarioEmail,
+  scenarioName,
+  scenarioUsername,
+} from "./scenario";
 
 /**
  * Identity probe for `assertLocalBackendIdentity`, and the only reliable half
@@ -208,5 +216,308 @@ export const apply = internalMutation({
     }
 
     return { users, matchmakers };
+  },
+});
+
+/*
+ * ─── Per-file scenarios ─────────────────────────────────────────────────────
+ *
+ * See `./scenario.ts` for what a scenario is and why. Everything below writes
+ * only rows carrying the caller's namespace, and reads nothing else, so two
+ * spec files seeding at the same time cannot collide.
+ */
+
+const scenarioPlatform = v.union(
+  v.literal("instagram"),
+  v.literal("whatsapp"),
+  v.literal("tiktok"),
+  v.literal("facebook"),
+  v.literal("x"),
+  v.literal("linkedin"),
+  v.literal("other"),
+);
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MESSAGE_GAP_MS = 60 * 1000;
+
+export const scenario = internalMutation({
+  args: {
+    ns: v.string(),
+    users: v.optional(
+      v.array(
+        v.object({
+          key: v.string(),
+          email: v.optional(v.string()),
+          name: v.optional(v.string()),
+          verified: v.optional(v.boolean()),
+          deleted: v.optional(v.boolean()),
+        }),
+      ),
+    ),
+    matchmakers: v.optional(
+      v.array(
+        v.object({
+          key: v.string(),
+          ownerKey: v.string(),
+          username: v.optional(v.string()),
+          displayName: v.optional(v.string()),
+          businessName: v.optional(v.string()),
+        }),
+      ),
+    ),
+    candidates: v.optional(
+      v.array(
+        v.object({
+          key: v.string(),
+          matchmakerKey: v.string(),
+          userKey: v.optional(v.string()),
+          email: v.optional(v.string()),
+          name: v.optional(v.string()),
+          membership: v.optional(
+            v.union(
+              v.literal("invited"),
+              v.literal("declined"),
+              v.literal("joined"),
+              v.literal("left"),
+              v.literal("account_deleted"),
+            ),
+          ),
+          status: v.optional(
+            v.union(
+              v.literal("active"),
+              v.literal("paused"),
+              v.literal("archived"),
+            ),
+          ),
+          socialHandles: v.optional(
+            v.array(
+              v.object({ platform: scenarioPlatform, handle: v.string() }),
+            ),
+          ),
+          invite: v.optional(
+            v.union(v.literal("open"), v.literal("expired"), v.literal("none")),
+          ),
+          membershipChangedDaysAgo: v.optional(v.number()),
+          invitesSentToday: v.optional(v.number()),
+          messages: v.optional(
+            v.array(
+              v.object({
+                author: v.union(
+                  v.literal("matchmaker"),
+                  v.literal("candidate"),
+                  v.literal("system"),
+                ),
+                visibility: v.optional(
+                  v.union(v.literal("everyone"), v.literal("matchmaker")),
+                ),
+                source: v.optional(
+                  v.union(
+                    v.literal("typed"),
+                    v.literal("imported"),
+                    v.literal("system"),
+                  ),
+                ),
+                body: v.string(),
+              }),
+            ),
+          ),
+          unreadForMatchmaker: v.optional(v.boolean()),
+          notes: v.optional(v.array(v.string())),
+        }),
+      ),
+    ),
+  },
+  returns: v.object({
+    ns: v.string(),
+    users: v.record(
+      v.string(),
+      v.object({ id: v.string(), email: v.string(), name: v.string() }),
+    ),
+    matchmakers: v.record(
+      v.string(),
+      v.object({
+        id: v.string(),
+        username: v.string(),
+        displayName: v.string(),
+      }),
+    ),
+    candidates: v.record(
+      v.string(),
+      v.object({
+        id: v.string(),
+        email: v.string(),
+        conversationId: v.string(),
+        inviteToken: v.union(v.null(), v.string()),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const ns = args.ns;
+    if (!NS_PATTERN.test(ns)) {
+      throw new Error(
+        `Scenario namespace "${ns}" must be 4–12 lowercase letters/digits starting with a letter.`,
+      );
+    }
+    const now = Date.now();
+
+    const users: ScenarioManifest["users"] = {};
+    const userIds: Record<string, Id<"users">> = {};
+    for (const user of args.users ?? []) {
+      const email = user.email ?? scenarioEmail(user.key, ns);
+      const name = user.name ?? scenarioName(user.key);
+      const id = await ctx.db.insert("users", {
+        email,
+        name,
+        emailVerificationTime: user.verified === false ? undefined : now,
+        deletedAt: user.deleted === true ? now : undefined,
+      });
+      userIds[user.key] = id;
+      users[user.key] = { id, email, name };
+    }
+
+    const matchmakers: ScenarioManifest["matchmakers"] = {};
+    const matchmakerIds: Record<string, Id<"matchmakers">> = {};
+    for (const profile of args.matchmakers ?? []) {
+      const ownerUserId = userIds[profile.ownerKey];
+      if (ownerUserId === undefined) {
+        throw new Error(`Scenario "${ns}": no user "${profile.ownerKey}"`);
+      }
+      const username = profile.username ?? scenarioUsername(profile.key, ns);
+      const displayName =
+        profile.displayName ?? `${scenarioName(profile.key)} ${ns}`;
+      const id = await ctx.db.insert("matchmakers", {
+        ownerUserId,
+        username,
+        usernameKey: username.replaceAll(".", ""),
+        displayName,
+        businessName: profile.businessName,
+      });
+      matchmakerIds[profile.key] = id;
+      matchmakers[profile.key] = { id, username, displayName };
+    }
+
+    const candidates: ScenarioManifest["candidates"] = {};
+    for (const spec of args.candidates ?? []) {
+      const matchmakerId = matchmakerIds[spec.matchmakerKey];
+      if (matchmakerId === undefined) {
+        throw new Error(
+          `Scenario "${ns}": no matchmaker "${spec.matchmakerKey}"`,
+        );
+      }
+      const membership = spec.membership ?? "invited";
+      const userId =
+        spec.userKey === undefined ? undefined : userIds[spec.userKey];
+      if (spec.userKey !== undefined && userId === undefined) {
+        throw new Error(`Scenario "${ns}": no user "${spec.userKey}"`);
+      }
+      const email =
+        spec.email ??
+        (spec.userKey !== undefined
+          ? users[spec.userKey].email
+          : scenarioEmail(spec.key, ns));
+
+      const candidateId = await ctx.db.insert("candidates", {
+        matchmakerId,
+        userId,
+        name: spec.name,
+        email,
+        socialHandles: spec.socialHandles ?? [],
+        membership,
+        membershipChangedAt:
+          now - (spec.membershipChangedDaysAgo ?? 0) * DAY_MS,
+        status: spec.status ?? "active",
+      });
+
+      // A real invite: the token is derived from the deployment secret, so
+      // the link a spec opens is the one the app would have emailed.
+      const wants = spec.invite ?? (membership === "invited" ? "open" : "none");
+      let inviteToken: string | null = null;
+      if (wants !== "none") {
+        const invite = await newInvite(candidateId, now);
+        inviteToken = await inviteTokenFor(candidateId, invite.nonce ?? "");
+        await ctx.db.patch("candidates", candidateId, {
+          invite:
+            wants === "expired"
+              ? { ...invite, expiresAt: now - 1 }
+              : { ...invite, lastSentAt: now },
+        });
+      }
+
+      // Audit events the app would have written, so limits that count them
+      // (three invite emails a day) behave as they would in the product.
+      for (let i = 0; i < (spec.invitesSentToday ?? 0); i++) {
+        await ctx.db.insert("auditEvents", {
+          matchmakerId,
+          candidateId,
+          actor: { type: "system", job: "e2e_seed" },
+          action: "invite.sent",
+          entityTable: "candidates",
+          entityId: candidateId,
+        });
+      }
+
+      const messages = spec.messages ?? [];
+      const conversationId = await ctx.db.insert("conversations", {
+        matchmakerId,
+        candidateId,
+        lastSeq: 0,
+        lastPublicSeq: 0,
+        lastMessageAt: now - messages.length * MESSAGE_GAP_MS,
+        matchmakerLastReadSeq: 0,
+        candidateLastReadSeq: 0,
+      });
+      let lastSeq = 0;
+      let lastPublicSeq = 0;
+      let lastMessageAt = now - messages.length * MESSAGE_GAP_MS;
+      for (const [index, message] of messages.entries()) {
+        lastSeq += 1;
+        const visibility = message.visibility ?? "everyone";
+        if (visibility === "everyone") lastPublicSeq = lastSeq;
+        lastMessageAt = now - (messages.length - 1 - index) * MESSAGE_GAP_MS;
+        await ctx.db.insert("messages", {
+          matchmakerId,
+          conversationId,
+          seq: lastSeq,
+          author: message.author,
+          authorUserId:
+            message.author === "candidate"
+              ? userId
+              : message.author === "matchmaker"
+                ? (await ctx.db.get("matchmakers", matchmakerId))?.ownerUserId
+                : undefined,
+          visibility,
+          source:
+            message.source ??
+            (message.author === "system" ? "system" : "typed"),
+          body: message.body,
+          sentAt: lastMessageAt,
+        });
+      }
+      await ctx.db.patch("conversations", conversationId, {
+        lastSeq,
+        lastPublicSeq,
+        lastMessageAt,
+        matchmakerLastReadSeq: spec.unreadForMatchmaker === true ? 0 : lastSeq,
+        candidateLastReadSeq: 0,
+      });
+
+      for (const body of spec.notes ?? []) {
+        await ctx.db.insert("notes", {
+          matchmakerId,
+          candidateId,
+          body,
+          updatedAt: now,
+        });
+      }
+
+      candidates[spec.key] = {
+        id: candidateId,
+        email,
+        conversationId,
+        inviteToken,
+      };
+    }
+
+    return { ns, users, matchmakers, candidates };
   },
 });
