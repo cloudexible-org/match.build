@@ -1,6 +1,3 @@
-# specific to this app
-/.clerk/
-
 # local env files (can opt-in for committing if needed)
 # .env* is covered by root only for .env*.local. 
 # Web had .env* which ignores .env.production etc.

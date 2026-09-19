@@ -5,7 +5,7 @@ import { Reveal, revealGroup, revealItem } from "@/components/landing/reveal";
 import { Typography } from "@/components/ui/typography";
 
 const TODAY = [
-  { tool: "Instagram DMs", job: "where clients find you" },
+  { tool: "Instagram DMs", job: "where candidates find you" },
   { tool: "WhatsApp", job: "where the real talking happens" },
   { tool: "A spreadsheet", job: "where profiles go to get stale" },
   { tool: "Your memory", job: "where everything else lives" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardPaste, MessagesSquare, PenLine } from "lucide-react";
+import { ClipboardPaste, MessagesSquare, Send } from "lucide-react";
 import { motion } from "motion/react";
 import { revealGroup, revealItem } from "@/components/landing/reveal";
 import { SectionHeading } from "@/components/landing/section-heading";
@@ -9,18 +9,18 @@ import { Typography } from "@/components/ui/typography";
 const STEPS = [
   {
     icon: ClipboardPaste,
-    title: "Paste the DM",
-    body: "When a conversation on Instagram or WhatsApp turns serious, ask for their email. Paste it and the chat so far into Matchmaker. It picks up their name and the first facts about them.",
+    title: "Onboard them from the DM",
+    body: "When a conversation on Instagram or WhatsApp turns serious, click Onboard and add their email. Their name, handles and the DM so far are optional. The pasted history is only ever visible to you.",
   },
   {
-    icon: PenLine,
-    title: "Approve the first email",
-    body: "Matchmaker drafts a warm first email that carries on from the DM, in your voice. You edit it, approve it, and it goes out from your own domain.",
+    icon: Send,
+    title: "They get an invitation",
+    body: "We email them an invitation from invites@matchmaker.io with your name on it. Or copy the invite link and drop it straight into the DM. Meanwhile you can read the history and add notes.",
   },
   {
     icon: MessagesSquare,
-    title: "Keep it in one thread",
-    body: "Clients reply by email or in a simple chat that opens from a link, with no app to download. Every message, from any channel, lands in the same thread.",
+    title: "Carry on in the chat",
+    body: "They sign up with their name and email, accept, and the conversation carries on in a private chat with you. There's no app to download.",
   },
 ] as const;
 
@@ -34,8 +34,8 @@ export function HowItWorks(): React.ReactNode {
       <div className="mx-auto max-w-6xl">
         <SectionHeading
           eyebrow="How it works"
-          title="From a DM to a client in three steps"
-          lead="Keep meeting people where you already do. Matchmaker takes over once they're ready to be a client."
+          title="From a DM to a candidate in three steps"
+          lead="Keep meeting people where you already do. When someone's ready to work with you, invite them in."
           className="mb-16"
         />
 

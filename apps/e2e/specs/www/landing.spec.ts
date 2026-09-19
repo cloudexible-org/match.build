@@ -26,8 +26,8 @@ test.describe("landing chrome", () => {
   });
 
   /**
-   * The product still is an illustration: its fake buttons ("Send", "Undo")
-   * must not reach assistive technology as controls, and its figcaption is
+   * The product still is an illustration: its fake composer button ("Send")
+   * must not reach assistive technology as a control, and its figcaption is
    * the single description of it.
    */
   test("the product mock is described once, not read out", async ({ page }) => {
@@ -36,12 +36,13 @@ test.describe("landing chrome", () => {
 
     const mock = landing.getConversationMock();
     await expect(mock).toBeVisible();
-    await expect(mock.locator("figcaption")).toContainText("suggested");
+    await expect(mock.locator("figcaption")).toContainText("invitation");
+    // The imported DM history is the matchmaker's alone, and says so.
+    await expect(mock.getByText(/Only visible to you/)).toBeVisible();
     // Role queries honour `aria-hidden`, so the mock's pretend controls are
     // absent from the accessibility tree even though they render.
     await expect(mock.getByText("Send", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Send" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Undo" })).toHaveCount(0);
   });
 
   /**
@@ -117,6 +118,35 @@ test.describe("landing chrome", () => {
     await expect(landing.getFaqItems()).toHaveCount(7);
   });
 
+  /**
+   * The phase-1 onboarding flow (prd/phase-1.md §3.1–3.2): onboard from the
+   * DM, the candidate gets an invitation, the conversation continues in the
+   * app. Email is never the conversation channel.
+   */
+  test("how it works follows the invitation flow", async ({ page }) => {
+    const landing = new LandingPage(page);
+    await landing.goto();
+
+    const steps = landing.getSteps();
+    await expect(steps.nth(0)).toContainText("Onboard them from the DM");
+    await expect(steps.nth(0)).toContainText("only ever visible to you");
+    await expect(steps.nth(1)).toContainText("invites@matchmaker.io");
+    await expect(steps.nth(1)).toContainText("invite link");
+    await expect(steps.nth(2)).toContainText("Carry on in the chat");
+  });
+
+  /** AI is phase 2: presented, but set apart from the shipped feature list. */
+  test("AI features are framed as coming next", async ({ page }) => {
+    const landing = new LandingPage(page);
+    await landing.goto();
+
+    await expect(landing.getComingNext()).toBeAttached();
+    await expect(landing.getComingNext()).toContainText("Coming next");
+    await expect(
+      landing.getFeatureCards().filter({ hasText: /suggested repl/i }),
+    ).toHaveCount(0);
+  });
+
   test("theme toggle switches the document theme", async ({ page }) => {
     const landing = new LandingPage(page);
     await landing.goto();
@@ -135,7 +165,7 @@ test.describe("faq", () => {
     await landing.goto();
 
     const question = landing.getFaqQuestion("Is this a dating app?");
-    const answer = page.getByText("Your clients never browse or swipe");
+    const answer = page.getByText("Your candidates never browse or swipe");
 
     await expect(question).toHaveAttribute("aria-expanded", "false");
     await expect(answer).toBeHidden();

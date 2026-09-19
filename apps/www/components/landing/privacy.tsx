@@ -8,9 +8,9 @@ import { Typography } from "@/components/ui/typography";
 
 const GUARANTEES = [
   "Every record belongs to one matchmaker. No other account can see it, and none of our tools look across accounts.",
-  "If someone is a client of two matchmakers, they get two separate records. Neither of you can find out about the other.",
-  "Clients only see their own conversation. They never see their profile, other clients, or any AI.",
-  "What a client tells you is only used to find matches among your own clients.",
+  "If someone is a candidate of two matchmakers, they get two separate records. Neither of you can find out about the other.",
+  "Candidates only see their chat with you. Never your notes, the DM history you pasted in, the change history or other candidates.",
+  "Nothing is deleted. If a candidate leaves or closes their account, you keep the conversation and your notes. They're told this before they accept your invitation.",
 ] as const;
 
 export function Privacy(): React.ReactNode {
@@ -24,8 +24,8 @@ export function Privacy(): React.ReactNode {
         <SectionHeading
           align="start"
           eyebrow="Privacy"
-          title="Your clients are yours alone."
-          lead="Clients tell you personal things. That information stays inside your account and is never pooled or shared."
+          title="Your candidates are yours alone."
+          lead="Candidates tell you personal things. That information stays inside your account and is never pooled or shared."
         />
 
         <motion.ul

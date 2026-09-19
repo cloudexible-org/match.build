@@ -114,6 +114,11 @@ export class LandingPage {
     return this.page.getByTestId("feature-card");
   }
 
+  /** The AI roadmap callout under the feature grid — planned, not shipped. */
+  getComingNext() {
+    return this.page.getByTestId("coming-next");
+  }
+
   getReveals() {
     return this.page.getByTestId("reveal");
   }

@@ -7,19 +7,19 @@ import { Typography } from "@/components/ui/typography";
 const PRINCIPLES = [
   {
     title: "Nothing sends without you",
-    body: "Every draft, including the very first email, waits for your approval.",
+    body: "Every message a candidate reads is one you chose to send. When AI suggestions arrive, they'll wait for your approval too.",
   },
   {
-    title: "Suggestions never look like messages",
-    body: "AI cards are dashed, tinted and labelled, so you'll never mistake one for something a client said.",
+    title: "Private means private",
+    body: "The DM history you paste in and your notes are marked as yours alone. Candidates see the chat and nothing else.",
   },
   {
-    title: "You can always see where a fact came from",
-    body: "Open any fact to see the message it came from. Anything added automatically can be undone.",
+    title: "Every change is on the record",
+    body: "Edited details, invitations, notes, who joined and who left: each is logged with who did it and when. Removing something never erases it.",
   },
   {
-    title: "It still works if the AI doesn't",
-    body: "If a suggestion fails, you still have a normal inbox and client list. The AI never stops you working.",
+    title: "It works without the AI",
+    body: "The first version is a complete inbox and candidate list with no AI in it. AI help comes next, and if it ever fails you keep working.",
   },
 ] as const;
 
@@ -41,12 +41,12 @@ export function Principles(): React.ReactNode {
             variant="h2"
             className="border-none pb-0 font-display font-normal text-5xl text-background tracking-normal sm:text-6xl"
           >
-            The AI drafts. <em>You decide.</em>
+            We organise. <em>You decide.</em>
           </Typography>
           <Typography variant="lead" className="text-background/70 text-lg">
             We're not building a dating app, and we're not trying to replace
-            your judgement with an algorithm. Your judgement is what clients pay
-            for.
+            your judgement with an algorithm. Your judgement is what candidates
+            pay for.
           </Typography>
         </Reveal>
 

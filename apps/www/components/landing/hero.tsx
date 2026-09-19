@@ -65,9 +65,8 @@ export function Hero(): React.ReactNode {
               className="max-w-xl text-lg leading-relaxed sm:text-xl"
             >
               Your business runs on DMs, a spreadsheet and your memory.
-              Matchmaker puts every client in one thread, builds their profile
-              as they talk, and drafts replies in your voice. You approve every
-              word.
+              Matchmaker moves each candidate into one private chat with you,
+              with the DM history they came from and your notes kept beside it.
             </Typography>
           </motion.div>
 

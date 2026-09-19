@@ -26,7 +26,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 const DESCRIPTION =
-  "One workspace for independent matchmakers: every client conversation in one thread, a profile that builds itself as they talk, and replies drafted in your voice for you to approve.";
+  "One workspace for independent matchmakers: bring candidates over from your DMs with an invitation, then run every relationship in one private chat, with the DM history, your notes and a full record of what changed.";
 
 export const metadata: Metadata = {
   title: "Matchmaker — the matchmaker's operating system",

@@ -1,54 +1,55 @@
 "use client";
 
 import {
-  AtSign,
-  BookUser,
-  Inbox,
-  MessageSquareQuote,
+  Bell,
+  ClipboardPaste,
+  History,
+  MessagesSquare,
+  Send,
   Smartphone,
-  Undo2,
+  Sparkles,
 } from "lucide-react";
 import { motion, useMotionTemplate, useMotionValue } from "motion/react";
-import { revealGroup, revealItem } from "@/components/landing/reveal";
+import { Reveal, revealGroup, revealItem } from "@/components/landing/reveal";
 import { SectionHeading } from "@/components/landing/section-heading";
 import { Typography } from "@/components/ui/typography";
 
 const FEATURES = [
   {
-    icon: Inbox,
-    title: "One thread per client",
+    icon: MessagesSquare,
+    title: "One chat per candidate",
     description:
-      "Email, chat and the original DM, in order, in one conversation. Small channel markers, no separate inboxes.",
+      "Each candidate gets one real-time conversation with you, in the app. No more scrolling back through DMs to find what they said.",
   },
   {
-    icon: MessageSquareQuote,
-    title: "Replies in your voice",
+    icon: ClipboardPaste,
+    title: "Their history comes with them",
     description:
-      "Up to three suggested replies after each message, written the way you write. Send, edit or dismiss them. Nothing goes out on its own.",
+      "Paste in the DM thread when you onboard someone. It opens their conversation, marked as only visible to you.",
   },
   {
-    icon: BookUser,
-    title: "A profile that builds itself",
+    icon: Send,
+    title: "Invite by email or link",
     description:
-      "Deal-breakers, preferences, lifestyle and logistics are picked up as clients talk. Each fact is saved on its own and linked to the message it came from.",
+      "Candidates get an invitation with your name on it, or you paste the invite link into the DM. Resend it, revoke it or fix a mistyped email any time.",
   },
   {
-    icon: Undo2,
-    title: "Nothing assumed quietly",
+    icon: History,
+    title: "Notes and a full history",
     description:
-      "Facts it's sure about are added with a one-tap Undo. Facts it isn't sure about wait for your say-so. When something changes, the old fact is kept, not deleted.",
+      "Private notes on every candidate, plus a record of every change: details edited, invitations sent, who joined and who left.",
   },
   {
-    icon: AtSign,
-    title: "Sent from your domain",
+    icon: Bell,
+    title: "Notified, not spammed",
     description:
-      "Email goes out as hello@yourbusiness.com, not from a platform address. We walk you through the DNS records, or set them up for you.",
+      "Push and email tell you a new message is waiting, never what it says. Once you've read the conversation, they stop.",
   },
   {
     icon: Smartphone,
     title: "Built for your phone",
     description:
-      "You work between meetings, so the conversation view works fully on a phone screen, with the profile one tap away.",
+      "You work between meetings, so every conversation works fully on a phone screen, and the app installs to your home screen.",
   },
 ] as const;
 
@@ -61,8 +62,8 @@ export function Features(): React.ReactNode {
       <div className="mx-auto max-w-6xl">
         <SectionHeading
           eyebrow="What you get"
-          title="Help with the busywork. The taste stays yours."
-          lead="The AI keeps notes, drafts and organises. Choosing and introducing people is still your job."
+          title="Everything your DMs can't do."
+          lead="A complete inbox for your book from day one. Choosing and introducing people is still your job."
           className="mb-16"
         />
 
@@ -77,8 +78,36 @@ export function Features(): React.ReactNode {
             <FeatureCard key={feature.title} {...feature} />
           ))}
         </motion.div>
+
+        <ComingNext />
       </div>
     </section>
+  );
+}
+
+/**
+ * The AI features are planned, not shipped. Dashed and tinted, like the
+ * suggestion cards they describe, so they never read as part of the list above.
+ */
+function ComingNext(): React.ReactNode {
+  return (
+    <Reveal className="mt-10">
+      <div
+        data-testid="coming-next"
+        className="flex flex-col items-start gap-4 rounded-2xl border border-primary/40 border-dashed bg-accent/50 p-6 text-left sm:flex-row sm:items-center sm:p-7"
+      >
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-card px-3 py-1 font-medium text-primary text-xs uppercase tracking-wider">
+          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+          Coming next
+        </span>
+        <Typography variant="muted" className="text-[15px] leading-relaxed">
+          <span className="font-medium text-foreground">AI assistance.</span>{" "}
+          Replies suggested in your voice, and a candidate profile that builds
+          itself as they talk. Nothing is sent without you, and if the AI is
+          ever down, everything above keeps working.
+        </Typography>
+      </div>
+    </Reveal>
   );
 }
 

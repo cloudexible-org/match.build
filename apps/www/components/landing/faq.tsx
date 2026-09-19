@@ -8,23 +8,23 @@ import { SectionHeading } from "@/components/landing/section-heading";
 const QUESTIONS = [
   {
     q: "Is this a dating app?",
-    a: "No. Your clients never browse or swipe through anyone. Matchmaker is the tool you use to run your business, and the matching is still done by you.",
+    a: "No. Your candidates never browse or swipe through anyone. Matchmaker is the tool you use to run your business, and the matching is still done by you.",
   },
   {
-    q: "Do my clients need to download anything?",
-    a: "No. They can reply to your emails like any other email, or open a simple chat from a link in the first one. Both end up in the same thread on your side.",
+    q: "Do my candidates need to download anything?",
+    a: "No. They open your invitation, sign up with their name and email, and chat with you in the browser. They can add it to their home screen if they'd like notifications on their phone.",
   },
   {
-    q: "Does the AI ever message clients on its own?",
-    a: "Never. It suggests replies and drafts the first email, and you send each one yourself. If the AI is unavailable, you can still read and reply as normal.",
-  },
-  {
-    q: "Why do I need my own email domain?",
-    a: "Email from your own domain looks like it's from you, and it's less likely to land in spam. Setup means adding a few DNS records. We show you exactly what to add, or we can do it for you.",
+    q: "Do conversations happen over email?",
+    a: "No. Email is only used for sign-in codes, invitations and a short note that a new message is waiting. That note never includes the message itself, and every reply happens in the chat.",
   },
   {
     q: "What about Instagram and WhatsApp?",
-    a: "Carry on meeting people there. When a client is ready, paste the conversation in and Matchmaker takes it from there. We don't connect to either app directly yet.",
+    a: "Carry on meeting people there. When someone's ready, onboard them with their email and paste in your DM history. We email them an invitation, or you can send the invite link in the DM. We don't connect to either app directly.",
+  },
+  {
+    q: "Where does AI come in?",
+    a: "Next. The first version is a complete inbox with no AI in it. Suggested replies in your voice and a profile that builds itself as candidates talk come after that. Even then, nothing is sent until you choose to send it.",
   },
   {
     q: "What does it cost?",
@@ -32,7 +32,7 @@ const QUESTIONS = [
   },
   {
     q: "What's coming next?",
-    a: "A match board for the other half of the job: suggested pairs with the reasons behind them, the introduction, both clients' answers, and how it went. It learns from the matches you reject as well as the ones you make.",
+    a: "AI help inside the conversation first. After that, a match board for the other half of the job: suggested pairs with the reasons behind them, the introduction, both candidates' answers, and how it went.",
   },
 ] as const;
 
