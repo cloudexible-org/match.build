@@ -34,6 +34,11 @@ export class HomePage {
     return this.page.getByTestId("home-matchmaker-profiles");
   }
 
+  /** Shown until the account owns a matchmaker profile. */
+  getCreateMatchmakerLink() {
+    return this.page.getByTestId("home-create-matchmaker");
+  }
+
   getCandidateProfilesSection() {
     return this.page.getByTestId("home-candidate-profiles");
   }
