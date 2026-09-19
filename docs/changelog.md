@@ -18,5 +18,7 @@ The monorepo was bootstrapped from [turbostack](https://github.com/cloudexible-o
 - **`apps/www` is a static export:** `output: "export"`, `trailingSlash: true`, unoptimised images, and `manifest.ts` marked `force-static`. The Clerk middleware (`proxy.ts`), Clerk provider and sign-in/up buttons are gone — a static site has no server to run them — and "Get Started"/"Sign In" now link to `/app/`, where auth will live.
 - **`apps/app` builds with `base: "/app/"`** (overridable by the static-hosting CLI's `STATIC_HOSTING_BASE_PATH`); the service worker registers from `BASE_URL` and caches `./` rather than `/`. The e2e `app` projects navigate to `/app/`.
 
+- **`apps/app` uses `@vitejs/plugin-react` instead of `@vitejs/plugin-react-swc`:** *Why:* Vite 8 (Rolldown) warns that the SWC plugin is slower when no SWC plugins are configured, and none are; `plugin-react` does Fast Refresh through Oxc there. Build, typecheck and e2e unchanged.
+
 ### Removed
 - Vercel: both `vercel.json` files, `@vercel/analytics`, the `VERCEL` build-cache input and standalone-output switch. Docker (`apps/www/Dockerfile`, `docker-compose.yml`) and `.gitlab-ci.yml`, which targeted the standalone Next server that no longer exists.
