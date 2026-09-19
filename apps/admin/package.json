@@ -1,0 +1,38 @@
+{
+  "name": "admin",
+  "private": true,
+  "version": "4.5.0",
+  "type": "module",
+  "scripts": {
+    "dev": "doppler run -- portless admin.matchmaker --app-port 5174 vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "preview": "vite preview",
+    "lint": "biome check .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@convex-dev/auth": "^0.0.95",
+    "@repo/api": "workspace:*",
+    "@repo/ui": "workspace:*",
+    "@t3-oss/env-core": "^0.13.11",
+    "convex": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router": "^7.18.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*",
+    "@tailwindcss/postcss": "catalog:default",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "^6.1.1",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "^8.3.0",
+    "vitest": "^4.1.11"
+  }
+}

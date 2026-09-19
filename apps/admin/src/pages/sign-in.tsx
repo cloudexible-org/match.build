@@ -26,22 +26,15 @@ import { safeNextPath } from "../auth/redirects";
 import { FullPageStatus } from "../components/full-page-status";
 
 /**
- * `sent` is false when the person chose "I already have a code" — one from an
- * earlier email, or issued by a platform admin (apps/admin) — so no new code
- * was sent, which would have replaced it.
- */
-type Step = { kind: "email" } | { kind: "code"; email: string; sent: boolean };
-
-/**
- * Sign-in and sign-up are one flow (prd/phase-1.md §8.3): enter an email, then
- * the code sent to it. A new account is asked for its name afterwards, by
- * RequireAuth. The page never says whether an account exists for an address.
+ * The same email + code sign-in as apps/app, with its own session (see
+ * main.tsx). Anyone can sign in; RequireAdmin then turns away accounts that
+ * aren't in PLATFORM_ADMIN_EMAILS.
  */
 export function SignInPage() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const [params] = useSearchParams();
   const next = safeNextPath(params.get("next"));
-  const [step, setStep] = useState<Step>({ kind: "email" });
+  const [email, setEmail] = useState<string | null>(null);
 
   if (isLoading) return <FullPageStatus>Loading…</FullPageStatus>;
   if (isAuthenticated) return <Navigate to={next} replace />;
@@ -49,48 +42,32 @@ export function SignInPage() {
   return (
     <main className="flex min-h-dvh items-start justify-center px-4 py-12 sm:items-center">
       <Card className="w-full max-w-sm">
-        {step.kind === "email" ? (
-          <EmailStep
-            onSent={(email) => setStep({ kind: "code", email, sent: true })}
-            onHaveCode={(email) =>
-              setStep({ kind: "code", email, sent: false })
-            }
-          />
+        {email === null ? (
+          <EmailStep onSent={setEmail} />
         ) : (
-          <CodeStep
-            email={step.email}
-            sent={step.sent}
-            onChangeEmail={() => setStep({ kind: "email" })}
-          />
+          <CodeStep email={email} onChangeEmail={() => setEmail(null)} />
         )}
       </Card>
     </main>
   );
 }
 
-function EmailStep({
-  onSent,
-  onHaveCode,
-}: {
-  onSent: (email: string) => void;
-  onHaveCode: (email: string) => void;
-}) {
+function EmailStep({ onSent }: { onSent: (email: string) => void }) {
   const { signIn } = useAuthActions();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
-  function validEmail(): string | null {
-    const invalid = emailError(email);
-    setError(invalid);
-    return invalid ? null : normaliseEmail(email);
-  }
-
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const address = validEmail();
-    if (address === null) return;
+    const invalid = emailError(email);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    setError(null);
     setSending(true);
+    const address = normaliseEmail(email);
     try {
       await signIn(SIGN_IN_PROVIDER_ID, { email: address });
       onSent(address);
@@ -104,9 +81,9 @@ function EmailStep({
   return (
     <>
       <CardHeader>
-        <CardTitle>Sign in to Matchmaker</CardTitle>
+        <CardTitle>Matchmaker Admin</CardTitle>
         <CardDescription>
-          New here? Use the same form — we'll set up your account.
+          Sign in with a platform admin's email.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -131,18 +108,6 @@ function EmailStep({
           <Button type="submit" disabled={sending}>
             {sending ? "Sending…" : "Email me a code"}
           </Button>
-          <Button
-            type="button"
-            variant="link"
-            className="h-auto self-center px-0"
-            disabled={sending}
-            onClick={() => {
-              const address = validEmail();
-              if (address !== null) onHaveCode(address);
-            }}
-          >
-            I already have a code
-          </Button>
         </form>
       </CardContent>
     </>
@@ -151,67 +116,45 @@ function EmailStep({
 
 function CodeStep({
   email,
-  sent,
   onChangeEmail,
 }: {
   email: string;
-  sent: boolean;
   onChangeEmail: () => void;
 }) {
   const { signIn } = useAuthActions();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function verify(value: string) {
     if (value.length !== SIGN_IN_CODE_LENGTH || busy) return;
     setBusy(true);
     setError(null);
-    setNotice(null);
     try {
       // On success the auth state flips and SignInPage redirects.
       await signIn(SIGN_IN_PROVIDER_ID, { email, code: value });
     } catch {
-      setError("That code didn't work. Check it, or send a new one.");
+      setError("That code didn't work. Check it, or start again.");
       setCode("");
       setBusy(false);
     }
-  }
-
-  async function resend() {
-    setBusy(true);
-    setError(null);
-    try {
-      await signIn(SIGN_IN_PROVIDER_ID, { email });
-      setCode("");
-      setNotice("We sent a new code.");
-    } catch {
-      setError("We couldn't send a code just now. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    void verify(code);
   }
 
   return (
     <>
       <CardHeader>
-        <CardTitle>{sent ? "Check your email" : "Enter your code"}</CardTitle>
+        <CardTitle>Check your email</CardTitle>
         <CardDescription>
-          {sent
-            ? `We sent a ${SIGN_IN_CODE_LENGTH}-digit code to `
-            : `Enter the ${SIGN_IN_CODE_LENGTH}-digit code for `}
+          We sent a {SIGN_IN_CODE_LENGTH}-digit code to{" "}
           <span className="font-medium text-foreground">{email}</span>.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form
-          onSubmit={handleSubmit}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void verify(code);
+          }}
           className="flex flex-col gap-4"
           data-testid="sign-in-code-form"
         >
@@ -227,43 +170,23 @@ function CodeStep({
             {error ? (
               <FieldError match>{error}</FieldError>
             ) : (
-              <FieldDescription>
-                {sent
-                  ? "It expires in 10 minutes."
-                  : "Codes expire 10 minutes after they're issued."}
-              </FieldDescription>
+              <FieldDescription>It expires in 10 minutes.</FieldDescription>
             )}
           </Field>
-          {notice && (
-            <p className="text-sm text-muted-foreground" aria-live="polite">
-              {notice}
-            </p>
-          )}
           <Button
             type="submit"
             disabled={busy || code.length !== SIGN_IN_CODE_LENGTH}
           >
             {busy ? "Checking…" : "Continue"}
           </Button>
-          <div className="flex flex-wrap justify-between gap-2">
-            <Button
-              type="button"
-              variant="link"
-              className="h-auto px-0"
-              onClick={onChangeEmail}
-            >
-              Use a different email
-            </Button>
-            <Button
-              type="button"
-              variant="link"
-              className="h-auto px-0"
-              onClick={() => void resend()}
-              disabled={busy}
-            >
-              Send a new code
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto self-start px-0"
+            onClick={onChangeEmail}
+          >
+            Use a different email
+          </Button>
         </form>
       </CardContent>
     </>

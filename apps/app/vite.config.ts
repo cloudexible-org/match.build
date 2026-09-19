@@ -14,6 +14,13 @@ const WWW_DEV_URL =
   process.env.WWW_DEV_URL ?? "https://www.matchmaker.localhost";
 
 /**
+ * Where `pnpm dev` runs the platform admin app (apps/admin `dev` script),
+ * served from here at /admin/ as in production.
+ */
+const ADMIN_DEV_URL =
+  process.env.ADMIN_DEV_URL ?? "https://admin.matchmaker.localhost";
+
+/**
  * Vite answers the bare base path (`/app`) with a 404; send it to `/app/` so a
  * hand-typed URL works. Runs before the proxy, which would otherwise hand
  * `/app` to Next.
@@ -53,12 +60,20 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     // Only under portless (it sets PORTLESS_URL): the e2e suite runs this
-    // server on its own port with no marketing site behind it. The pattern
-    // matches everything outside /app, so Vite's own HMR socket and modules
-    // (all under the base) stay local; `ws` carries Next's HMR socket.
+    // server on its own port with no marketing site behind it. /admin goes to
+    // the admin app's Vite server (its HMR socket too, under its own base);
+    // every other path outside /app goes to Next. Vite's own HMR socket and
+    // modules (all under the base) stay local; `ws` carries the others.
     proxy: process.env.PORTLESS_URL
       ? {
-          "^/(?!app(?:/|$))": {
+          "^/admin(?:/|$)": {
+            target: ADMIN_DEV_URL,
+            changeOrigin: true,
+            // Portless's local CA is not in Node's trust store.
+            secure: false,
+            ws: true,
+          },
+          "^/(?!(?:app|admin)(?:/|$))": {
             target: WWW_DEV_URL,
             changeOrigin: true,
             // Portless's local CA is not in Node's trust store.

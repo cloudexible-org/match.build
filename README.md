@@ -24,6 +24,7 @@ Built on [turbostack](https://github.com/cloudexible-org/turbostack).
 ```text
 ├── apps/
 │   ├── app/          # Vite React app (mounted at /app/)
+│   ├── admin/        # Vite React platform admin app (mounted at /admin/)
 │   ├── www/          # Next.js marketing site (static export, mounted at /)
 │   └── e2e/          # Playwright end-to-end tests
 ├── packages/
@@ -40,6 +41,7 @@ Built on [turbostack](https://github.com/cloudexible-org/turbostack).
 |---|---|
 | `/` | `www` static-hosting instance (`apps/www/out`) |
 | `/app/…` | `app` static-hosting instance (`apps/app/dist`, SPA fallback) |
+| `/admin/…` | `admin` static-hosting instance (`apps/admin/dist`, SPA fallback) — platform admins only |
 | `/api/…` | Convex HTTP actions in `packages/api/convex/http.ts` (e.g. the Resend inbound webhook) |
 
 The mounts are configured in `packages/api/convex/convex.config.ts`.
@@ -53,7 +55,7 @@ and the [Doppler CLI](https://docs.doppler.com/docs/install-cli) with access to 
 ```bash
 pnpm install
 doppler login                     # once per machine
-doppler setup --no-interactive    # binds apps/app and apps/www via doppler.yaml
+doppler setup --no-interactive    # binds apps/app, apps/admin and apps/www via doppler.yaml
 cd packages/api && npx convex dev # links a Convex deployment, writes .env.local
 ```
 
@@ -67,11 +69,12 @@ checkout or worktree. Doppler values override any `.env.local`. Then from the ro
 pnpm dev
 ```
 
-Open **`https://matchmaker.localhost`**: the marketing site at `/` and the app
-at `/app/`, on one origin as in production. Portless routes by hostname only,
-so the app's Vite server is the front door and proxies every path outside
-`/app/` to the Next dev server, which portless also serves directly at
-`https://www.matchmaker.localhost`.
+Open **`https://matchmaker.localhost`**: the marketing site at `/`, the app at
+`/app/` and the admin app at `/admin/`, on one origin as in production.
+Portless routes by hostname only, so the app's Vite server is the front door:
+it proxies `/admin/` to the admin app's Vite server and every other path
+outside `/app/` to the Next dev server. Portless also serves those two directly
+at `https://www.matchmaker.localhost` and `https://admin.matchmaker.localhost`.
 
 ## Development
 
@@ -88,7 +91,7 @@ Everything ships to the Convex deployment. There is no separate frontend host.
 
 ```bash
 npx convex login   # first time only
-pnpm ship          # convex deploy → build + upload www → build + upload app (production)
+pnpm ship          # convex deploy → build + upload www, app and admin (production)
 ```
 
 To smoke-test the hosted sites on your **dev** deployment first:
@@ -158,7 +161,7 @@ To set it up again, or to move to a new domain:
 `pnpm ship` asks for confirmation before `convex deploy`, so run it from an
 interactive terminal. It stops at the first failure. If an upload fails on a
 network error, the backend is already deployed, so re-run only the upload that
-failed (`pnpm --filter @repo/api run ship:www` or `ship:app`).
+failed (`pnpm --filter @repo/api run ship:www`, `ship:app` or `ship:admin`).
 
 ### Auth (Convex Auth)
 
@@ -173,6 +176,26 @@ Add `--prod` for the production deployment. Then set `RESEND_API_KEY` on the
 deployment to send real email. Without it, codes are printed to the Convex logs
 and written to the internal `emailOutbox` table. That's fine for development,
 and it's how the e2e suite signs in.
+
+### Platform admin app (`/admin/`)
+
+The admin app signs in like any other account and then checks the address
+against `PLATFORM_ADMIN_EMAILS` on the deployment — a comma-separated list.
+Unset means nobody can use it:
+
+```bash
+npx convex env set PLATFORM_ADMIN_EMAILS you@example.com --prod
+```
+
+It has two pages: the platform-wide **audit trail** (filter by matchmaker,
+candidate, acting account and action) and **sign-in codes**, which issues a
+code for any account so an admin can sign in to the app as them. The code is
+shown, never emailed to the account's owner, and issuing it is recorded in the
+audit trail as `account.sign_in_code_issued`. Spend it on the app's sign-in
+page under **I already have a code** — "Email me a code" would replace it — and
+use a private window, since `/app` and `/admin` share an origin (they keep
+separate sessions, but signing in as someone else replaces your own app
+session).
 
 ### Invite links
 
@@ -189,7 +212,7 @@ every open invite link; the candidates can be re-invited.
 
 Convex validates session tokens through the OpenID discovery document at
 `<site>/.well-known/openid-configuration`, so `convex/http.ts` owns the root of
-the URL space and registers the two static sites behind it (see
+the URL space and registers the three static sites behind it (see
 `convex/convex.config.ts`).
 
 ## Contributing
