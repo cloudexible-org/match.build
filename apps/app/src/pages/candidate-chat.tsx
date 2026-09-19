@@ -1,17 +1,26 @@
-import { api } from "@repo/api";
-import { useQuery } from "convex/react";
+import { api, type Id } from "@repo/api";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
+import { useCallback } from "react";
 import { useParams } from "react-router";
+import { Composer } from "../chat/composer";
+import { Thread } from "../chat/thread";
+import { useMarkRead } from "../chat/use-mark-read";
 import { AppHeader } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
 import { NotFoundPage } from "./not-found";
 
+const PAGE_SIZE = 30;
+
 /**
  * A candidate's chat with one matchmaker (prd/phase-1.md §4.2), at
- * `/c/:matchmakerUsername`. Only members get it; anyone else sees "Page not
- * found", whether or not the matchmaker exists.
+ * `/c/:matchmakerUsername`: one thread, the matchmaker's display name above
+ * it, and a composer.
  *
- * For now the shell a new member lands on after accepting: the messages and
- * composer arrive with step 5, and Leave with step 7.
+ * Only members get it; anyone else sees "Page not found", whether or not the
+ * matchmaker exists. Only `visibility: "everyone"` messages are ever loaded —
+ * the query itself can't return the matchmaker's private ones.
+ *
+ * Leaving arrives with step 7.
  */
 export function CandidateChatPage() {
   const { matchmakerUsername = "" } = useParams();
@@ -27,13 +36,13 @@ export function CandidateChatPage() {
   if (membership === null) return <NotFoundPage />;
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex h-dvh flex-col">
       <AppHeader name={me.name ?? ""} />
       <main
-        className="mx-auto flex w-full max-w-3xl flex-1 flex-col"
+        className="mx-auto flex w-full min-h-0 max-w-3xl flex-1 flex-col border-border md:border-x"
         data-testid="candidate-chat"
       >
-        <div className="flex h-14 items-center border-b border-border px-4">
+        <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
           <h1
             className="font-display text-xl"
             data-testid="candidate-chat-matchmaker"
@@ -41,15 +50,52 @@ export function CandidateChatPage() {
             {membership.matchmakerDisplayName}
           </h1>
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center">
-          <p className="font-medium">
-            You've joined {membership.matchmakerDisplayName}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Your conversation with them will appear here.
-          </p>
-        </div>
+        <CandidateThread
+          candidateId={membership.candidateId}
+          matchmakerName={membership.matchmakerDisplayName}
+        />
       </main>
     </div>
+  );
+}
+
+function CandidateThread({
+  candidateId,
+  matchmakerName,
+}: {
+  candidateId: Id<"candidates">;
+  matchmakerName: string;
+}) {
+  const { results, status, loadMore, isLoading } = usePaginatedQuery(
+    api.messages.queries.candidateThread,
+    { candidateId },
+    { initialNumItems: PAGE_SIZE },
+  );
+  const send = useMutation(api.messages.mutations.sendAsCandidate);
+  const markReadMutation = useMutation(
+    api.messages.mutations.markReadAsCandidate,
+  );
+
+  const markRead = useCallback(
+    (seq: number) => markReadMutation({ candidateId, seq }),
+    [markReadMutation, candidateId],
+  );
+  useMarkRead(results[0]?.seq, markRead);
+
+  return (
+    <>
+      <Thread
+        messages={[...results].reverse()}
+        mine="candidate"
+        emptyState={`Your conversation with ${matchmakerName} starts here.`}
+        canLoadOlder={status === "CanLoadMore"}
+        onLoadOlder={() => loadMore(PAGE_SIZE)}
+        loadingOlder={isLoading}
+      />
+      <Composer
+        placeholder={`Message ${matchmakerName}`}
+        onSend={(body) => send({ candidateId, body })}
+      />
+    </>
   );
 }

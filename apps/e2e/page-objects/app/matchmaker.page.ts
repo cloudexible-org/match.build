@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /**
  * `/app/mm/new`: create a matchmaker profile. Rendered by
@@ -226,6 +226,38 @@ export class ConversationPage {
 
   getMessages() {
     return this.page.getByTestId("conversation-message");
+  }
+
+  getLoadOlderButton() {
+    return this.page.getByRole("button", { name: "Load older messages" });
+  }
+
+  getComposer() {
+    return this.page.getByTestId("composer");
+  }
+
+  /** Shown in the composer's place when the conversation is closed. */
+  getClosedComposer() {
+    return this.page.getByTestId("composer-closed");
+  }
+
+  getMessageInput() {
+    return this.page.getByLabel("Message", { exact: true });
+  }
+
+  getSendButton() {
+    return this.page.getByRole("button", { name: /^Send/ });
+  }
+
+  getComposerError() {
+    return this.page.getByTestId("composer-error");
+  }
+
+  /** Types a message and sends it. */
+  async send(body: string) {
+    await this.getMessageInput().fill(body);
+    await this.getSendButton().click();
+    await expect(this.getMessageInput()).toHaveValue("");
   }
 
   /** Where the candidate stands: open invite, declined, left, … */

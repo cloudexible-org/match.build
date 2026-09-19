@@ -1,17 +1,26 @@
-import { api } from "@repo/api";
+import { api, type Id } from "@repo/api";
 import { buttonVariants, cn } from "@repo/ui";
-import { useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
+import { useCallback } from "react";
 import { Link, useParams } from "react-router";
-import { candidateDisplayName } from "../workspace/candidate-labels";
+import { Composer } from "../chat/composer";
+import { Thread } from "../chat/thread";
+import { useMarkRead } from "../chat/use-mark-read";
+import {
+  candidateDisplayName,
+  type Membership,
+} from "../workspace/candidate-labels";
 import { MembershipBanner } from "../workspace/membership-banner";
 import { useWorkspace } from "../workspace/workspace-layout";
 
+/** Messages loaded at a time; "Load older messages" fetches another page. */
+const PAGE_SIZE = 30;
+
 /**
  * One candidate's conversation in the workspace's centre column
- * (prd/phase-1.md §3.1, §4.1): who they are, their invite while it's open,
- * and the thread, private messages included and marked.
- *
- * Read-only for now: the composer and live chat arrive with step 5.
+ * (prd/phase-1.md §3.3, §4.1): who they are, their invite while it's open,
+ * the thread including the matchmaker's private messages, and the composer —
+ * which only opens while they're a member.
  */
 export function ConversationPage() {
   const workspace = useWorkspace();
@@ -40,7 +49,7 @@ export function ConversationPage() {
     );
   }
 
-  const { candidate, messages } = view;
+  const { candidate } = view;
   const name = candidateDisplayName(candidate);
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="conversation">
@@ -85,53 +94,67 @@ export function ConversationPage() {
         invite={candidate.invite}
       />
 
-      <ol
-        className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
-        data-testid="conversation-messages"
-      >
-        {messages.length === 0 ? (
-          <li className="m-auto text-sm text-muted-foreground">
-            No messages yet.
-          </li>
-        ) : (
-          messages.map((message) => (
-            <li
-              key={message._id}
-              data-testid="conversation-message"
-              className={cn(
-                "flex max-w-prose flex-col gap-1 rounded-xl px-4 py-3 text-sm",
-                message.visibility === "matchmaker"
-                  ? "self-stretch border border-dashed border-border bg-muted/60"
-                  : message.author === "matchmaker"
-                    ? "self-end bg-primary text-primary-foreground"
-                    : "self-start bg-card border border-border",
-              )}
-            >
-              {message.visibility === "matchmaker" && (
-                <span className="text-xs font-medium text-muted-foreground">
-                  {message.source === "imported"
-                    ? "Imported conversation · "
-                    : ""}
-                  Only visible to you
-                </span>
-              )}
-              <p className="whitespace-pre-wrap break-words">{message.body}</p>
-            </li>
-          ))
-        )}
-      </ol>
-
-      <footer className="shrink-0 border-t border-border px-4 py-3 text-sm text-muted-foreground">
-        {
-          {
-            invited: `You can message ${name} once they accept your invitation.`,
-            declined: `You can message ${name} if they accept a new invitation.`,
-            joined: "Messaging arrives in the next update.",
-            left: `${name} isn't a member any more. You can still read the thread.`,
-            account_deleted: `${name} isn't a member any more. You can still read the thread.`,
-          }[candidate.membership]
-        }
-      </footer>
+      {/* Keyed by candidate: opening another one starts its paging fresh. */}
+      <Conversation
+        key={candidate.candidateId}
+        candidateId={candidate.candidateId}
+        name={name}
+        membership={candidate.membership}
+      />
     </div>
+  );
+}
+
+function Conversation({
+  candidateId,
+  name,
+  membership,
+}: {
+  candidateId: Id<"candidates">;
+  name: string;
+  membership: Membership;
+}) {
+  const workspace = useWorkspace();
+  const args = { matchmakerId: workspace.matchmakerId, candidateId };
+  const { results, status, loadMore, isLoading } = usePaginatedQuery(
+    api.messages.queries.thread,
+    args,
+    { initialNumItems: PAGE_SIZE },
+  );
+  const send = useMutation(api.messages.mutations.send);
+  const markReadMutation = useMutation(api.messages.mutations.markRead);
+
+  // The query pages newest-first; a thread reads oldest-first.
+  const messages = [...results].reverse();
+  const markRead = useCallback(
+    (seq: number) => markReadMutation({ ...args, seq }),
+    [markReadMutation, args.matchmakerId, args.candidateId],
+  );
+  useMarkRead(results[0]?.seq, markRead);
+
+  const closed = {
+    invited: `You can message ${name} once they accept your invitation.`,
+    declined: `You can message ${name} if they accept a new invitation.`,
+    joined: undefined,
+    left: `${name} isn't a member any more. You can still read the thread.`,
+    account_deleted: `${name} deleted their account. You can still read the thread.`,
+  }[membership];
+
+  return (
+    <>
+      <Thread
+        messages={messages}
+        mine="matchmaker"
+        emptyState={`Nothing here yet. Say hello to ${name}.`}
+        canLoadOlder={status === "CanLoadMore"}
+        onLoadOlder={() => loadMore(PAGE_SIZE)}
+        loadingOlder={isLoading}
+      />
+      <Composer
+        placeholder={`Message ${name}`}
+        disabledReason={closed}
+        onSend={(body) => send({ ...args, body })}
+      />
+    </>
   );
 }

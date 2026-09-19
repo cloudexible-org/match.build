@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /**
  * The accept screen: `/app/invite/:token` and `/app/invitations/:id`.
@@ -55,5 +55,20 @@ export class CandidateChatPage {
 
   getMatchmakerName() {
     return this.page.getByTestId("candidate-chat-matchmaker");
+  }
+
+  getMessages() {
+    return this.page.getByTestId("conversation-message");
+  }
+
+  getMessageInput() {
+    return this.page.getByLabel("Message", { exact: true });
+  }
+
+  /** Types a message and sends it. */
+  async send(body: string) {
+    await this.getMessageInput().fill(body);
+    await this.page.getByRole("button", { name: /^Send/ }).click();
+    await expect(this.getMessageInput()).toHaveValue("");
   }
 }

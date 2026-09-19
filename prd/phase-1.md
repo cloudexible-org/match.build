@@ -520,7 +520,7 @@ Candidate conversations include sexual orientation, religion, health and family 
 2. *Done.* **Matchmaker profiles:** create (username rules, reserved list), workspace route, settings.
 3. *Done.* **Onboarding:** Onboard form → candidate + conversation + private imported message + invitation.
 4. *Done.* **Invitations:** invite email, `/invite/:token`, home-page invitations, accept/decline, resend/revoke/change email, expiry job.
-5. **Chat:** real-time messaging on both sides, read markers, private-message badge, candidate view.
+5. *Done.* **Chat:** real-time messaging on both sides, read markers, private-message badge, candidate view.
 6. **Candidate panel:** Details, Notes, History.
 7. **Leaving & account deletion.**
 8. **Notifications:** delayed email, web push, PWA manifest and service worker, settings.

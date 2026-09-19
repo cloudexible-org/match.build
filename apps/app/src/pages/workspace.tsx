@@ -177,11 +177,22 @@ function CandidateList({
                       </span>
                     )}
                   </span>
-                  {marker && (
-                    <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                      {marker}
-                    </span>
-                  )}
+                  <span className="flex shrink-0 items-center gap-2">
+                    {marker && (
+                      <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                        {marker}
+                      </span>
+                    )}
+                    {row.unread > 0 && (
+                      <span
+                        className="min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-xs font-medium text-primary-foreground"
+                        data-testid="candidate-unread"
+                      >
+                        {row.unread}
+                        <span className="sr-only"> unread</span>
+                      </span>
+                    )}
+                  </span>
                 </Link>
               </li>
             );
