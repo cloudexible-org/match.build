@@ -140,7 +140,7 @@ export default defineConfig({
       // reparented to PID 1 still holding 5173, and teardown timed out after
       // every test had already passed. See `docs/e2e-architecture.md` §3.
       command: withDoppler(
-        "matchmaker_app",
+        "app",
         `pnpm exec vite --port ${APP_PORT} --strictPort`,
         APP_ENV,
       ),
@@ -170,7 +170,7 @@ export default defineConfig({
       // processes sharing `.next` refuse to start and a different port does not
       // help. Giving the suite its own distDir gives it its own lock.
       command: withDoppler(
-        "matchmaker_www",
+        "www",
         `pnpm exec next dev --port ${WWW_PORT} --hostname 127.0.0.1`,
         WWW_ENV,
       ),
