@@ -49,6 +49,9 @@ The monorepo was bootstrapped from [turbostack](https://github.com/cloudexible-o
 
 - **`apps/app` uses `@vitejs/plugin-react` instead of `@vitejs/plugin-react-swc`:** *Why:* Vite 8 (Rolldown) warns that the SWC plugin is slower when no SWC plugins are configured, and none are; `plugin-react` does Fast Refresh through Oxc there. Build, typecheck and e2e unchanged.
 
+### Fixed
+- **`convex dev` / `convex deploy` failed typechecking `convex/auth.config.ts`** (`Cannot find name 'process'`). Convex typechecks `convex/` without Node's types, so the file now reads `CONVEX_SITE_URL` through the generated, typed `env` from `_generated/server` (which is `process.env` at runtime), like the rest of the backend.
+
 ### Removed
 - **Template demo `messages` table and functions**, and the app's demo message list and its specs. The name is now used by phase-1 chat messages. Existing deployments with demo rows must clear them before the new schema will deploy.
 - **Clerk wiring:** `VITE_CLERK_PUBLISHABLE_KEY`, the Clerk README section, and Clerk mentions in CI and turbo config.
