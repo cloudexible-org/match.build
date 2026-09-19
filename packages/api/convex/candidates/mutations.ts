@@ -3,7 +3,7 @@ import { mutation } from "../_generated/server";
 import { recordAudit } from "../audit/helpers";
 import { diffFields } from "../audit/rules";
 import { openInvite, sendInvite } from "../invites/helpers";
-import { requireMatchmaker } from "../matchmakers/helpers";
+import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
 import { socialPlatform } from "../schema";
 import { normaliseEmail } from "../waitlist/rules";
 import {
@@ -160,5 +160,104 @@ export const onboard = mutation({
     });
 
     return { kind: "created" as const, candidateId };
+  },
+});
+
+/**
+ * Edits a candidate's details from the panel (prd/phase-1.md §4.1): the
+ * matchmaker's own label for them, and their social handles.
+ *
+ * Their email is not editable here. While they're invited it belongs to the
+ * invitation (changing it reissues the link — `invites.changeEmail`), and
+ * once they've joined it is the address they accepted with.
+ */
+export const updateDetails = mutation({
+  args: {
+    matchmakerId: v.id("matchmakers"),
+    candidateId: v.id("candidates"),
+    name: v.string(),
+    socialHandles: v.array(
+      v.object({ platform: socialPlatform, handle: v.string() }),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { user, matchmaker } = await requireMatchmaker(
+      ctx,
+      args.matchmakerId,
+    );
+    const candidate = await ctx.db.get("candidates", args.candidateId);
+    assertSameTenant(candidate, matchmaker._id);
+
+    if (args.socialHandles.length > CANDIDATE_LIMITS.socialHandles) {
+      throw new ConvexError(
+        `Add at most ${CANDIDATE_LIMITS.socialHandles} social handles.`,
+      );
+    }
+    const invalid =
+      candidateNameError(args.name) ??
+      args.socialHandles
+        .map(({ platform, handle }) => handleError(platform, handle))
+        .find((error) => error !== null) ??
+      null;
+    if (invalid) throw new ConvexError(invalid);
+
+    const next = {
+      name: normaliseCandidateName(args.name),
+      socialHandles: normaliseHandles(args.socialHandles),
+    };
+    const changes = diffFields(candidate, next, ["name", "socialHandles"]);
+    if (changes.length === 0) return null;
+
+    await ctx.db.patch("candidates", candidate._id, next);
+    await recordAudit(ctx, {
+      matchmakerId: matchmaker._id,
+      candidateId: candidate._id,
+      actor: { type: "user", userId: user._id, role: "matchmaker" },
+      action: "candidate.details_changed",
+      entity: { table: "candidates", id: candidate._id },
+      changes,
+    });
+    return null;
+  },
+});
+
+/**
+ * The matchmaker's own workflow label (prd §4.1): active, paused or
+ * archived. It only affects their list; it never restricts messaging, and the
+ * candidate never sees it.
+ */
+export const setStatus = mutation({
+  args: {
+    matchmakerId: v.id("matchmakers"),
+    candidateId: v.id("candidates"),
+    status: v.union(
+      v.literal("active"),
+      v.literal("paused"),
+      v.literal("archived"),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { user, matchmaker } = await requireMatchmaker(
+      ctx,
+      args.matchmakerId,
+    );
+    const candidate = await ctx.db.get("candidates", args.candidateId);
+    assertSameTenant(candidate, matchmaker._id);
+    if (candidate.status === args.status) return null;
+
+    await ctx.db.patch("candidates", candidate._id, { status: args.status });
+    await recordAudit(ctx, {
+      matchmakerId: matchmaker._id,
+      candidateId: candidate._id,
+      actor: { type: "user", userId: user._id, role: "matchmaker" },
+      action: "candidate.status_changed",
+      entity: { table: "candidates", id: candidate._id },
+      changes: [
+        { field: "status", before: candidate.status, after: args.status },
+      ],
+    });
+    return null;
   },
 });

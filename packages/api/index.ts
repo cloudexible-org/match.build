@@ -7,5 +7,6 @@ export * from "./convex/email/rules";
 export * from "./convex/invites/rules";
 export * from "./convex/matchmakers/rules";
 export * from "./convex/messages/rules";
+export * from "./convex/notes/rules";
 export * from "./convex/users/rules";
 export * from "./convex/waitlist/rules";
