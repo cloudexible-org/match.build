@@ -47,6 +47,16 @@ This document defines the core standards and automated workflows that any AI age
 ## 7. Commit Standards
 * **Conventional Commits:** All commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat: add user login`, `fix: resolve crash on startup`).
 
+## 8. Convex Backend Layout
+* **One directory per domain:** backend code lives in `packages/api/convex/<domain>/` (e.g. `convex/waitlist/`), never as loose files at the `convex/` root. Only `schema.ts`, `http.ts`, `convex.config.ts`, `auth.config.ts` and `crons.ts` stay at the root.
+* **Four files per domain, split by role:**
+    * `rules.ts` — pure validation, normalisation and limits. No Convex imports, so frontends can import it through `@repo/api` and validate exactly as the server does.
+    * `mutations.ts` — `mutation` / `internalMutation` definitions only.
+    * `queries.ts` — `query` / `internalQuery` definitions only.
+    * `helpers.ts` — plain functions that take a `ctx` (lookups, shared writes) and are called from that domain's queries and mutations. Never registered as functions.
+* **Tests sit beside the file they cover:** `rules.test.ts`, `mutations.test.ts` (convex-test), etc.
+* Function references follow the path: `api.<domain>.mutations.<name>`, `internal.<domain>.queries.<name>`.
+
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.

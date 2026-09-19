@@ -14,13 +14,16 @@
     "preview:app": "static-hosting upload --component app --dist ../../apps/app/dist --build-command 'cd ../../apps/app && pnpm run build'",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "test": "echo \"No tests for API yet\""
+    "test": "vitest run"
   },
   "devDependencies": {
     "@repo/config": "workspace:*",
     "@types/node": "catalog:",
     "convex": "catalog:",
-    "typescript": "catalog:"
+    "convex-test": "^0.0.59",
+    "typescript": "catalog:",
+    "vite": "^8.3.0",
+    "vitest": "^4.1.11"
   },
   "dependencies": {
     "@convex-dev/static-hosting": "^0.2.1"
