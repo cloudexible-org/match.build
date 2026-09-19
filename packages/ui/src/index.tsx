@@ -14,4 +14,6 @@ export {
   FieldLabel,
   Input,
 } from "./components/field";
+export { NativeSelect } from "./components/native-select";
+export { Textarea } from "./components/textarea";
 export { cn } from "./lib/cn";
