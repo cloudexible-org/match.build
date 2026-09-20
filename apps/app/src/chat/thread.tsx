@@ -143,8 +143,10 @@ function Message({
         <p className="whitespace-pre-wrap break-words">{message.body}</p>
         <span
           className={cn(
+            // 85%, not less: 12px text on the primary bubble needs 4.5:1, and
+            // 70% fell under it in the light palette (axe, WCAG AA).
             "text-xs",
-            isMine ? "text-primary-foreground/70" : "text-muted-foreground",
+            isMine ? "text-primary-foreground/85" : "text-muted-foreground",
           )}
         >
           {time.format(message.sentAt)}

@@ -6,10 +6,12 @@ import {
   candidateNameError,
   handleError,
   importedHistoryError,
+  leaveReasonError,
   normaliseCandidateName,
   normaliseHandle,
   normaliseHandles,
   normaliseImportedHistory,
+  normaliseLeaveReason,
   SOCIAL_PLATFORMS,
   type SocialPlatform,
 } from "./rules";
@@ -105,5 +107,17 @@ describe("name and history", () => {
     expect(normaliseImportedHistory("\n Hi!\n\nHello \n")).toBe("Hi!\n\nHello");
     expect(importedHistoryError("a".repeat(100_000))).toBeNull();
     expect(importedHistoryError("a".repeat(100_001))).not.toBeNull();
+  });
+});
+
+describe("the reason for leaving", () => {
+  test("is optional, trimmed, and capped", () => {
+    expect(normaliseLeaveReason("   ")).toBeUndefined();
+    expect(normaliseLeaveReason("  Met someone.  ")).toBe("Met someone.");
+    expect(leaveReasonError("  ")).toBeNull();
+    expect(leaveReasonError("a".repeat(500))).toBeNull();
+    expect(leaveReasonError(`  ${"a".repeat(501)}  `)).toBe(
+      "That's too long. A sentence or two is plenty.",
+    );
   });
 });

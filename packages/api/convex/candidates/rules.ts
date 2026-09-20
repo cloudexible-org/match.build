@@ -13,6 +13,9 @@ export const CANDIDATE_LIMITS = {
   socialHandles: 10,
   // A long DM history pasted in one go. Far below Convex's 1 MB document cap.
   importedHistory: 100_000,
+  // The optional note someone leaves behind when they leave (prd §3.4). A
+  // sentence or two, not an essay: it is shown in the matchmaker's History.
+  leaveReason: 500,
 } as const;
 
 export const SOCIAL_PLATFORMS = [
@@ -144,5 +147,20 @@ export function normaliseImportedHistory(raw: string): string | undefined {
 export function importedHistoryError(raw: string): string | null {
   return raw.trim().length > CANDIDATE_LIMITS.importedHistory
     ? "That conversation is too long to import. Paste the most recent part."
+    : null;
+}
+
+/**
+ * The reason someone gives for leaving a matchmaker (prd §3.4), or
+ * `undefined` when they gave none. Optional by design: nobody is made to
+ * explain themselves to leave.
+ */
+export function normaliseLeaveReason(raw: string): string | undefined {
+  return raw.trim() || undefined;
+}
+
+export function leaveReasonError(raw: string): string | null {
+  return raw.trim().length > CANDIDATE_LIMITS.leaveReason
+    ? "That's too long. A sentence or two is plenty."
     : null;
 }

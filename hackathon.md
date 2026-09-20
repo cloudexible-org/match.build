@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** none
 - **Started:** 2026-09-19T15:37:25Z
-- **Last updated:** 2026-09-19T21:42:04Z
+- **Last updated:** 2026-09-20T00:28:45Z
 
 ## Log
 
@@ -153,3 +153,77 @@ gets in comes from the deployment: every `convex/admin/` function starts with
 `auditEvents`, so no filter scans the table. Convex features: paginated queries,
 indexes, queries, mutations, registered component
 (`packages/api/convex/admin/`, `apps/admin/`).
+
+### 2026-09-19 - ae9e09a
+Rebuilt how the e2e suite gets its data. Each spec file now seeds its own
+accounts, profiles, candidates, threads and invites in `beforeAll`, namespaced
+per file and run, so files can't touch each other's rows whatever order they
+run in. That reaches states the UI can't produce quickly: an invite that has
+expired but still has a real openable link, someone who left a month ago, an
+invitation already emailed three times today. Specs sign in over HTTP through
+the real Convex Auth code flow instead of typing a code, which is about ten
+times faster. Tests within a file now run serially and files in parallel, so a
+file's tests can share its world. Added tenant-isolation, phone-layout and
+axe accessibility suites, and an observe mode (`pnpm test:e2e:observe`) that
+runs headed with a pause between actions. 38 tests became 81; CI no longer runs
+the suite (3fc2e94), so it guards locally
+(`apps/e2e/scenario.ts`, `apps/e2e/session.ts`,
+`packages/api/convex/seed/e2e/scenario.ts`).
+
+### 2026-09-19 - 2ec76b5
+Phase 1 step 5: chat. Both sides hold one conversation and see each other's
+messages without a refresh — proven by driving two browser sessions at once.
+One sequence per conversation is allocated server-side, so ordering can't race,
+and sending moves the conversation's counters with it. The matchmaker's private
+imported history never reaches the candidate: their thread reads through the
+visibility index, which can't return anything else. Read markers only move
+forward and never past what that side can see, and the app reports them only
+while the thread is open and the tab is visible — the same rule notifications
+will use. Unread counts come straight from the counters, and scrollback pages 30
+at a time. Convex features: paginated queries, realtime queries, indexes,
+mutations (`packages/api/convex/messages/`, `apps/app/src/chat/`).
+
+### 2026-09-19 - f7879a3
+Phase 1 step 6: the candidate panel. Details (the matchmaker's own label and
+social handles, plus membership and the status that drives the list filters),
+private Notes with add, edit and soft remove, and a History tab reading the
+audit trail — paginated, filtered by area, each entry naming who did it. The
+sentences are rendered from the recorded events rather than written at the call
+site, so the log and the display can't drift. Seeded worlds now carry their
+membership history too, so a seeded candidate's History reads like a real one's.
+Convex features: paginated queries, indexes, queries, mutations
+(`packages/api/convex/notes/`, `packages/api/convex/audit/queries.ts`,
+`apps/app/src/workspace/candidate-panel.tsx`).
+
+### 2026-09-19 - f1b40a3
+The panel's three tabs became collapsible sections, so the details and the notes
+can be read at once, and the app header gained a control that cycles light,
+dark and the device's own setting. Writing it found that dark had never actually
+worked when chosen: the design tokens only defined their dark values inside a
+`prefers-color-scheme` block, so forcing the class did nothing on a light
+device. The palette is now defined once and applied by either. The first test
+passed while the feature was broken because it only checked the class, so it now
+asserts the rendered colour and scans dark mode for contrast
+(`packages/ui/src/components/accordion.tsx`, `apps/app/src/theme/`,
+`packages/ui/src/styles/theme.css`).
+
+### 2026-09-20 - 6fd115f
+Phase 1 step 7: leaving and account deletion. A candidate can leave from their
+chat menu with an optional reason, and nothing is removed from the matchmaker —
+the thread, notes and trail stay readable, the banner and the closed composer
+both say when they left, and re-inviting relinks the same record so one person
+keeps one history. Account settings arrived at `/settings`, where deleting the
+account is confirmed with an emailed six-digit code kept only as a hash; it
+can't sign anyone in, and five wrong guesses throw it away. Deleting marks every
+linked candidate `account_deleted` with one audit event in that matchmaker's
+trail alone, so none of them learns about the others, keeps the user row because
+the matchmakers' records still name that person, and removes the account's
+sessions and credentials — the only hard delete in the product, and only auth
+plumbing. Refusals are returned rather than thrown, because a throwing mutation
+rolls back its own writes and so could never have counted the wrong guess that
+caused it. Writing the accessibility scan for the new screens found that message
+timestamps on your own bubble had been below the AA contrast ratio, and that the
+existing scan of the chat had been passing by racing the thread's render. Convex
+features: mutations, internal actions, scheduled functions, indexes
+(`packages/api/convex/users/`, `packages/api/convex/candidates/mutations.ts`,
+`apps/app/src/pages/account-settings.tsx`).

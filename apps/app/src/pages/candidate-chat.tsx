@@ -1,8 +1,10 @@
 import { api, type Id } from "@repo/api";
+import { Button, Menu, MenuItem } from "@repo/ui";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useParams } from "react-router";
 import { Composer } from "../chat/composer";
+import { LeaveMatchmaker } from "../chat/leave-matchmaker";
 import { Thread } from "../chat/thread";
 import { useMarkRead } from "../chat/use-mark-read";
 import { AppHeader } from "../components/app-header";
@@ -20,7 +22,7 @@ const PAGE_SIZE = 30;
  * matchmaker exists. Only `visibility: "everyone"` messages are ever loaded —
  * the query itself can't return the matchmaker's private ones.
  *
- * Leaving arrives with step 7.
+ * The menu holds **Leave** (prd §3.4, §4.2).
  */
 export function CandidateChatPage() {
   const { matchmakerUsername = "" } = useParams();
@@ -42,20 +44,77 @@ export function CandidateChatPage() {
         className="mx-auto flex w-full min-h-0 max-w-3xl flex-1 flex-col border-border md:border-x"
         data-testid="candidate-chat"
       >
-        <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
-          <h1
-            className="font-display text-xl"
-            data-testid="candidate-chat-matchmaker"
-          >
-            {membership.matchmakerDisplayName}
-          </h1>
-        </div>
-        <CandidateThread
+        <Chat
           candidateId={membership.candidateId}
           matchmakerName={membership.matchmakerDisplayName}
         />
       </main>
     </div>
+  );
+}
+
+/** The header, the leave confirmation when it's open, and the thread. */
+function Chat({
+  candidateId,
+  matchmakerName,
+}: {
+  candidateId: Id<"candidates">;
+  matchmakerName: string;
+}) {
+  const [leaving, setLeaving] = useState(false);
+  return (
+    <>
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
+        <h1
+          className="min-w-0 flex-1 truncate font-display text-xl"
+          data-testid="candidate-chat-matchmaker"
+        >
+          {matchmakerName}
+        </h1>
+        <Menu
+          trigger={
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Conversation menu"
+              data-testid="candidate-chat-menu"
+            >
+              <MoreIcon />
+            </Button>
+          }
+        >
+          <MenuItem onClick={() => setLeaving(true)}>
+            Leave {matchmakerName}
+          </MenuItem>
+        </Menu>
+      </div>
+      {leaving && (
+        <LeaveMatchmaker
+          candidateId={candidateId}
+          matchmakerName={matchmakerName}
+          onCancel={() => setLeaving(false)}
+        />
+      )}
+      <CandidateThread
+        candidateId={candidateId}
+        matchmakerName={matchmakerName}
+      />
+    </>
+  );
+}
+
+function MoreIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="size-4"
+    >
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
+    </svg>
   );
 }
 

@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router";
 import { RequireAuth } from "./auth/require-auth";
+import { AccountSettingsPage } from "./pages/account-settings";
 import { CandidateChatPage } from "./pages/candidate-chat";
 import { ConversationPage } from "./pages/conversation";
 import { CreateMatchmakerPage } from "./pages/create-matchmaker";
@@ -22,6 +23,7 @@ export default function App() {
           it. */}
       <Route element={<RequireAuth />}>
         <Route index element={<HomePage />} />
+        <Route path="/settings" element={<AccountSettingsPage />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/invitations/:candidateId" element={<InvitePage />} />
         <Route path="/c/:matchmakerUsername" element={<CandidateChatPage />} />

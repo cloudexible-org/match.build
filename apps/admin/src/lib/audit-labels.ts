@@ -8,6 +8,7 @@ import type { AuditAction } from "@repo/api";
 export const ACTION_LABELS: Record<AuditAction, string> = {
   "account.created": "Account created",
   "account.name_changed": "Account name changed",
+  "account.deleted": "Account deleted",
   "account.sign_in_code_issued": "Sign-in code issued by admin",
   "matchmaker.created": "Matchmaker profile created",
   "matchmaker.updated": "Matchmaker profile updated",

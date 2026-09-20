@@ -46,6 +46,7 @@ import type * as seed_dev_mutations from "../seed/dev/mutations.js";
 import type * as seed_e2e_fixture from "../seed/e2e/fixture.js";
 import type * as seed_e2e_mutations from "../seed/e2e/mutations.js";
 import type * as seed_e2e_scenario from "../seed/e2e/scenario.js";
+import type * as users_actions from "../users/actions.js";
 import type * as users_helpers from "../users/helpers.js";
 import type * as users_mutations from "../users/mutations.js";
 import type * as users_queries from "../users/queries.js";
@@ -100,6 +101,7 @@ declare const fullApi: ApiFromModules<{
   "seed/e2e/fixture": typeof seed_e2e_fixture;
   "seed/e2e/mutations": typeof seed_e2e_mutations;
   "seed/e2e/scenario": typeof seed_e2e_scenario;
+  "users/actions": typeof users_actions;
   "users/helpers": typeof users_helpers;
   "users/mutations": typeof users_mutations;
   "users/queries": typeof users_queries;

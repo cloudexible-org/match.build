@@ -259,9 +259,7 @@ test("the composer is closed for an invited candidate and for one who left", asy
 
   const gone = await asMatchmaker(page, "gone");
   await expect(gone.getComposer()).toBeHidden();
-  await expect(gone.getClosedComposer()).toContainText(
-    "Gus Gone isn't a member any more.",
-  );
+  await expect(gone.getClosedComposer()).toContainText("Gus Gone left on");
   // The thread is still readable.
   await expect(gone.getMessages()).toHaveCount(1);
 });

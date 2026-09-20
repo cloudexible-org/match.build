@@ -421,6 +421,7 @@ export default defineSchema({
 - **Two fields for candidate state.** `membership` is the person's side; `status` is the matchmaker's workflow. A candidate who left can still be archived; keeping them separate avoids a combined status explosion.
 - **Uniqueness is enforced in mutations**, since Convex has no unique constraints: one `usernameKey` across matchmakers; one candidate per `(matchmakerId, email)`; one candidate per `(matchmakerId, userId)`.
 - **Account deletion and Convex Auth.** Convex Auth links a new sign-in to an existing user with the same email by default. Override `createOrUpdateUser` so a user with `deletedAt` is never reused.
+- **The deletion confirmation code** (§3.5) is not in the schema above: the built `users` table also carries an optional `deletionCode` (`{ codeHash, expiresAt, attempts }`), holding only the SHA-256 of the six digits, cleared once spent, replaced, or guessed at too often. It is not a credential — only `users.deleteAccount` accepts it, and only from the account that asked for it — so it can't be used to sign in.
 - **Remove the template's demo `messages` table and `convex/messages.ts`** before this schema lands; they collide with the table above.
 - Phase 2 adds tables (`facts`, `replySuggestions`) and fields (voice profile, conversation summaries, the `ai_suggestion` message source, the `agent` audit actor). Adding them later is a non-breaking schema change.
 
@@ -522,7 +523,7 @@ Candidate conversations include sexual orientation, religion, health and family 
 4. *Done.* **Invitations:** invite email, `/invite/:token`, home-page invitations, accept/decline, resend/revoke/change email, expiry job.
 5. *Done.* **Chat:** real-time messaging on both sides, read markers, private-message badge, candidate view.
 6. *Done.* **Candidate panel:** Details, Notes, History.
-7. **Leaving & account deletion.**
+7. *Done.* **Leaving & account deletion.**
 8. **Notifications:** delayed email, web push, PWA manifest and service worker, settings.
 
 **Done when:** a friendly matchmaker can onboard real candidates and run conversations in the app for a week without falling back to DMs.

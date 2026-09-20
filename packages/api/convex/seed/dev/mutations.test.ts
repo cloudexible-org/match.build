@@ -46,15 +46,23 @@ describe("seed.dev.mutations.apply", () => {
 
     const joined = state.candidates.filter((c) => c.membership === "joined");
     const invited = state.candidates.filter((c) => c.membership === "invited");
-    expect(joined).toHaveLength(DEV_MEMBERS.length);
+    const left = state.candidates.filter((c) => c.membership === "left");
+    const departed = DEV_MEMBERS.filter((m) => m.left !== undefined);
+    expect(joined).toHaveLength(DEV_MEMBERS.length - departed.length);
     expect(invited).toHaveLength(1);
     expect(invited[0].invite).toBeDefined();
     expect(state.conversations).toHaveLength(DEV_MEMBERS.length);
 
+    // Whoever left kept their thread, and their reason is on the record.
+    expect(left).toHaveLength(departed.length);
+    expect(left[0].leaveReason).toBe(departed[0].left?.reason);
+    expect(left[0].membershipChangedAt).toBeLessThan(Date.now());
+
     const seeded = DEV_MEMBERS.flatMap((m) => m.messages);
     expect(state.messages).toHaveLength(seeded.length);
-    const thread = state.conversations.find((c) => c.lastSeq > 0);
-    expect(thread?.lastSeq).toBe(seeded.length);
+    // The seeded conversation with a private message in it.
+    const thread = state.conversations.find((c) => c.lastSeq === 3);
+    expect(thread).toBeDefined();
     // The last message is matchmaker-only, so the candidate's view ends earlier.
     expect(thread?.lastPublicSeq).toBe(2);
   });

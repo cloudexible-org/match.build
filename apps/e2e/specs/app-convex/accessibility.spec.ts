@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { expectNoA11yViolations } from "../../a11y";
+import { AccountSettingsPage } from "../../page-objects/app/account-settings.page";
 import { HomePage } from "../../page-objects/app/home.page";
-import { InvitePage } from "../../page-objects/app/invite.page";
+import {
+  CandidateChatPage,
+  InvitePage,
+} from "../../page-objects/app/invite.page";
 import {
   ConversationPage,
   CreateMatchmakerPage,
@@ -151,5 +155,29 @@ test("the accept screen and a candidate's chat", async ({ page }) => {
 
   await signInAs(page, world.email("jane"));
   await page.goto(`/app/c/${world.username("book")}`);
+  // Wait for the thread: scanning an empty chat misses everything in it.
+  await expect(new CandidateChatPage(page).getMessages().first()).toBeVisible();
+  await expectNoA11yViolations(page);
+});
+
+test("account settings, and the screens for leaving or deleting", async ({
+  page,
+}) => {
+  await signInAs(page, world.email("jane"));
+  const settings = new AccountSettingsPage(page);
+  await settings.goto();
+  await expect(settings.getHeading()).toBeVisible();
+  await expectNoA11yViolations(page);
+
+  // The code step. Asking for a code deletes nothing.
+  await settings.getDeleteStartButton().click();
+  await expect(settings.getCodeInput()).toBeVisible();
+  await expectNoA11yViolations(page);
+
+  // And the leave confirmation, left unconfirmed.
+  await page.goto(`/app/c/${world.username("book")}`);
+  const chat = new CandidateChatPage(page);
+  await (await chat.openLeave()).click();
+  await expect(chat.getLeaveConfirmation()).toBeVisible();
   await expectNoA11yViolations(page);
 });

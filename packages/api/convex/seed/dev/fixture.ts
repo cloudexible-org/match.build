@@ -28,6 +28,12 @@ export type DevMessage = {
 export type DevMember = {
   userSlug: string;
   messages: DevMessage[];
+  /**
+   * Set to seed someone who has since left (prd/phase-1.md §3.4), so the
+   * read-only treatment — the badge, the closed composer, Re-invite — is
+   * visible in dev without ending a real membership.
+   */
+  left?: { daysAgo: number; reason?: string };
 };
 
 export const DEV_DOMAIN = "matchmaker-dev.test";
@@ -66,6 +72,13 @@ export const DEV_USERS: DevUser[] = [
     email: `ivy.invited@${DEV_DOMAIN}`,
     name: "Ivy Invited",
     role: "invited by Maya (not joined)",
+  },
+  // Joined, then left: the matchmaker's read-only view of a past candidate.
+  {
+    slug: "left",
+    email: `lee.left@${DEV_DOMAIN}`,
+    name: "Lee Left",
+    role: "candidate (left Maya's book)",
   },
   // Verified account with nothing attached, for onboarding.
   {
@@ -106,6 +119,17 @@ export const DEV_MEMBERS: DevMember[] = [
   },
   { userSlug: "jordan", messages: [] },
   { userSlug: "alex", messages: [] },
+  {
+    userSlug: "left",
+    messages: [
+      {
+        author: "matchmaker",
+        visibility: "everyone",
+        body: "All the best, Lee — do come back if anything changes.",
+      },
+    ],
+    left: { daysAgo: 12, reason: "Met someone, thank you!" },
+  },
 ];
 
 /** Users invited to Maya's book who have not accepted. */

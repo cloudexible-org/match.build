@@ -133,6 +133,7 @@ function Conversation({
           candidateId={candidate.candidateId}
           name={name}
           membership={candidate.membership}
+          membershipChangedAt={candidate.membershipChangedAt}
         />
       </div>
 
@@ -152,15 +153,19 @@ function Conversation({
   );
 }
 
+const day = (time: number) => new Date(time).toLocaleDateString();
+
 /** The thread and composer for one candidate. */
 function Thread({
   candidateId,
   name,
   membership,
+  membershipChangedAt,
 }: {
   candidateId: Id<"candidates">;
   name: string;
   membership: Membership;
+  membershipChangedAt: number;
 }) {
   const workspace = useWorkspace();
   const args = { matchmakerId: workspace.matchmakerId, candidateId };
@@ -178,12 +183,14 @@ function Thread({
   );
   useMarkRead(results[0]?.seq, markRead);
 
+  // Where the composer would be, so the reason is at the end of the timeline
+  // as well as in the banner above it (prd/phase-1.md §3.4).
   const closed = {
     invited: `You can message ${name} once they accept your invitation.`,
     declined: `You can message ${name} if they accept a new invitation.`,
     joined: undefined,
-    left: `${name} isn't a member any more. You can still read the thread.`,
-    account_deleted: `${name} deleted their account. You can still read the thread.`,
+    left: `${name} left on ${day(membershipChangedAt)}. You can still read the thread, and your notes are yours to keep.`,
+    account_deleted: `${name} deleted their account on ${day(membershipChangedAt)}. You can still read the thread, and your notes are yours to keep.`,
   }[membership];
 
   return (

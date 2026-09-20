@@ -7,9 +7,12 @@ import { ThemeToggle } from "./theme-toggle";
 /**
  * Top bar for signed-in pages: brand, who's signed in, and sign out.
  *
- * `nav` adds links after the brand (a workspace's name and settings); the
- * account name then gives way to them on narrow screens. `wide` spans the
- * full width for the workspace's columns instead of the reading width.
+ * The account's name is the way into `/settings` (account name, deleting the
+ * account). `nav` adds links after the brand (a workspace's name and its own
+ * settings); the account name then gives way to them on narrow screens —
+ * a workspace's owner can't delete their account anyway (prd §3.5), and
+ * reaches account settings from home. `wide` spans the full width for the
+ * workspace's columns instead of the reading width.
  */
 export function AppHeader({
   name,
@@ -38,15 +41,17 @@ export function AppHeader({
           {nav}
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <span
+          <Link
+            to="/settings"
+            aria-label={`Account settings for ${name}`}
             className={cn(
-              "truncate text-sm text-muted-foreground",
+              "truncate rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               nav !== undefined && "hidden sm:inline",
             )}
             data-testid="header-account-name"
           >
             {name}
-          </span>
+          </Link>
           <ThemeToggle />
           <Button variant="outline" size="sm" onClick={() => void signOut()}>
             Sign out

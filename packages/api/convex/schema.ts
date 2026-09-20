@@ -56,6 +56,19 @@ export default defineSchema({
     phoneVerificationTime: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
     deletedAt: v.optional(v.number()), // set on account deletion; the row stays
+    // The open confirmation code for deleting this account (prd/phase-1.md
+    // §3.5). Beyond the PRD's schema: deletion is confirmed with a fresh
+    // one-time code, and the code has to live somewhere. Like an invite, only
+    // its hash is stored, and it is cleared once spent or replaced. It is not
+    // a credential: it can't sign anyone in, only confirm a deletion the
+    // signed-in account asked for.
+    deletionCode: v.optional(
+      v.object({
+        codeHash: v.string(), // SHA-256 of the six digits; never the code
+        expiresAt: v.number(),
+        attempts: v.number(), // wrong guesses; the code dies after a few
+      }),
+    ),
   })
     .index("email", ["email"])
     .index("phone", ["phone"]),
@@ -253,7 +266,11 @@ export default defineSchema({
   // reads it.
   emailOutbox: defineTable({
     to: v.string(),
-    kind: v.union(v.literal("sign_in_code"), v.literal("invite")),
+    kind: v.union(
+      v.literal("sign_in_code"),
+      v.literal("invite"),
+      v.literal("account_deletion_code"),
+    ),
     subject: v.string(),
     text: v.string(),
   }).index("by_to", ["to"]),

@@ -13,6 +13,11 @@ export const AUDIT_ACTIONS = [
   // person has joined, as a separate event in that matchmaker's trail.
   "account.created",
   "account.name_changed",
+  // The person deleted their own account (prd/phase-1.md §3.5). Recorded at
+  // account level; each matchmaker they had joined gets its own
+  // `membership.account_deleted` event instead, so none of them learns about
+  // the others.
+  "account.deleted",
   // A platform admin issued a sign-in code for the account (apps/admin).
   "account.sign_in_code_issued",
 
@@ -175,6 +180,7 @@ const PLAIN_SENTENCES: Partial<Record<AuditAction, string>> = {
   "candidate.details_changed": "Updated their details",
   "candidate.status_changed": "Changed their status",
   "account.created": "Created their account",
+  "account.deleted": "Deleted their account",
 };
 
 /** One recorded change, as stored: JSON-encoded values. */

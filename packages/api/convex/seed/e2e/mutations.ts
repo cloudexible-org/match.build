@@ -298,6 +298,7 @@ export const scenario = internalMutation({
             v.union(v.literal("open"), v.literal("expired"), v.literal("none")),
           ),
           membershipChangedDaysAgo: v.optional(v.number()),
+          leaveReason: v.optional(v.string()),
           invitesSentToday: v.optional(v.number()),
           messages: v.optional(
             v.array(
@@ -438,6 +439,7 @@ export const scenario = internalMutation({
         membership,
         membershipChangedAt:
           now - (spec.membershipChangedDaysAgo ?? 0) * DAY_MS,
+        leaveReason: membership === "left" ? spec.leaveReason : undefined,
         status: spec.status ?? "active",
       });
 
@@ -490,12 +492,16 @@ export const scenario = internalMutation({
       const answered: Partial<
         Record<
           typeof membership,
-          "invite.accepted" | "invite.declined" | "membership.left"
+          | "invite.accepted"
+          | "invite.declined"
+          | "membership.left"
+          | "membership.account_deleted"
         >
       > = {
         joined: "invite.accepted",
         declined: "invite.declined",
         left: "membership.left",
+        account_deleted: "membership.account_deleted",
       };
       const answer = answered[membership];
       if (answer !== undefined) {
@@ -517,6 +523,7 @@ export const scenario = internalMutation({
           action: answer,
           entityTable: "candidates",
           entityId: candidateId,
+          reason: membership === "left" ? spec.leaveReason : undefined,
         });
       }
 

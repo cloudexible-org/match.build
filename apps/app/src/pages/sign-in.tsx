@@ -22,6 +22,7 @@ import {
 import { useConvexAuth } from "convex/react";
 import { type FormEvent, useState } from "react";
 import { Navigate, useSearchParams } from "react-router";
+import { takeAccountDeleted } from "../auth/account-deleted";
 import { safeNextPath } from "../auth/redirects";
 import { FullPageStatus } from "../components/full-page-status";
 
@@ -41,13 +42,29 @@ export function SignInPage() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const [params] = useSearchParams();
   const next = safeNextPath(params.get("next"));
+  // Set by the account settings page just before it deleted the account, so
+  // the person lands somewhere that says it worked rather than on a bare
+  // sign-in form. Read once, on arrival: reading it clears it.
+  const [deleted] = useState(takeAccountDeleted);
   const [step, setStep] = useState<Step>({ kind: "email" });
 
   if (isLoading) return <FullPageStatus>Loading…</FullPageStatus>;
   if (isAuthenticated) return <Navigate to={next} replace />;
 
   return (
-    <main className="flex min-h-dvh items-start justify-center px-4 py-12 sm:items-center">
+    <main className="flex min-h-dvh flex-col items-center justify-start gap-4 px-4 py-12 sm:justify-center">
+      {deleted && (
+        <Card
+          className="w-full max-w-sm bg-accent/40 p-4 text-sm"
+          data-testid="account-deleted-notice"
+        >
+          <p className="font-medium">Your account is deleted.</p>
+          <p className="text-muted-foreground">
+            Matchmakers you worked with keep their copy of past conversations.
+            Signing up again with the same address starts a new account.
+          </p>
+        </Card>
+      )}
       <Card className="w-full max-w-sm">
         {step.kind === "email" ? (
           <EmailStep

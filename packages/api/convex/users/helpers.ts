@@ -104,3 +104,91 @@ export async function findLiveUserByEmail(
     .take(20);
   return users.find((user) => user.deletedAt === undefined) ?? null;
 }
+
+/*
+ * ─── Deleting an account (prd/phase-1.md §3.5) ──────────────────────────────
+ */
+
+/** Lowercase hex SHA-256. Deletion codes are stored hashed, never in plain. */
+export async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(input),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+/**
+ * Throws unless this account may be deleted from the UI.
+ *
+ * An account that owns a matchmaker profile can't be: candidates, notes and
+ * conversations hang off that profile, and closing one is its own feature
+ * (see the backlog). A verified email is also required — it is where the
+ * confirmation code goes.
+ */
+export async function assertCanDeleteAccount(
+  ctx: QueryCtx,
+  user: Doc<"users">,
+): Promise<void> {
+  if (user.email === undefined || user.emailVerificationTime === undefined) {
+    throw new ConvexError("Verify your email address first.");
+  }
+  const owned = await ctx.db
+    .query("matchmakers")
+    .withIndex("by_ownerUserId", (q) => q.eq("ownerUserId", user._id))
+    .first();
+  if (owned !== null) {
+    throw new ConvexError(
+      "This account has a matchmaker profile, so it can't be deleted here. Get in touch and we'll help.",
+    );
+  }
+}
+
+/**
+ * How many rows of each auth table one account can plausibly have: a session
+ * per device, a refresh token per session. Far above anyone real, and it keeps
+ * the deletion inside one transaction.
+ */
+const MAX_AUTH_ROWS = 200;
+
+/**
+ * Removes everything that lets this account sign in: its sessions (and their
+ * refresh tokens) and its `authAccounts` rows (and any unused verification
+ * code). The `users` row itself stays, marked `deletedAt`.
+ *
+ * This is the one place in the product that hard-deletes (prd §6): auth
+ * plumbing is not a record of anything, and leaving it behind would leave the
+ * account signable-in.
+ */
+export async function removeSignInCredentials(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<void> {
+  const sessions = await ctx.db
+    .query("authSessions")
+    .withIndex("userId", (q) => q.eq("userId", userId))
+    .take(MAX_AUTH_ROWS);
+  for (const session of sessions) {
+    const tokens = await ctx.db
+      .query("authRefreshTokens")
+      .withIndex("sessionId", (q) => q.eq("sessionId", session._id))
+      .take(MAX_AUTH_ROWS);
+    for (const token of tokens) await ctx.db.delete(token._id);
+    await ctx.db.delete(session._id);
+  }
+
+  const accounts = await ctx.db
+    .query("authAccounts")
+    .withIndex("userIdAndProvider", (q) => q.eq("userId", userId))
+    .take(MAX_AUTH_ROWS);
+  for (const account of accounts) {
+    const codes = await ctx.db
+      .query("authVerificationCodes")
+      .withIndex("accountId", (q) => q.eq("accountId", account._id))
+      .take(MAX_AUTH_ROWS);
+    for (const code of codes) await ctx.db.delete(code._id);
+    await ctx.db.delete(account._id);
+  }
+}

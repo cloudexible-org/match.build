@@ -1,11 +1,16 @@
 import { internal } from "../_generated/api";
 import { type ActionCtx, env } from "../_generated/server";
-import { type EmailMessage, SIGN_IN_FROM, signInCodeEmail } from "./rules";
+import {
+  accountDeletionCodeEmail,
+  type EmailMessage,
+  SIGN_IN_FROM,
+  signInCodeEmail,
+} from "./rules";
 
 export type OutgoingEmail = {
   from: string;
   to: string;
-  kind: "sign_in_code" | "invite";
+  kind: "sign_in_code" | "invite" | "account_deletion_code";
   message: EmailMessage;
 };
 
@@ -69,5 +74,27 @@ export async function sendSignInCode(
   });
   if (env.RESEND_API_KEY === undefined) {
     console.log(`RESEND_API_KEY unset — sign-in code for ${to}: ${code}`);
+  }
+}
+
+/**
+ * Sends the code that confirms deleting an account (prd/phase-1.md §3.5),
+ * from the same no-reply address as a sign-in code. Scheduled by
+ * `users.mutations.requestDeletionCode`. Without Resend the code is also
+ * logged, as sign-in codes are.
+ */
+export async function sendAccountDeletionCode(
+  ctx: ActionCtx,
+  to: string,
+  code: string,
+): Promise<void> {
+  await sendEmail(ctx, {
+    from: SIGN_IN_FROM,
+    to,
+    kind: "account_deletion_code",
+    message: accountDeletionCodeEmail(code),
+  });
+  if (env.RESEND_API_KEY === undefined) {
+    console.log(`RESEND_API_KEY unset — deletion code for ${to}: ${code}`);
   }
 }

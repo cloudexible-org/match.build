@@ -252,6 +252,11 @@ signing in. Nothing about that touches a real inbox or a cloud deployment:
 - **Platform admins** are the `SEED_ADMINS` addresses, which `configureAuthEnv`
   puts in `PLATFORM_ADMIN_EMAILS`. One per signing-in spec, for the same reason
   as any other seeded user.
+- **Account-deletion codes** go to the same outbox, so they are read the same
+  way — but `latestSignInEmail` returns the latest email of *any* kind, and
+  `signInAs` has already put a sign-in code there. `deletion-codes.ts` matches
+  on the subject instead (`waitForDeletionCode`). Typing the last digit submits
+  on its own, so there is no button to click afterwards.
 - **Codes a platform admin issues** (`specs/admin-convex/sign-in-codes.spec.ts`)
   never reach the outbox: the admin app returns them instead of mailing them.
   Spend one through "I already have a code" on the app's sign-in page —

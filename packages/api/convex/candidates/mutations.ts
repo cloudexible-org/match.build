@@ -6,15 +6,18 @@ import { openInvite, sendInvite } from "../invites/helpers";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
 import { socialPlatform } from "../schema";
 import { normaliseEmail } from "../waitlist/rules";
+import { requireCandidateSelf } from "./helpers";
 import {
   CANDIDATE_LIMITS,
   candidateEmailError,
   candidateNameError,
   handleError,
   importedHistoryError,
+  leaveReasonError,
   normaliseCandidateName,
   normaliseHandles,
   normaliseImportedHistory,
+  normaliseLeaveReason,
 } from "./rules";
 
 /**
@@ -257,6 +260,48 @@ export const setStatus = mutation({
       changes: [
         { field: "status", before: candidate.status, after: args.status },
       ],
+    });
+    return null;
+  },
+});
+
+/**
+ * The candidate leaves this matchmaker (prd/phase-1.md §3.4), with an optional
+ * reason. Their side of the relationship ends: the conversation disappears
+ * from their home page and every candidate-facing function stops answering for
+ * it (`requireCandidateSelf` requires `joined`).
+ *
+ * Nothing is removed from the matchmaker: the thread, the notes and the trail
+ * stay fully readable, and they can re-invite the same record so the history
+ * continues in one thread. The accept screen says so before anyone joins
+ * (§9.3), and the confirmation says it again before they leave.
+ */
+export const leave = mutation({
+  args: { candidateId: v.id("candidates"), reason: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { user, candidate } = await requireCandidateSelf(
+      ctx,
+      args.candidateId,
+    );
+    const raw = args.reason ?? "";
+    const invalid = leaveReasonError(raw);
+    if (invalid) throw new ConvexError(invalid);
+    const reason = normaliseLeaveReason(raw);
+
+    await ctx.db.patch("candidates", candidate._id, {
+      membership: "left",
+      membershipChangedAt: Date.now(),
+      leaveReason: reason,
+    });
+    await recordAudit(ctx, {
+      matchmakerId: candidate.matchmakerId,
+      candidateId: candidate._id,
+      actor: { type: "user", userId: user._id, role: "candidate" },
+      action: "membership.left",
+      entity: { table: "candidates", id: candidate._id },
+      changes: [{ field: "membership", before: "joined", after: "left" }],
+      reason,
     });
     return null;
   },

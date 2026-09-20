@@ -106,15 +106,41 @@ export const apply = internalMutation({
         .first();
       if (existing !== null) continue;
 
+      const left = member.left;
       const candidateId = await ctx.db.insert("candidates", {
         matchmakerId,
         userId: users[member.userSlug],
         email: user.email,
         socialHandles: [],
-        membership: "joined",
-        membershipChangedAt: now,
+        membership: left === undefined ? "joined" : "left",
+        membershipChangedAt:
+          left === undefined ? now : now - left.daysAgo * 24 * 60 * 60 * 1000,
+        leaveReason: left?.reason,
         status: "active",
       });
+      if (left !== undefined) {
+        // The event the product would have written, so History reads the same.
+        await ctx.db.insert("auditEvents", {
+          matchmakerId,
+          candidateId,
+          actor: {
+            type: "user",
+            userId: users[member.userSlug],
+            role: "candidate",
+          },
+          action: "membership.left",
+          entityTable: "candidates",
+          entityId: candidateId,
+          changes: [
+            {
+              field: "membership",
+              before: JSON.stringify("joined"),
+              after: JSON.stringify("left"),
+            },
+          ],
+          reason: left.reason,
+        });
+      }
 
       const conversationId = await ctx.db.insert("conversations", {
         matchmakerId,
@@ -153,7 +179,9 @@ export const apply = internalMutation({
         matchmakerLastReadSeq: seq,
         candidateLastReadSeq: lastPublicSeq,
       });
-      created.push(`member ${user.email}`);
+      created.push(
+        `member ${user.email}${left === undefined ? "" : " (left)"}`,
+      );
     }
 
     for (const slug of DEV_INVITED_SLUGS) {

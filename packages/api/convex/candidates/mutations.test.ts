@@ -257,3 +257,171 @@ describe("candidates.onboard", () => {
     ).rejects.toThrow("Invite links aren't set up on this deployment yet");
   });
 });
+
+describe("candidates.leave", () => {
+  /** A joined candidate linked to `member`, with one message in the thread. */
+  async function joined() {
+    const base = await world();
+    const memberId = await base.t.run((ctx) =>
+      ctx.db.insert("users", {
+        email: "member@example.test",
+        name: "Mem Ber",
+        emailVerificationTime: 1,
+      }),
+    );
+    const candidateId = await base.t.run(async (ctx) => {
+      const id = await ctx.db.insert("candidates", {
+        matchmakerId: base.matchmakerId,
+        userId: memberId,
+        email: "member@example.test",
+        socialHandles: [],
+        membership: "joined",
+        membershipChangedAt: 1,
+        status: "active",
+      });
+      const conversationId = await ctx.db.insert("conversations", {
+        matchmakerId: base.matchmakerId,
+        candidateId: id,
+        lastSeq: 1,
+        lastPublicSeq: 1,
+        lastMessageAt: 1,
+        matchmakerLastReadSeq: 1,
+        candidateLastReadSeq: 0,
+      });
+      await ctx.db.insert("messages", {
+        matchmakerId: base.matchmakerId,
+        conversationId,
+        seq: 1,
+        author: "matchmaker",
+        visibility: "everyone",
+        source: "typed",
+        body: "Welcome!",
+        sentAt: 1,
+      });
+      return id;
+    });
+    return {
+      ...base,
+      memberId,
+      candidateId,
+      asMember: base.t.withIdentity({ subject: `${memberId}|s` }),
+    };
+  }
+
+  test("marks them left with their reason, and audits it as theirs", async () => {
+    const { t, asMember, memberId, candidateId, matchmakerId } = await joined();
+    await asMember.mutation(api.candidates.mutations.leave, {
+      candidateId,
+      reason: "  Met someone, thank you!  ",
+    });
+
+    const state = await t.run(async (ctx) => ({
+      candidate: await ctx.db.get("candidates", candidateId),
+      events: await ctx.db
+        .query("auditEvents")
+        .withIndex("by_candidateId", (q) => q.eq("candidateId", candidateId))
+        .collect(),
+    }));
+    expect(state.candidate?.membership).toBe("left");
+    expect(state.candidate?.leaveReason).toBe("Met someone, thank you!");
+    expect(state.candidate?.membershipChangedAt).toBeGreaterThan(1);
+    const left = state.events.find((e) => e.action === "membership.left");
+    expect(left?.matchmakerId).toBe(matchmakerId);
+    expect(left?.reason).toBe("Met someone, thank you!");
+    expect(left?.actor).toEqual({
+      type: "user",
+      userId: memberId,
+      role: "candidate",
+    });
+    expect(left?.changes).toEqual([
+      { field: "membership", before: '"joined"', after: '"left"' },
+    ]);
+  });
+
+  test("keeps everything on the matchmaker's side, and closes the candidate's", async () => {
+    const { t, asOwner, asMember, candidateId, matchmakerId } = await joined();
+    await asMember.mutation(api.candidates.mutations.leave, { candidateId });
+
+    // The matchmaker still reads the thread, and can still write notes.
+    const view = await asOwner.query(api.candidates.queries.conversation, {
+      matchmakerId,
+      candidateId,
+    });
+    expect(view?.candidate.membership).toBe("left");
+    const thread = await asOwner.query(api.messages.queries.thread, {
+      matchmakerId,
+      candidateId,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(thread.page).toHaveLength(1);
+    await asOwner.mutation(api.notes.mutations.create, {
+      matchmakerId,
+      candidateId,
+      body: "Left in March. Lovely to work with.",
+    });
+
+    // The messages and the notes survive; only the membership moved.
+    const counts = await t.run(async (ctx) => ({
+      messages: (await ctx.db.query("messages").take(10)).length,
+      notes: (await ctx.db.query("notes").take(10)).length,
+    }));
+    expect(counts).toEqual({ messages: 1, notes: 1 });
+
+    // Their own side is closed: no thread, and no composer.
+    await expect(
+      asMember.query(api.messages.queries.candidateThread, {
+        candidateId,
+        paginationOpts: { numItems: 10, cursor: null },
+      }),
+    ).rejects.toThrow("Conversation not found.");
+    await expect(
+      asMember.mutation(api.messages.mutations.sendAsCandidate, {
+        candidateId,
+        body: "Are you still there?",
+      }),
+    ).rejects.toThrow("Conversation not found.");
+  });
+
+  test("leaving twice, and leaving someone else's record, are both refused", async () => {
+    const { asMember, asStranger, candidateId } = await joined();
+    await asMember.mutation(api.candidates.mutations.leave, { candidateId });
+    await expect(
+      asMember.mutation(api.candidates.mutations.leave, { candidateId }),
+    ).rejects.toThrow("Conversation not found.");
+    await expect(
+      asStranger.mutation(api.candidates.mutations.leave, { candidateId }),
+    ).rejects.toThrow("Conversation not found.");
+  });
+
+  test("refuses a reason longer than the limit, writing nothing", async () => {
+    const { t, asMember, candidateId } = await joined();
+    await expect(
+      asMember.mutation(api.candidates.mutations.leave, {
+        candidateId,
+        reason: "a".repeat(501),
+      }),
+    ).rejects.toThrow("That's too long.");
+    const candidate = await t.run((ctx) =>
+      ctx.db.get("candidates", candidateId),
+    );
+    expect(candidate?.membership).toBe("joined");
+  });
+
+  test("the matchmaker can re-invite the same record, continuing one thread", async () => {
+    const { t, asOwner, asMember, candidateId, matchmakerId } = await joined();
+    await asMember.mutation(api.candidates.mutations.leave, { candidateId });
+    await asOwner.mutation(api.invites.mutations.reinvite, {
+      matchmakerId,
+      candidateId,
+    });
+
+    const state = await t.run(async (ctx) => ({
+      candidate: await ctx.db.get("candidates", candidateId),
+      conversations: (await ctx.db.query("conversations").take(10)).length,
+    }));
+    expect(state.candidate?.membership).toBe("invited");
+    expect(state.candidate?.invite).toBeDefined();
+    // One record, one conversation: the history carries on where it left off.
+    expect(state.conversations).toBe(1);
+  });
+});

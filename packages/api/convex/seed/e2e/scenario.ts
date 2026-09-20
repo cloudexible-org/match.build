@@ -88,6 +88,8 @@ export type ScenarioCandidate = {
   invite?: ScenarioInvite;
   /** How many days ago the membership last changed. Default: 0. */
   membershipChangedDaysAgo?: number;
+  /** The reason they gave for leaving, for a `left` candidate. */
+  leaveReason?: string;
   /**
    * Invite emails already recorded as sent today, for the resend limit
    * (`invites/helpers.ts`, three a day).
