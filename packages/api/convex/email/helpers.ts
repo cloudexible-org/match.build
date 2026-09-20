@@ -10,7 +10,12 @@ import {
 export type OutgoingEmail = {
   from: string;
   to: string;
-  kind: "sign_in_code" | "invite" | "account_deletion_code";
+  kind:
+    | "sign_in_code"
+    | "invite"
+    | "account_deletion_code"
+    | "new_message"
+    | "membership_changed";
   message: EmailMessage;
 };
 

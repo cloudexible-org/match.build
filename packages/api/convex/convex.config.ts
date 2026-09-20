@@ -28,6 +28,22 @@ const app = defineApp({
     // Comma-separated emails of the platform admins, who can sign in to
     // apps/admin (admin/helpers.ts). Unset means nobody can.
     PLATFORM_ADMIN_EMAILS: v.optional(v.string()),
+    // Web-push VAPID keys (prd/phase-1.md §8.2), set by `push:setup`. The
+    // public key is also handed to the browser so it can subscribe; the
+    // private key signs the request to the push service. Unset means push is
+    // off and email is the only channel — which is the state of any
+    // deployment that hasn't run the script, including the e2e backend
+    // unless a spec sets them.
+    VAPID_PUBLIC_KEY: v.optional(v.string()),
+    VAPID_PRIVATE_KEY: v.optional(v.string()),
+    // The `sub` claim in the VAPID JWT: how a push service reaches us about a
+    // misbehaving sender. A `mailto:` or `https:` URL. Defaults to SITE_URL.
+    VAPID_SUBJECT: v.optional(v.string()),
+    // How long a notification waits before it gives up on you being there
+    // (notifications/rules.ts). Unset means the spec's 30s / 5min; prd §12
+    // expects these to be tuned with the first matchmaker.
+    NOTIFICATION_PUSH_DELAY_SECONDS: v.optional(v.string()),
+    NOTIFICATION_EMAIL_DELAY_SECONDS: v.optional(v.string()),
   },
 });
 app.use(staticHosting, { name: "www" });

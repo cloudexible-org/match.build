@@ -27,10 +27,11 @@ import { markAccountDeleted } from "../auth/account-deleted";
 import { AppHeader } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
 import { serverErrorMessage } from "../lib/server-error";
+import { NotificationSettings } from "../notifications/notification-settings";
 
 /**
- * Account settings (prd/phase-1.md §4): the account's name, and deleting it
- * (§3.5). Notification preferences join them in step 8.
+ * Account settings (prd/phase-1.md §4): the account's name, how it is
+ * notified (§8.1), and deleting it (§3.5).
  */
 export function AccountSettingsPage() {
   const me = useQuery(api.users.queries.me);
@@ -47,6 +48,7 @@ export function AccountSettingsPage() {
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8">
         <h1 className="font-display text-3xl">Account settings</h1>
         <NameForm name={me.name ?? ""} email={me.email ?? ""} />
+        <NotificationSettings />
         <DeleteAccount
           ownsMatchmakerProfile={home.matchmakerProfiles.length > 0}
         />

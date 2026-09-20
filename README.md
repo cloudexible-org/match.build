@@ -212,6 +212,38 @@ pnpm --filter @repo/api invites:setup
 Add `--prod` for the production deployment. Rotating it (`--force`) breaks
 every open invite link; the candidates can be re-invited.
 
+### Notifications
+
+Email notifications work as soon as `RESEND_API_KEY` is set. **Web push needs
+VAPID keys**, which identify the deployment to Apple's and Google's push
+services (`packages/api/convex/notifications/helpers.ts`):
+
+```bash
+pnpm --filter @repo/api push:setup --subject mailto:you@example.com
+```
+
+Add `--prod` for production. Without them the app offers email only and says so
+in `/settings`; rotating them (`--force`) silently breaks every push
+subscription already stored, and browsers only notice when they next
+re-subscribe.
+
+Two optional overrides tune how long a notification waits for you to read the
+message yourself (`prd/phase-1.md` §12 expects these to be tuned with the first
+matchmaker). Unset means the spec's 30 seconds and 5 minutes:
+
+```bash
+npx convex env set NOTIFICATION_PUSH_DELAY_SECONDS 30
+npx convex env set NOTIFICATION_EMAIL_DELAY_SECONDS 300
+```
+
+Notifications never carry the message, only who it is from: they are read on
+lock screens and in inbox lists other people can see.
+
+**iOS delivers web push only to an app installed on the home screen** (16.4+),
+so the app ships a web app manifest and the settings page tells iPhone and iPad
+users to add it before offering the switch. Email is their fallback until they
+do.
+
 Convex validates session tokens through the OpenID discovery document at
 `<site>/.well-known/openid-configuration`, so `convex/http.ts` owns the root of
 the URL space and registers the three static sites behind it (see

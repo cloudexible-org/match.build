@@ -35,6 +35,8 @@ export type Scenario = ScenarioManifest & {
   displayName(key: string): string;
   /** A seeded candidate's id, by key. */
   candidateId(key: string): string;
+  /** A seeded candidate's conversation id, by key. */
+  conversationId(key: string): string;
   /** A seeded candidate's invite link path, by key. Throws without one. */
   invitePath(key: string): string;
 };
@@ -71,6 +73,8 @@ export async function seedScenario(
     displayName: (key) =>
       lookup("matchmaker", manifest.matchmakers, key).displayName,
     candidateId: (key) => lookup("candidate", manifest.candidates, key).id,
+    conversationId: (key) =>
+      lookup("candidate", manifest.candidates, key).conversationId,
     invitePath: (key) => {
       const token = lookup("candidate", manifest.candidates, key).inviteToken;
       if (token === null) {

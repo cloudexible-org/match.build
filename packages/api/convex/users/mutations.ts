@@ -6,6 +6,7 @@ import {
   ACCOUNT_DELETION_CODE_TTL_SECONDS,
   generateSignInCode,
 } from "../email/rules";
+import { notifyMatchmakerOfMembership } from "../notifications/helpers";
 import {
   assertCanDeleteAccount,
   removeSignInCredentials,
@@ -184,6 +185,11 @@ export const deleteAccount = mutation({
             after: "account_deleted",
           },
         ],
+      });
+      // One notice per matchmaker, each knowing only about their own record.
+      await notifyMatchmakerOfMembership(ctx, {
+        candidateId: candidate._id,
+        event: "account_deleted",
       });
     }
 

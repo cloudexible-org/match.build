@@ -8,6 +8,7 @@ import {
 import { type AuditActor, recordAudit } from "../audit/helpers";
 import { candidateEmailError } from "../candidates/rules";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
+import { notifyMatchmakerOfMembership } from "../notifications/helpers";
 import { requireUser } from "../users/helpers";
 import { normaliseEmail } from "../waitlist/rules";
 import {
@@ -90,6 +91,11 @@ export const accept = mutation({
         { field: "acceptedAs", after: user.email },
       ],
       relatedEntityId: user._id,
+    });
+    // The matchmaker has been waiting for this one (prd/phase-1.md §8.1).
+    await notifyMatchmakerOfMembership(ctx, {
+      candidateId: candidate._id,
+      event: "accepted",
     });
     return { matchmakerUsername: matchmaker.username };
   },

@@ -9,6 +9,8 @@ export const recordOutbox = internalMutation({
       v.literal("sign_in_code"),
       v.literal("invite"),
       v.literal("account_deletion_code"),
+      v.literal("new_message"),
+      v.literal("membership_changed"),
     ),
     subject: v.string(),
     text: v.string(),

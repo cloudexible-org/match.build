@@ -11,16 +11,17 @@ import { env } from "./env";
 
 const convex = new ConvexReactClient(env.VITE_CONVEX_URL);
 
-// Register service worker
+// The service worker shows push notifications and opens the conversation they
+// point at (public/sw.js). Registering it is also what makes the app
+// installable to a home screen, which is the only way iOS delivers web push
+// (prd/phase-1.md §8.2). A failure here costs notifications, not the app, so
+// it is logged rather than surfaced.
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker
+    void navigator.serviceWorker
       .register(`${import.meta.env.BASE_URL}sw.js`)
-      .then((registration) => {
-        console.log("SW registered:", registration.scope);
-      })
       .catch((error) => {
-        console.error("SW registration failed:", error);
+        console.error("Service worker registration failed:", error);
       });
   });
 }

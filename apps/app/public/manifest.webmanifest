@@ -1,0 +1,20 @@
+{
+  "name": "Matchmaker",
+  "short_name": "Matchmaker",
+  "description": "Your conversations with your matchmaker, and your matchmaker's book of candidates.",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#fcf9f5",
+  "theme_color": "#8f2239",
+  "icons": [
+    { "src": "icon-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512x512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

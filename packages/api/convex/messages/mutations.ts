@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { requireCandidateSelf } from "../candidates/helpers";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
+import { scheduleMessageNotifications } from "../notifications/helpers";
 import { advanceReadMarker, appendMessage, conversationFor } from "./helpers";
 import { messageBodyError, normaliseMessageBody } from "./rules";
 
@@ -39,14 +40,24 @@ export const send = mutation({
     const invalid = messageBodyError(args.body);
     if (invalid) throw new ConvexError(invalid);
 
+    const now = Date.now();
+    const conversation = await conversationFor(ctx, candidate._id);
     const { seq } = await appendMessage(ctx, {
-      conversation: await conversationFor(ctx, candidate._id),
+      conversation,
       author: "matchmaker",
       authorUserId: user._id,
       visibility: "everyone",
       source: "typed",
       body: normaliseMessageBody(args.body),
-      now: Date.now(),
+      now,
+    });
+    await scheduleMessageNotifications(ctx, {
+      conversation,
+      candidate,
+      author: "matchmaker",
+      visibility: "everyone",
+      seq,
+      now,
     });
     return { seq };
   },
@@ -64,14 +75,24 @@ export const sendAsCandidate = mutation({
     const invalid = messageBodyError(args.body);
     if (invalid) throw new ConvexError(invalid);
 
+    const now = Date.now();
+    const conversation = await conversationFor(ctx, candidate._id);
     const { seq } = await appendMessage(ctx, {
-      conversation: await conversationFor(ctx, candidate._id),
+      conversation,
       author: "candidate",
       authorUserId: user._id,
       visibility: "everyone",
       source: "typed",
       body: normaliseMessageBody(args.body),
-      now: Date.now(),
+      now,
+    });
+    await scheduleMessageNotifications(ctx, {
+      conversation,
+      candidate,
+      author: "candidate",
+      visibility: "everyone",
+      seq,
+      now,
     });
     return { seq };
   },
@@ -79,8 +100,9 @@ export const sendAsCandidate = mutation({
 
 /**
  * The matchmaker has seen up to `seq` (prd §8.1: the conversation is open and
- * the tab is visible). Drives the unread indicator now, and which
- * notifications are skipped in step 8.
+ * the tab is visible). Drives the unread indicator, and decides which
+ * scheduled notifications are skipped when their job fires
+ * (`notifications/mutations.ts`).
  */
 export const markRead = mutation({
   args: {

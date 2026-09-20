@@ -58,6 +58,12 @@ export type ScenarioUser = {
   verified?: boolean;
   /** Marks the account deleted (`users.deletedAt`). */
   deleted?: boolean;
+  /**
+   * Registers a browser for web push at this endpoint, with the receiver keys
+   * from RFC 8291's test vector. Reaches a state the UI can't: a real
+   * subscription needs a real browser and a real push service.
+   */
+  pushEndpoint?: string;
 };
 
 export type ScenarioMatchmaker = {

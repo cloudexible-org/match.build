@@ -4,6 +4,7 @@ import { recordAudit } from "../audit/helpers";
 import { diffFields } from "../audit/rules";
 import { openInvite, sendInvite } from "../invites/helpers";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
+import { notifyMatchmakerOfMembership } from "../notifications/helpers";
 import { socialPlatform } from "../schema";
 import { normaliseEmail } from "../waitlist/rules";
 import { requireCandidateSelf } from "./helpers";
@@ -302,6 +303,10 @@ export const leave = mutation({
       entity: { table: "candidates", id: candidate._id },
       changes: [{ field: "membership", before: "joined", after: "left" }],
       reason,
+    });
+    await notifyMatchmakerOfMembership(ctx, {
+      candidateId: candidate._id,
+      event: "left",
     });
     return null;
   },

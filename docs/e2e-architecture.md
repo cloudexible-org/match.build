@@ -257,6 +257,24 @@ signing in. Nothing about that touches a real inbox or a cloud deployment:
   `signInAs` has already put a sign-in code there. `deletion-codes.ts` matches
   on the subject instead (`waitForDeletionCode`). Typing the last digit submits
   on its own, so there is no button to click afterwards.
+- **Notification emails arrive in the same outbox**, because the run turns the
+  notification delays down to 0 s push / 3 s email (`auth-env.ts`). So "the
+  latest email to this address" is no longer necessarily the one you asked for:
+  every reader matches on the subject (`waitForSignInCode`,
+  `waitForDeletionCode`, `waitForNotificationEmail`) rather than taking the
+  newest. Keep it that way when adding another kind of email.
+- **Deployment env vars are run-wide, so a spec must not set one.** Files run in
+  parallel against one backend, so a spec that changed a delay would change it
+  under every file beside it. Anything a spec needs from the environment belongs
+  in `auth-env.ts`. The one exception is `push-keys.ts`: the VAPID keys, which
+  only `notifications.spec.ts` reads, and which it puts back afterwards.
+- **Push has no service to talk to**, so `notifications.spec.ts` points a seeded
+  subscription at the deployment's own `/api/health`. The POST comes back 404,
+  which is exactly what a real push service says about a browser that is gone,
+  so the subscription is dropped — and the notification reaching any final state
+  at all proves the deployment encrypted the payload and signed the VAPID JWT in
+  its own runtime. That is the part unit tests cannot cover: they run on Node's
+  Web Crypto, not Convex's.
 - **Codes a platform admin issues** (`specs/admin-convex/sign-in-codes.spec.ts`)
   never reach the outbox: the admin app returns them instead of mailing them.
   Spend one through "I already have a code" on the app's sign-in page —

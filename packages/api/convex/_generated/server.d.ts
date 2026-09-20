@@ -31,9 +31,14 @@ type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly INVITE_LINK_SECRET: string | undefined;
+  readonly NOTIFICATION_EMAIL_DELAY_SECONDS: string | undefined;
+  readonly NOTIFICATION_PUSH_DELAY_SECONDS: string | undefined;
   readonly PLATFORM_ADMIN_EMAILS: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
   readonly SITE_URL: string | undefined;
+  readonly VAPID_PRIVATE_KEY: string | undefined;
+  readonly VAPID_PUBLIC_KEY: string | undefined;
+  readonly VAPID_SUBJECT: string | undefined;
 };
 
 /**

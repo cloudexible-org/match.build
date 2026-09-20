@@ -6,6 +6,7 @@ import { Link, useParams } from "react-router";
 import { Composer } from "../chat/composer";
 import { Thread as MessageThread } from "../chat/thread";
 import { useMarkRead } from "../chat/use-mark-read";
+import { PushNudge } from "../notifications/push-nudge";
 import {
   candidateDisplayName,
   type Membership,
@@ -182,6 +183,8 @@ function Thread({
     [markReadMutation, args.matchmakerId, args.candidateId],
   );
   useMarkRead(results[0]?.seq, markRead);
+  // Push is offered after the first message they send, not on load (prd §8.2).
+  const [justSent, setJustSent] = useState(false);
 
   // Where the composer would be, so the reason is at the end of the timeline
   // as well as in the banner above it (prd/phase-1.md §3.4).
@@ -204,10 +207,14 @@ function Thread({
         onLoadOlder={() => loadMore(PAGE_SIZE)}
         loadingOlder={isLoading}
       />
+      {justSent && closed === undefined && <PushNudge />}
       <Composer
         placeholder={`Message ${name}`}
         disabledReason={closed}
-        onSend={(body) => send({ ...args, body })}
+        onSend={async (body) => {
+          await send({ ...args, body });
+          setJustSent(true);
+        }}
       />
     </>
   );

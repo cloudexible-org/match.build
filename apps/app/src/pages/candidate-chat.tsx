@@ -9,6 +9,7 @@ import { Thread } from "../chat/thread";
 import { useMarkRead } from "../chat/use-mark-read";
 import { AppHeader } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
+import { PushNudge } from "../notifications/push-nudge";
 import { NotFoundPage } from "./not-found";
 
 const PAGE_SIZE = 30;
@@ -140,6 +141,8 @@ function CandidateThread({
     [markReadMutation, candidateId],
   );
   useMarkRead(results[0]?.seq, markRead);
+  // Push is offered after the first message they send, not on load (prd §8.2).
+  const [justSent, setJustSent] = useState(false);
 
   return (
     <>
@@ -151,9 +154,13 @@ function CandidateThread({
         onLoadOlder={() => loadMore(PAGE_SIZE)}
         loadingOlder={isLoading}
       />
+      {justSent && <PushNudge />}
       <Composer
         placeholder={`Message ${matchmakerName}`}
-        onSend={(body) => send({ candidateId, body })}
+        onSend={async (body) => {
+          await send({ candidateId, body });
+          setJustSent(true);
+        }}
       />
     </>
   );

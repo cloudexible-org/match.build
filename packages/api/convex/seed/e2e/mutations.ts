@@ -251,6 +251,7 @@ export const scenario = internalMutation({
           name: v.optional(v.string()),
           verified: v.optional(v.boolean()),
           deleted: v.optional(v.boolean()),
+          pushEndpoint: v.optional(v.string()),
         }),
       ),
     ),
@@ -374,6 +375,18 @@ export const scenario = internalMutation({
       });
       userIds[user.key] = id;
       users[user.key] = { id, email, name };
+      if (user.pushEndpoint !== undefined) {
+        await ctx.db.insert("pushSubscriptions", {
+          userId: id,
+          endpoint: user.pushEndpoint,
+          // The receiver half of RFC 8291 §5's vector: a real P-256 point and
+          // a real 16-byte auth secret, so encryption actually succeeds.
+          p256dh:
+            "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+          auth: "BTBZMqHH6r4Tts7J_aSIgg",
+          userAgent: "e2e",
+        });
+      }
     }
 
     const matchmakers: ScenarioManifest["matchmakers"] = {};

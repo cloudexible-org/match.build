@@ -15,6 +15,9 @@ export async function latestSignInEmail(email: string): Promise<OutboxEmail> {
   )) as OutboxEmail;
 }
 
+/** How `email/rules.ts` subjects a sign-in code: "123456 is your …". */
+const SIGN_IN_SUBJECT = /^(\d{6}) is your Matchmaker sign-in code$/;
+
 /**
  * Waits for a sign-in code newer than `previous` (the email returned by
  * `latestSignInEmail` before the code was requested) and returns it.
@@ -22,6 +25,11 @@ export async function latestSignInEmail(email: string): Promise<OutboxEmail> {
  * Comparing against the previous email rather than just taking the latest is
  * what makes "send a new code" testable: the old code is still in the outbox
  * until the new one lands.
+ *
+ * Matched on the subject, not just taken as "the newest email": the same
+ * outbox also collects invitations, deletion codes and — since the run turns
+ * the notification delays down (`auth-env.ts`) — new-message notifications,
+ * any of which can land in between.
  */
 export async function waitForSignInCode(
   email: string,
@@ -31,9 +39,12 @@ export async function waitForSignInCode(
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const latest = await latestSignInEmail(email);
-    if (latest !== null && latest.subject !== previous?.subject) {
-      const code = latest.subject.match(/\b(\d{6})\b/)?.[1];
-      if (!code) throw new Error(`No code in "${latest.subject}"`);
+    const code = latest?.subject.match(SIGN_IN_SUBJECT)?.[1];
+    if (
+      latest !== null &&
+      code !== undefined &&
+      latest.subject !== previous?.subject
+    ) {
       return code;
     }
     if (Date.now() > deadline) {
