@@ -69,35 +69,55 @@ type ProfileEntries = Record<
 >;
 
 /**
- * A `DevProfile` as the two entry maps the table holds.
+ * A `DevProfile` merged into whatever is already on the record.
+ *
+ * **Additive one entry at a time, not one row at a time.** These people are
+ * seeded long before anyone clicks on them, so by the time a new proposal is
+ * added here they already have a profile — and a guard that skipped the whole
+ * row when one existed would never write another proposal again. What is
+ * missing is the proposal, so that is what gets added.
+ *
+ * So: an entry that is already there keeps its value, its source and its
+ * timestamp untouched, and only gains a `pending` if it has none. An entry
+ * that is not there is created. Nothing is ever overwritten — which also means
+ * a proposal you have already answered comes back on the next seed, because
+ * from here that is indistinguishable from one that was never written.
  *
  * A proposal is written straight onto the entry rather than through
  * `applyAgentEntries`, because that path decides between writing and
  * suggesting from the field's policy — and what dev needs is an open proposal
  * on each of these fields whatever their policy says.
  */
-function profileEntries(
+function mergeProfile(
   profile: DevProfile,
+  current: { facts: ProfileEntries; notes: ProfileEntries },
   now: number,
-): { facts: ProfileEntries; notes: ProfileEntries } {
-  const maps: { facts: ProfileEntries; notes: ProfileEntries } = {
-    facts: {},
-    notes: {},
+): { facts: ProfileEntries; notes: ProfileEntries; added: number } {
+  const maps = {
+    facts: { ...current.facts },
+    notes: { ...current.notes },
   };
-  for (const [key, value] of Object.entries(profile.facts ?? {})) {
-    maps.facts[key] = { value, source: "matchmaker", updatedAt: now };
+  let added = 0;
+
+  for (const kind of ["facts", "notes"] as const) {
+    for (const [key, value] of Object.entries(profile[kind] ?? {})) {
+      if (maps[kind][key] !== undefined) continue; // theirs, not ours
+      maps[kind][key] = { value, source: "matchmaker", updatedAt: now };
+      added += 1;
+    }
   }
-  for (const [key, value] of Object.entries(profile.notes ?? {})) {
-    maps.notes[key] = { value, source: "matchmaker", updatedAt: now };
-  }
+
   for (const suggestion of profile.suggestions ?? []) {
-    const map = maps[suggestion.kind];
-    const existing = map[suggestion.key];
-    map[suggestion.key] = {
-      // A proposal sits beside the value, never instead of it.
-      value: suggestion.current ?? existing?.value ?? "",
+    const existing = maps[suggestion.kind][suggestion.key];
+    if (existing?.pending !== undefined) continue; // one is already open
+    maps[suggestion.kind][suggestion.key] = {
+      // A proposal sits beside the value, never instead of it — and where
+      // there is a real value already, it is the one worth proposing against.
+      value: existing?.value ?? suggestion.current ?? "",
       source: existing?.source ?? "agent",
-      updatedAt: now,
+      updatedAt: existing?.updatedAt ?? now,
+      model: existing?.model,
+      sourceQuote: existing?.sourceQuote,
       pending: {
         action: suggestion.remove === true ? "clear" : "set",
         value: suggestion.remove === true ? "" : suggestion.value,
@@ -106,8 +126,10 @@ function profileEntries(
         sourceQuote: suggestion.quote,
       },
     };
+    added += 1;
   }
-  return maps;
+
+  return { ...maps, added };
 }
 
 /**
@@ -285,8 +307,12 @@ export const apply = internalMutation({
           .query("candidateProfiles")
           .withIndex("by_candidateId", (q) => q.eq("candidateId", candidateId))
           .unique();
+        const { facts, notes, added } = mergeProfile(
+          member.profile,
+          { facts: seeded?.facts ?? {}, notes: seeded?.notes ?? {} },
+          now,
+        );
         if (seeded === null) {
-          const { facts, notes } = profileEntries(member.profile, now);
           await ctx.db.insert("candidateProfiles", {
             matchmakerId,
             candidateId,
@@ -295,31 +321,49 @@ export const apply = internalMutation({
             updatedAt: now,
           });
           created.push(`profile for ${user.email}`);
+        } else if (added > 0) {
+          await ctx.db.patch("candidateProfiles", seeded._id, {
+            facts,
+            notes,
+            updatedAt: now,
+          });
+          created.push(`${added} entries on the profile for ${user.email}`);
         }
       }
     }
 
+    // Their voice, and the draft waiting on it. Same rule as a candidate's
+    // entries: whatever they have written stays, and the draft is added only
+    // where there isn't one.
     const mineSeeded = await ctx.db
       .query("matchmakerProfiles")
       .withIndex("by_matchmakerId", (q) => q.eq("matchmakerId", matchmakerId))
       .unique();
-    if (mineSeeded === null) {
-      await ctx.db.insert("matchmakerProfiles", {
-        matchmakerId,
-        voice: {
-          value: DEV_MATCHMAKER.voice,
-          source: "matchmaker",
-          updatedAt: now,
-          pending: {
-            action: "set",
-            value: DEV_MATCHMAKER.voiceSuggestion,
-            suggestedAt: now,
-            model: "seed/model",
-          },
+    if (mineSeeded?.voice?.pending === undefined) {
+      const voice = {
+        value: mineSeeded?.voice?.value ?? DEV_MATCHMAKER.voice,
+        source: mineSeeded?.voice?.source ?? ("matchmaker" as const),
+        updatedAt: mineSeeded?.voice?.updatedAt ?? now,
+        pending: {
+          action: "set" as const,
+          value: DEV_MATCHMAKER.voiceSuggestion,
+          suggestedAt: now,
+          model: "seed/model",
         },
-        updatedAt: now,
-      });
-      created.push(`voice for ${DEV_MATCHMAKER.username}`);
+      };
+      if (mineSeeded === null) {
+        await ctx.db.insert("matchmakerProfiles", {
+          matchmakerId,
+          voice,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.patch("matchmakerProfiles", mineSeeded._id, {
+          voice,
+          updatedAt: now,
+        });
+      }
+      created.push(`voice draft for ${DEV_MATCHMAKER.username}`);
     }
 
     for (const slug of DEV_INVITED_SLUGS) {

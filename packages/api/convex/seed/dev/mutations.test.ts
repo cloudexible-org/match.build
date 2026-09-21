@@ -148,6 +148,105 @@ describe("seed.dev.mutations.apply", () => {
     expect(after.candidates).toBe(DEV_MEMBERS.length + 1);
   });
 
+  test("adds proposals to a profile someone has already filled in", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.dev.mutations.apply, {});
+
+    // The state a dev database is actually in by the time a new proposal is
+    // added to the fixture: these people were seeded long ago and have since
+    // been clicked on, so they have a profile — with values of their own, and
+    // nothing pending.
+    const sam = DEV_MEMBERS.find((m) => m.userSlug === "candidate");
+    await t.run(async (ctx) => {
+      for (const profile of await ctx.db.query("candidateProfiles").collect()) {
+        await ctx.db.patch("candidateProfiles", profile._id, {
+          facts: {
+            // Typed by hand, and nothing the fixture mentions.
+            pronouns: { value: "he/him", source: "matchmaker", updatedAt: 1 },
+            // The same key the fixture proposes against, with their value.
+            lookingFor: {
+              value: "companionship",
+              source: "matchmaker",
+              updatedAt: 1,
+            },
+          },
+          notes: {},
+        });
+      }
+      for (const mine of await ctx.db.query("matchmakerProfiles").collect()) {
+        await ctx.db.patch("matchmakerProfiles", mine._id, {
+          voice: { value: "Mine.", source: "matchmaker", updatedAt: 1 },
+        });
+      }
+    });
+
+    const again = await t.mutation(internal.seed.dev.mutations.apply, {});
+    expect(again.created.some((line) => line.includes("entries on the"))).toBe(
+      true,
+    );
+
+    const state = await t.run(async (ctx) => {
+      const profiles = await ctx.db.query("candidateProfiles").collect();
+      const withEmails = [];
+      for (const profile of profiles) {
+        const candidate = await ctx.db.get("candidates", profile.candidateId);
+        withEmails.push({ email: candidate?.email ?? "", profile });
+      }
+      return {
+        profiles: withEmails,
+        mine: (await ctx.db.query("matchmakerProfiles").collect())[0],
+      };
+    });
+
+    const samProfile = state.profiles.find((p) =>
+      p.email.startsWith("sam."),
+    )?.profile;
+    expect(samProfile).toBeDefined();
+    if (samProfile === undefined) return;
+
+    // Every proposal the fixture asks for is now open.
+    const pending = [
+      ...Object.values(samProfile.facts),
+      ...Object.values(samProfile.notes),
+    ].filter((entry) => entry.pending !== undefined);
+    expect(pending).toHaveLength(sam?.profile?.suggestions?.length ?? 0);
+
+    // What they typed is untouched — the value, and the fact they wrote it.
+    expect(samProfile.facts.pronouns?.value).toBe("he/him");
+    expect(samProfile.facts.pronouns?.pending).toBeUndefined();
+    expect(samProfile.facts.lookingFor?.value).toBe("companionship");
+    expect(samProfile.facts.lookingFor?.source).toBe("matchmaker");
+    // The proposal sits beside it, against what is really there rather than
+    // against the value the fixture imagined.
+    expect(samProfile.facts.lookingFor?.pending?.value).toBe("long-term");
+
+    // Same rule for their voice: theirs stays, the draft is added.
+    expect(state.mine?.voice?.value).toBe("Mine.");
+    expect(state.mine?.voice?.pending?.value).toBe(
+      DEV_MATCHMAKER.voiceSuggestion,
+    );
+  });
+
+  test("leaves a proposal that is already open alone", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.dev.mutations.apply, {});
+
+    // `?? 0`: an array with an `undefined` in it is not a Convex value.
+    const stamps = async () =>
+      await t.run(async (ctx) =>
+        (await ctx.db.query("candidateProfiles").collect()).flatMap((p) =>
+          Object.values(p.facts).map((e) => e.pending?.suggestedAt ?? 0),
+        ),
+      );
+
+    const before = await stamps();
+    const again = await t.mutation(internal.seed.dev.mutations.apply, {});
+    const after = await stamps();
+
+    expect(again.created).toEqual([]);
+    expect(after).toEqual(before);
+  });
+
   test("is a no-op the second time", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.seed.dev.mutations.apply, {});
