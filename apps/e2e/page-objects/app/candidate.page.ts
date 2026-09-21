@@ -31,6 +31,11 @@ export class CandidateShellPage {
     return this.page.getByTestId("candidate-matchmakers");
   }
 
+  /** The list column's scroller, between its heading and its footer. */
+  getMatchmakerListScroll() {
+    return this.page.getByTestId("candidate-matchmakers-scroll");
+  }
+
   /** A matchmaker's row in the first column, by any text it contains. */
   getMatchmakerRow(text: string) {
     return this.getMatchmakerList()
@@ -84,6 +89,11 @@ export class CandidateChatPage {
     return this.page.getByTestId("conversation-message");
   }
 
+  /** The middle column's scroller: the messages, above the composer. */
+  getThread() {
+    return this.page.getByTestId("conversation-messages");
+  }
+
   getMessageInput() {
     return this.page.getByLabel("Message", { exact: true });
   }
@@ -105,6 +115,11 @@ export class CandidateChatPage {
 
   getPanel() {
     return this.page.getByTestId("matchmaker-panel");
+  }
+
+  /** The panel's scroller, below its header. */
+  getPanelScroll() {
+    return this.page.getByTestId("matchmaker-panel-scroll");
   }
 
   getPanelMembership() {

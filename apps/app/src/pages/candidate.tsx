@@ -56,8 +56,10 @@ export function CandidatePage() {
   }
   if (me === null || home === null) return null; // RequireAuth handles this
 
+  // `h-dvh`, not `min-h-dvh`: like the workspace, this is a chat shell whose
+  // columns scroll inside themselves rather than growing the page.
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex h-dvh flex-col overflow-hidden">
       <AppHeader name={me.name ?? ""} />
       <Shell
         matchmakers={home.candidateProfiles}

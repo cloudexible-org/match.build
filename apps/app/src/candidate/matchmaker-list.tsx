@@ -53,7 +53,11 @@ export function MatchmakerList({
         </h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      {/* The column's one scroller, between its heading and its footer. */}
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        data-testid="candidate-matchmakers-scroll"
+      >
         {invitations.length > 0 && (
           <section
             aria-labelledby="candidate-invitations-heading"

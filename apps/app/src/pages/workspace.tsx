@@ -85,7 +85,7 @@ function CandidateList({
       className={cn("flex-col border-border", className)}
       data-testid="workspace-candidates"
     >
-      <div className="flex h-14 items-center justify-between gap-3 border-b border-border px-4">
+      <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
         <h1 id="workspace-candidates-heading" className="font-display text-xl">
           Candidates
         </h1>
@@ -98,7 +98,7 @@ function CandidateList({
         </Link>
       </div>
 
-      <div className="flex flex-col gap-2 border-b border-border p-3">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-border p-3">
         <Input
           type="search"
           aria-label="Search candidates"
@@ -126,70 +126,77 @@ function CandidateList({
         </fieldset>
       </div>
 
-      {rows === undefined ? (
-        <p className="p-4 text-sm text-muted-foreground">Loading…</p>
-      ) : shown.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center">
-          <p className="font-medium">
-            {needle !== ""
-              ? "No matches"
-              : status === "active"
-                ? "No candidates yet"
-                : `No ${status} candidates`}
-          </p>
-          {needle === "" && status === "active" && (
-            <p className="text-sm text-muted-foreground">
-              People you onboard to {workspace.displayName} will appear here.
+      {/* The column's one scroller: the search and the status tabs above it
+          stay put however long the book gets. */}
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+        data-testid="workspace-candidates-scroll"
+      >
+        {rows === undefined ? (
+          <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+        ) : shown.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center">
+            <p className="font-medium">
+              {needle !== ""
+                ? "No matches"
+                : status === "active"
+                  ? "No candidates yet"
+                  : `No ${status} candidates`}
             </p>
-          )}
-        </div>
-      ) : (
-        <ul className="flex-1 divide-y divide-border overflow-y-auto">
-          {shown.map((row) => {
-            const marker = membershipMarker(row.membership);
-            const selected = row.candidateId === openId;
-            return (
-              <li key={row.candidateId}>
-                <Link
-                  to={`${base}/c/${row.candidateId}`}
-                  aria-current={selected ? "page" : undefined}
-                  className={cn(
-                    "flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none",
-                    selected && "bg-accent",
-                  )}
-                >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate font-medium">
-                      {candidateDisplayName(row)}
+            {needle === "" && status === "active" && (
+              <p className="text-sm text-muted-foreground">
+                People you onboard to {workspace.displayName} will appear here.
+              </p>
+            )}
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {shown.map((row) => {
+              const marker = membershipMarker(row.membership);
+              const selected = row.candidateId === openId;
+              return (
+                <li key={row.candidateId}>
+                  <Link
+                    to={`${base}/c/${row.candidateId}`}
+                    aria-current={selected ? "page" : undefined}
+                    className={cn(
+                      "flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none",
+                      selected && "bg-accent",
+                    )}
+                  >
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-medium">
+                        {candidateDisplayName(row)}
+                      </span>
+                      {row.name !== undefined && (
+                        <span className="truncate text-sm text-muted-foreground">
+                          {row.email}
+                        </span>
+                      )}
                     </span>
-                    {row.name !== undefined && (
-                      <span className="truncate text-sm text-muted-foreground">
-                        {row.email}
-                      </span>
-                    )}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    {marker && (
-                      <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                        {marker}
-                      </span>
-                    )}
-                    {row.unread > 0 && (
-                      <span
-                        className="min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-xs font-medium text-primary-foreground"
-                        data-testid="candidate-unread"
-                      >
-                        {row.unread}
-                        <span className="sr-only"> unread</span>
-                      </span>
-                    )}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                    <span className="flex shrink-0 items-center gap-2">
+                      {marker && (
+                        <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                          {marker}
+                        </span>
+                      )}
+                      {row.unread > 0 && (
+                        <span
+                          className="min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-xs font-medium text-primary-foreground"
+                          data-testid="candidate-unread"
+                        >
+                          {row.unread}
+                          <span className="sr-only"> unread</span>
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

@@ -73,6 +73,11 @@ export class WorkspacePage {
     return this.page.getByTestId("workspace-candidates");
   }
 
+  /** The list column's scroller, below its heading and its filters. */
+  getCandidatesScroll() {
+    return this.page.getByTestId("workspace-candidates-scroll");
+  }
+
   getConversation() {
     return this.page.getByTestId("workspace-conversation");
   }
@@ -221,6 +226,11 @@ export class ConversationPage {
 
   getMessages() {
     return this.page.getByTestId("conversation-message");
+  }
+
+  /** The middle column's scroller: the messages, above the composer. */
+  getThread() {
+    return this.page.getByTestId("conversation-messages");
   }
 
   getLoadOlderButton() {
