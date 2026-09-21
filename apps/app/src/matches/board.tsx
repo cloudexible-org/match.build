@@ -123,6 +123,15 @@ export function MatchBoard() {
   }
 
   const closed = cards === undefined ? [] : cardsInStage(cards, "closed");
+  /**
+   * Closed is a column like the others, and hidden until it is asked for: what
+   * is over is worth keeping and worth counting, and it is not work. The count
+   * sits with the board's other controls, where it reads as a way in rather
+   * than as a fourth thing to do.
+   */
+  const columns: MatchStage[] = showClosed
+    ? [...MATCH_BOARD_STAGES, "closed"]
+    : [...MATCH_BOARD_STAGES];
 
   return (
     <main
@@ -153,7 +162,23 @@ export function MatchBoard() {
             same rules every time. No AI: every card says what it read.
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 items-center gap-2">
+          {closed.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowClosed(!showClosed)}
+              aria-pressed={showClosed}
+              data-testid="match-closed-toggle"
+              className={cn(
+                "rounded-md px-2 py-1.5 text-sm transition-colors",
+                showClosed
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+              )}
+            >
+              {closedSummary(closed)}
+            </button>
+          )}
           <Button
             variant="outline"
             onClick={() => setPairing(!pairing)}
@@ -204,7 +229,7 @@ export function MatchBoard() {
               that runs out of room scrolls its own cards, which is a better
               answer than a page that scrolls to reach it. */}
           <div className="-mx-4 flex min-h-0 min-w-0 flex-1 gap-3 overflow-x-auto px-4 pb-2">
-            {MATCH_BOARD_STAGES.map((stage) => (
+            {columns.map((stage) => (
               <Column
                 key={stage}
                 stage={stage}
@@ -222,13 +247,6 @@ export function MatchBoard() {
               />
             ))}
           </div>
-
-          <ClosedSection
-            cards={closed}
-            actions={actions}
-            open={showClosed}
-            onOpenChange={setShowClosed}
-          />
         </>
       )}
     </main>
@@ -253,15 +271,19 @@ function Column({
   onDrop: (event: DragEvent) => void;
 }) {
   const headingId = `match-column-${stage}`;
+  // Closed takes what happened, so it cannot be arrived at by dropping. It is
+  // not a drop target at all rather than one that refuses what it is given:
+  // a column that lights up and then throws an error is a column that lied.
+  const takesDrops = stage !== "closed";
   return (
     <section
       aria-labelledby={headingId}
       data-testid="match-column"
       data-stage={stage}
       data-over={over}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      onDragOver={takesDrops ? onDragOver : undefined}
+      onDragLeave={takesDrops ? onDragLeave : undefined}
+      onDrop={takesDrops ? onDrop : undefined}
       className={cn(
         "flex min-w-72 flex-1 flex-col gap-2 rounded-xl border border-dashed p-2 transition-colors",
         over ? "border-primary bg-accent/50" : "border-transparent bg-muted/40",
@@ -293,65 +315,12 @@ function Column({
           <p className="px-1 py-6 text-center text-xs text-muted-foreground">
             {stage === "proposed"
               ? "Nothing proposed yet."
-              : "Drop a card here."}
+              : takesDrops
+                ? "Drop a card here."
+                : "Nothing has ended yet."}
           </p>
         )}
       </div>
-    </section>
-  );
-}
-
-/**
- * What is over, under the board (prd/phase-3.md §2).
- *
- * Not a column and not a lane: a match that has ended — well or badly — is not
- * at a stage any more, and a board whose last column fills up for ever is a
- * board that gets worse the better you are at your job. So it collapses to one
- * line that counts them, and opens when somebody wants it.
- *
- * Nothing ages out. What a match ended as, and why, is the one thing worth
- * keeping of it.
- */
-function ClosedSection({
-  cards,
-  actions,
-  open,
-  onOpenChange,
-}: {
-  cards: BoardCard[];
-  actions: (card: BoardCard) => CardActions;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  if (cards.length === 0) return null;
-  return (
-    <section
-      aria-labelledby="match-closed-heading"
-      data-testid="match-closed"
-      data-open={open}
-      className="flex shrink-0 flex-col gap-2"
-    >
-      <button
-        type="button"
-        onClick={() => onOpenChange(!open)}
-        aria-expanded={open}
-        data-testid="match-closed-toggle"
-        className="flex items-center gap-2 self-start rounded-md px-1 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <span aria-hidden className="text-xs">
-          {open ? "▾" : "▸"}
-        </span>
-        <span id="match-closed-heading">{closedSummary(cards)}</span>
-      </button>
-      {open && (
-        <div className="-mx-1 flex max-h-[min(45%,18rem)] gap-2 overflow-y-auto overflow-x-auto px-1 pb-1">
-          {cards.map((card) => (
-            <div key={card.matchId} className="w-72 shrink-0">
-              <MatchCard card={card} actions={actions(card)} />
-            </div>
-          ))}
-        </div>
-      )}
     </section>
   );
 }
