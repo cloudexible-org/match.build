@@ -34,6 +34,21 @@ export class MatchesPage {
     );
   }
 
+  /**
+   * How far the *document* scrolls. Should always be 0 inside the workspace,
+   * which is a `h-dvh` shell — and is not, the moment anything inside it is
+   * absolutely positioned without a positioned ancestor, because no scroll
+   * container clips such an element and it stretches the page instead.
+   */
+  async pageScroll(): Promise<number> {
+    return await this.page.evaluate(() => {
+      window.scrollTo(0, 100_000);
+      const reached = window.scrollY;
+      window.scrollTo(0, 0);
+      return reached;
+    });
+  }
+
   getColumn(stage: MatchStage) {
     return this.page.locator(
       `[data-testid="match-column"][data-stage="${stage}"]`,
