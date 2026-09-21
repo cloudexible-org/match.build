@@ -29,8 +29,8 @@ export default defineConfig({
   // Production is served from the Convex deployment by the `admin` instance of
   // @convex-dev/static-hosting, registered at /admin/ in
   // packages/api/convex/http.ts. In dev, portless serves this server at
-  // https://admin.matchmaker.localhost, and apps/app's Vite server (the front
-  // door at https://matchmaker.localhost) proxies /admin/ here, so dev has
+  // https://admin.matchbuild.localhost, and apps/app's Vite server (the front
+  // door at https://matchbuild.localhost) proxies /admin/ here, so dev has
   // production's one-origin layout.
   base: ADMIN_BASE_PATH,
   plugins: [react(), redirectBareBase()],

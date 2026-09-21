@@ -13,7 +13,7 @@ const modules = import.meta.glob([
 ]);
 
 beforeEach(() => {
-  vi.stubEnv("SITE_URL", "https://matchmaker.localhost/app");
+  vi.stubEnv("SITE_URL", "https://matchbuild.localhost/app");
 });
 
 afterEach(() => {

@@ -1,17 +1,17 @@
-# One Doppler project (`matchmaker`) for every app. Each app has its own
+# One Doppler project (`matchbuild`) for every app. Each app has its own
 # branch config under an environment: `dev_app`, `dev_admin` and `dev_www`
 # branch off the `dev` root config, so anything shared by all apps can live in
 # `dev` and be inherited. Run `doppler setup
 # --no-interactive` once from the repo root to bind each directory; `pnpm dev`
 # then injects secrets through `doppler run`. Switch a directory to a personal
-# branch config with `doppler setup -p matchmaker -c dev_<app>_personal`.
+# branch config with `doppler setup -p matchbuild -c dev_<app>_personal`.
 setup:
-  - project: matchmaker
+  - project: matchbuild
     config: dev_app
     path: apps/app/
-  - project: matchmaker
+  - project: matchbuild
     config: dev_admin
     path: apps/admin/
-  - project: matchmaker
+  - project: matchbuild
     config: dev_www
     path: apps/www/

@@ -6,19 +6,19 @@ const APP_BASE_PATH = "/app/";
 
 /**
  * Where `pnpm dev` runs the marketing site (apps/www `dev` script). Under
- * portless this dev server is the front door at https://matchmaker.localhost,
+ * portless this dev server is the front door at https://matchbuild.localhost,
  * serving the app at /app/ and proxying every other path to Next, so dev has
  * the same one-origin layout as production.
  */
 const WWW_DEV_URL =
-  process.env.WWW_DEV_URL ?? "https://www.matchmaker.localhost";
+  process.env.WWW_DEV_URL ?? "https://www.matchbuild.localhost";
 
 /**
  * Where `pnpm dev` runs the platform admin app (apps/admin `dev` script),
  * served from here at /admin/ as in production.
  */
 const ADMIN_DEV_URL =
-  process.env.ADMIN_DEV_URL ?? "https://admin.matchmaker.localhost";
+  process.env.ADMIN_DEV_URL ?? "https://admin.matchbuild.localhost";
 
 /**
  * Vite answers the bare base path (`/app`) with a 404; send it to `/app/` so a

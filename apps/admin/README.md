@@ -22,7 +22,7 @@ The session is kept under its own storage namespace (`src/main.tsx`), so
 signing in to `/app` as someone else does not replace the admin's own session.
 
 ```bash
-pnpm --filter admin dev     # portless: https://admin.matchmaker.localhost
-                            # (and https://matchmaker.localhost/admin/ via apps/app)
+pnpm --filter admin dev     # portless: https://admin.matchbuild.localhost
+                            # (and https://matchbuild.localhost/admin/ via apps/app)
 pnpm --filter admin test    # Vitest, plain logic only; UI is covered by apps/e2e
 ```

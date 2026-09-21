@@ -3,7 +3,7 @@
   "version": "4.5.0",
   "private": true,
   "scripts": {
-    "dev": "doppler run -- portless www.matchmaker next dev",
+    "dev": "doppler run -- portless www.matchbuild next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "lint": "biome check ."

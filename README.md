@@ -1,4 +1,4 @@
-# Matchmaker
+# match.build
 
 The operating system for independent human matchmakers: invite candidates from
 Instagram/WhatsApp into an in-app chat, with AI-drafted replies in the
@@ -50,7 +50,7 @@ The mounts are configured in `packages/api/convex/convex.config.ts`.
 
 Prerequisites: Node.js 26 (`nvm use`), pnpm, a [Convex](https://convex.dev/) account,
 and the [Doppler CLI](https://docs.doppler.com/docs/install-cli) with access to the
-`matchmaker` project.
+`matchbuild` project.
 
 ```bash
 pnpm install
@@ -60,7 +60,7 @@ cd packages/api && npx convex dev # links a Convex deployment, writes .env.local
 ```
 
 The app dev scripts run under `doppler run`, so `VITE_CONVEX_URL`,
-`NEXT_PUBLIC_CONVEX_URL` and friends come from the `matchmaker` project, one
+`NEXT_PUBLIC_CONVEX_URL` and friends come from the `matchbuild` project, one
 branch config per app (`dev_app`, `dev_www`) under the `dev` environment.
 Doppler binds by absolute path, so run `doppler setup` again in every new
 checkout or worktree. Doppler values override any `.env.local`. Then from the root:
@@ -69,12 +69,12 @@ checkout or worktree. Doppler values override any `.env.local`. Then from the ro
 pnpm dev
 ```
 
-Open **`https://matchmaker.localhost`**: the marketing site at `/`, the app at
+Open **`https://matchbuild.localhost`**: the marketing site at `/`, the app at
 `/app/` and the admin app at `/admin/`, on one origin as in production.
 Portless routes by hostname only, so the app's Vite server is the front door:
 it proxies `/admin/` to the admin app's Vite server and every other path
 outside `/app/` to the Next dev server. Portless also serves those two directly
-at `https://www.matchmaker.localhost` and `https://admin.matchmaker.localhost`.
+at `https://www.matchbuild.localhost` and `https://admin.matchbuild.localhost`.
 
 ## Development
 

@@ -22,8 +22,8 @@ const nextConfig: NextConfig = {
   // Unset everywhere else, so dev, CI and deploys all use `.next`.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   transpilePackages: ["@repo/ui", "@repo/api"],
-  // `pnpm dev` serves this app through portless at https://www.matchmaker.localhost,
-  // and the app's Vite server proxies to it from https://matchmaker.localhost
+  // `pnpm dev` serves this app through portless at https://www.matchbuild.localhost,
+  // and the app's Vite server proxies to it from https://matchbuild.localhost
   // (see apps/app/vite.config.ts),
   // which Next treats as cross-origin: it blocks /_next dev resources (including the
   // HMR client) from any unlisted host, so the page ships HTML but never hydrates.
@@ -33,8 +33,8 @@ const nextConfig: NextConfig = {
   // chunk from that host, so the page ships HTML and never hydrates — which
   // reads as "every animation is broken" rather than as a blocked request.
   allowedDevOrigins: [
-    "matchmaker.localhost",
-    "*.matchmaker.localhost",
+    "matchbuild.localhost",
+    "*.matchbuild.localhost",
     "127.0.0.1",
     "localhost",
   ],

@@ -15,7 +15,7 @@
  *     setup seeds (and wipes) the local one — the exact defect §1a of
  *     `docs/e2e-architecture.md` exists to prevent.
  *
- * Every app lives in the one `matchmaker` project, as a branch config per app
+ * Every app lives in the one `matchbuild` project, as a branch config per app
  * under each environment (`dev_app`, `dev_www`, ...).
  *
  * `E2E_DOPPLER=0` runs the servers bare, for machines without Doppler access.
@@ -24,7 +24,7 @@
  * config in it is `<environment>_<app>`.
  */
 
-const DOPPLER_PROJECT = "matchmaker";
+const DOPPLER_PROJECT = "matchbuild";
 
 export type DopplerApp = "app" | "admin" | "www";
 
