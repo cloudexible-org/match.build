@@ -677,3 +677,69 @@ describe("the board", () => {
     expect(people.map((person) => person.name)).toEqual(["sam"]);
   });
 });
+
+describe("one candidate's matches", () => {
+  test("finds them whichever side of the pair they are on", async () => {
+    // `alex` first, so Sam has neither the lowest id nor the highest: a pair
+    // is stored keyed by id order, so this is a book where Sam really is `a`
+    // on one pair and `b` on another. With Sam inserted first he would be `a`
+    // on both, and a single-index read would pass while being wrong.
+    const w = await world({ alex: JORDAN, sam: SAM, jordan: JORDAN });
+    await w.run();
+    const mine = await w.asOwner.query(api.matches.queries.forCandidate, {
+      matchmakerId: w.matchmakerId,
+      candidateId: w.candidates.sam,
+    });
+    expect(mine.length).toBeGreaterThan(0);
+    for (const card of mine) {
+      expect([card.a.candidateId, card.b.candidateId]).toContain(
+        w.candidates.sam,
+      );
+    }
+    // And at least one of them has Sam second, or this test proves nothing.
+    expect(mine.some((card) => card.b.candidateId === w.candidates.sam)).toBe(
+      true,
+    );
+  });
+
+  test("is empty for somebody nobody has been paired with", async () => {
+    const w = await world({ sam: SAM, jordan: JORDAN, lonely: {} });
+    await w.run();
+    const mine = await w.asOwner.query(api.matches.queries.forCandidate, {
+      matchmakerId: w.matchmakerId,
+      candidateId: w.candidates.lonely,
+    });
+    expect(mine).toEqual([]);
+  });
+
+  test("another matchmaker's account is refused", async () => {
+    const w = await world();
+    await w.run();
+    await expect(
+      w.asStranger.query(api.matches.queries.forCandidate, {
+        matchmakerId: w.matchmakerId,
+        candidateId: w.candidates.sam,
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("a rejection older than the window is not carried", async () => {
+    const w = await world();
+    await w.run();
+    const [card] = await w.cards();
+    if (card === undefined) throw new Error("no card");
+    await w.t.run(async (ctx) => {
+      await ctx.db.patch("matches", card._id, {
+        stage: "rejected",
+        // Older than `rejectedVisibleDays`, so it has aged out of the view.
+        stageChangedAt: Date.now() - 60 * 24 * 60 * 60 * 1000,
+      });
+    });
+
+    const mine = await w.asOwner.query(api.matches.queries.forCandidate, {
+      matchmakerId: w.matchmakerId,
+      candidateId: w.candidates.sam,
+    });
+    expect(mine.find((one) => one.matchId === card._id)).toBeUndefined();
+  });
+});

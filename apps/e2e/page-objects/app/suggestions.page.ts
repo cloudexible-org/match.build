@@ -1,11 +1,7 @@
 import type { Page } from "@playwright/test";
 
 /** The rows `apps/app/src/chat/suggestions.ts` names, in stack order. */
-export type SuggestionKind =
-  | "match"
-  | "matchmakerProfile"
-  | "candidateProfile"
-  | "reply";
+export type SuggestionKind = "matchmakerProfile" | "candidateProfile" | "reply";
 
 /**
  * The stack of suggestion cards above the message composer. Rendered by
@@ -39,9 +35,10 @@ export class SuggestionsPage {
     return this.getRow(kind).getByTestId("suggestion-card");
   }
 
-  /** "2/5", or hidden where the row has only one card. */
+  /** "2/5", or hidden where the row has only one card. Shared with the
+   * Matches carousel in the candidate panel, hence `carousel-`. */
   getCounter(kind: SuggestionKind) {
-    return this.getRow(kind).getByTestId("suggestion-counter");
+    return this.getRow(kind).getByTestId("carousel-counter");
   }
 
   /** Which card is showing, by the id `conversation-suggestions.tsx` gave it. */
@@ -51,20 +48,20 @@ export class SuggestionsPage {
 
   /** Towards the newer end of the row. */
   async goNewer(kind: SuggestionKind) {
-    await this.getRow(kind).getByTestId("suggestion-previous").click();
+    await this.getRow(kind).getByTestId("carousel-previous").click();
   }
 
   /** Towards the older end of the row. */
   async goOlder(kind: SuggestionKind) {
-    await this.getRow(kind).getByTestId("suggestion-next").click();
+    await this.getRow(kind).getByTestId("carousel-next").click();
   }
 
   getNewerButton(kind: SuggestionKind) {
-    return this.getRow(kind).getByTestId("suggestion-previous");
+    return this.getRow(kind).getByTestId("carousel-previous");
   }
 
   getOlderButton(kind: SuggestionKind) {
-    return this.getRow(kind).getByTestId("suggestion-next");
+    return this.getRow(kind).getByTestId("carousel-next");
   }
 
   /** Takes what the showing card proposes. */

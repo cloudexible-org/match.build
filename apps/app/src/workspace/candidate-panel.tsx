@@ -23,6 +23,7 @@ import { serverErrorMessage } from "../lib/server-error";
 import { PanelHeader } from "../shell/panel-header";
 import { CandidateHistory } from "./candidate-history";
 import { type Membership, membershipMarker } from "./candidate-labels";
+import { CandidateMatches } from "./candidate-matches";
 import { CandidateProfile } from "./candidate-profile";
 import { useWorkspace } from "./workspace-layout";
 
@@ -77,6 +78,14 @@ export function CandidatePanel({
         className="min-h-0 flex-1 overflow-y-auto"
         data-testid="candidate-panel-scroll"
       >
+        {/* First: a match is the thing the whole product is for, and a
+            matchmaker opening someone's file wants to know whether there is
+            one before they want anything else. Closed by default all the
+            same — Details is what you need on a thread you haven't touched in
+            a week. */}
+        <AccordionSection value="matches" title="Matches">
+          <CandidateMatches candidateId={candidate.candidateId} />
+        </AccordionSection>
         <AccordionSection value="details" title="Details">
           <Details candidate={candidate} />
         </AccordionSection>

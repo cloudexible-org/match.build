@@ -138,6 +138,12 @@ export const MATCH_LIMITS = {
   boardCards: 2_000,
   /** Cards one column shows before the board asks you to move some on. */
   cardsPerColumn: 100,
+  /**
+   * Cards the candidate panel carries for one person. A carousel with more
+   * than this behind it is not a carousel any more, and the board is where
+   * somebody goes to see all of them.
+   */
+  cardsPerCandidate: 20,
 } as const;
 
 /**

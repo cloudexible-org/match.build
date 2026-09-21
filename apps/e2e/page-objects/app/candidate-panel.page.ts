@@ -25,12 +25,12 @@ export class CandidatePanelPage {
    * Each section's header button. By test id, not by name: "Profile" also
    * labels a filter inside the History section.
    */
-  getSection(name: "Details" | "Profile" | "History") {
+  getSection(name: "Matches" | "Details" | "Profile" | "History") {
     return this.page.getByTestId(`accordion-${name.toLowerCase()}`);
   }
 
   /** Expands a section, unless it is already open. */
-  async openSection(name: "Details" | "Profile" | "History") {
+  async openSection(name: "Matches" | "Details" | "Profile" | "History") {
     const header = this.getSection(name);
     if ((await header.getAttribute("aria-expanded")) !== "true") {
       await header.click();
@@ -141,6 +141,34 @@ export class CandidatePanelPage {
 
   async removeNote(key: string) {
     await this.getNote(key).getByRole("button", { name: "Remove" }).click();
+  }
+
+  // --- Matches (prd/phase-3.md §2) --------------------------------------
+
+  getMatches() {
+    return this.page.getByTestId("candidate-matches");
+  }
+
+  /** The one card showing, which is the board's card verbatim. */
+  getMatchCard() {
+    return this.getMatches().getByTestId("match-card");
+  }
+
+  /** The stage badge — what the board says by which column a card is in. */
+  getMatchStage() {
+    return this.page.getByTestId("candidate-match-stage");
+  }
+
+  getMatchCounter() {
+    return this.getMatches().getByTestId("carousel-counter");
+  }
+
+  async nextMatch() {
+    await this.getMatches().getByTestId("carousel-next").click();
+  }
+
+  async previousMatch() {
+    await this.getMatches().getByTestId("carousel-previous").click();
   }
 
   // --- History -------------------------------------------------------------

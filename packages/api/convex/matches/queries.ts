@@ -12,7 +12,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { type QueryCtx, query } from "../_generated/server";
-import { requireMatchmaker } from "../matchmakers/helpers";
+import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
 import {
   matchRejectedBy,
   matchResponse,
@@ -107,6 +107,88 @@ export const board = query({
           outcome: match.outcome,
         });
       }
+    }
+    return cards;
+  },
+});
+
+/**
+ * The matches one candidate is in, whichever side of the pair they are on
+ * (prd/phase-3.md §2) — the candidate panel's first section.
+ *
+ * The same card the board draws, so a matchmaker reading a person's file sees
+ * exactly what they would see on the board, plus the stage it is sitting at
+ * — which the board says by *which column the card is in*, and a panel has no
+ * columns to say it with.
+ *
+ * Two reads rather than one, because a pair is stored as `a` and `b` and this
+ * person may be either. Bounded on each side: a carousel is not the place for
+ * a hundred cards.
+ */
+export const forCandidate = query({
+  args: {
+    matchmakerId: v.id("matchmakers"),
+    candidateId: v.id("candidates"),
+  },
+  returns: v.array(card),
+  handler: async (ctx, args) => {
+    const { matchmaker } = await requireMatchmaker(ctx, args.matchmakerId);
+    const candidate = await ctx.db.get("candidates", args.candidateId);
+    assertSameTenant(candidate, matchmaker._id);
+    const now = Date.now();
+    const people = new Map<Id<"candidates">, Doc<"candidates"> | null>();
+
+    const rows = [
+      ...(await ctx.db
+        .query("matches")
+        .withIndex("by_candidateAId", (q) =>
+          q.eq("candidateAId", candidate._id),
+        )
+        .order("desc")
+        .take(MATCH_LIMITS.cardsPerCandidate)),
+      ...(await ctx.db
+        .query("matches")
+        .withIndex("by_candidateBId", (q) =>
+          q.eq("candidateBId", candidate._id),
+        )
+        .order("desc")
+        .take(MATCH_LIMITS.cardsPerCandidate)),
+    ];
+
+    const cards = [];
+    for (const match of rows) {
+      // Their own book only. The index is by candidate, and a candidate
+      // belongs to one matchmaker — but a tenancy check that relies on that
+      // is a tenancy check somebody can break by adding a second.
+      if (match.matchmakerId !== matchmaker._id) continue;
+      if (
+        match.stage === "rejected" &&
+        !rejectedIsVisible(match.stageChangedAt, now)
+      ) {
+        continue;
+      }
+      const a = await personOn(ctx, people, match.candidateAId);
+      const b = await personOn(ctx, people, match.candidateBId);
+      if (a === null || b === null) continue;
+      cards.push({
+        matchId: match._id,
+        a,
+        b,
+        origin: match.origin,
+        stage: match.stage,
+        stageChangedAt: match.stageChangedAt,
+        score: match.score,
+        coverage: match.coverage,
+        signals: match.signals,
+        checkDealbreakers: match.checkDealbreakers,
+        algorithmVersion: match.algorithmVersion,
+        lastScoredAt: match.lastScoredAt,
+        candidateAResponse: match.candidateAResponse,
+        candidateBResponse: match.candidateBResponse,
+        rejectedBy: match.rejectedBy,
+        rejectionReason: match.rejectionReason,
+        outcome: match.outcome,
+      });
     }
     return cards;
   },

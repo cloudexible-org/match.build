@@ -1,14 +1,17 @@
-import { Button, cn } from "@repo/ui";
+import { Button } from "@repo/ui";
 import { type KeyboardEvent, type ReactNode, useState } from "react";
+import {
+  CarouselArrow,
+  CarouselCounter,
+  CarouselGutter,
+} from "../components/carousel";
+import { currentIndex, idAfterDismiss, stepId } from "../lib/carousel";
 import { serverErrorMessage } from "../lib/server-error";
 import {
-  currentIndex,
-  idAfterDismiss,
   rowsByKind,
   SUGGESTION_KIND_LABELS,
   type Suggestion,
   type SuggestionKind,
-  stepId,
 } from "./suggestions";
 
 /**
@@ -143,14 +146,14 @@ function Row({
       onKeyDown={handleKeyDown}
     >
       {many ? (
-        <Step
+        <CarouselArrow
           direction="previous"
           label="Newer suggestion"
           disabled={newerId === null}
           onClick={() => setSelectedId(newerId)}
         />
       ) : (
-        gutters && <Gutter />
+        gutters && <CarouselGutter />
       )}
       <div
         // Nothing here is on the record until somebody says so, so it looks
@@ -167,14 +170,7 @@ function Row({
               <span className="font-normal"> · {card.subject}</span>
             )}
           </span>
-          {many && (
-            <span
-              className="shrink-0 text-xs tabular-nums text-muted-foreground"
-              data-testid="suggestion-counter"
-            >
-              {index + 1}/{items.length}
-            </span>
-          )}
+          {many && <CarouselCounter index={index} count={items.length} />}
         </div>
         {/* Capped rather than clipped: a drafted voice runs to a paragraph,
             and a card that hid the end of it would send someone hunting. */}
@@ -225,65 +221,15 @@ function Row({
         )}
       </div>
       {many ? (
-        <Step
+        <CarouselArrow
           direction="next"
           label="Older suggestion"
           disabled={olderId === null}
           onClick={() => setSelectedId(olderId)}
         />
       ) : (
-        gutters && <Gutter />
+        gutters && <CarouselGutter />
       )}
     </fieldset>
-  );
-}
-
-/**
- * The space an arrow would have taken, in a row that has nowhere to go. An
- * empty box rather than a disabled button: there is nothing here to tab to,
- * and nothing for a screen reader to read out.
- */
-function Gutter() {
-  return <div aria-hidden className="size-8 shrink-0" />;
-}
-
-/** One of the arrows either side of a row. */
-function Step({
-  direction,
-  label,
-  disabled,
-  onClick,
-}: {
-  direction: "previous" | "next";
-  /** Named for a screen reader: an arrow glyph alone says nothing. */
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="size-8 shrink-0 p-0"
-      aria-label={label}
-      disabled={disabled}
-      data-testid={`suggestion-${direction}`}
-      onClick={onClick}
-    >
-      <svg
-        aria-hidden
-        viewBox="0 0 12 12"
-        className={cn("size-3", direction === "next" && "rotate-180")}
-      >
-        <path
-          d="M7.5 2 3.5 6l4 4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </Button>
   );
 }
