@@ -4,9 +4,11 @@ import {
   CandidateChatPage,
   CandidateShellPage,
 } from "@repo/harness/page-objects/app/candidate.page";
+import { AppHeaderPage } from "@repo/harness/page-objects/app/header.page";
 import { InvitePage } from "@repo/harness/page-objects/app/invite.page";
 import {
   ConversationPage,
+  MatchmakerSettingsPage,
   OnboardPage,
   WorkspacePage,
 } from "@repo/harness/page-objects/app/matchmaker.page";
@@ -154,4 +156,35 @@ test("the candidate shell fits the screen, one column at a time", async ({
   await expectNoSidewaysScroll(page);
   await page.getByTestId("close-matchmaker-panel").click();
   await expect(chat.getMatchmakerName()).toBeVisible();
+});
+
+test("the header's links fold into one menu, and it goes where they went", async ({
+  page,
+}) => {
+  await signInAs(page, world.email("maya"));
+  const workspace = new WorkspacePage(page);
+  await workspace.goto(world.username("book"));
+
+  // All that is left in the bar is where you are, the bell, the theme and the
+  // hamburger. Everything with words on it is behind the last of those.
+  const header = new AppHeaderPage(page);
+  await expect(workspace.getName()).toBeVisible();
+  await expect(header.getMenuButton()).toBeVisible();
+  await expect(header.getAccountSettingsLink()).toBeHidden();
+  await expect(header.getSignOutButton()).toBeHidden();
+  await expectNoSidewaysScroll(page);
+
+  // Whose account these are is the menu's first line — the bar no longer
+  // says it anywhere.
+  await header.openMenu();
+  await expect(header.getMenuAccountName()).toHaveText("Maya Maker");
+  await expect(header.getMenuItem("Matches")).toBeVisible();
+  await expect(header.getMenuAccountSettings()).toBeVisible();
+  await expect(header.getMenuSignOut()).toBeVisible();
+  await expectNoSidewaysScroll(page);
+
+  // An item is a real link, and it takes the menu with it.
+  await header.getMenuItem("Profile settings").click();
+  await expect(new MatchmakerSettingsPage(page).getForm()).toBeVisible();
+  await expect(header.getMenu()).toBeHidden();
 });

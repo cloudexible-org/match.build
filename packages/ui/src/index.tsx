@@ -18,7 +18,14 @@ export {
   FieldLabel,
   Input,
 } from "./components/field";
-export { Menu, MenuItem } from "./components/menu";
+export {
+  Menu,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuItem,
+  MenuLinkItem,
+  MenuSeparator,
+} from "./components/menu";
 export { NativeSelect } from "./components/native-select";
 export { Popover, PopoverTitle } from "./components/popover";
 export { Textarea } from "./components/textarea";

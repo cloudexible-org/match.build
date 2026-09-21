@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { CandidateShellPage } from "@repo/harness/page-objects/app/candidate.page";
+import { AppHeaderPage } from "@repo/harness/page-objects/app/header.page";
 import { HomePage } from "@repo/harness/page-objects/app/home.page";
 import { InvitePage } from "@repo/harness/page-objects/app/invite.page";
 import { WorkspacePage } from "@repo/harness/page-objects/app/matchmaker.page";
@@ -65,7 +66,12 @@ test("two profiles is the one case that still gets the picker", async ({
   const home = new HomePage(page);
   await home.goto();
 
-  await expect(home.getAccountName()).toHaveText(world.users.full.name);
+  // Who is signed in: the page greets them, and the header's way into their
+  // account settings is there whatever their name is.
+  await expect(home.getWelcomeHeading()).toHaveText(
+    `Welcome, ${world.users.full.name.split(" ")[0]}`,
+  );
+  await expect(new AppHeaderPage(page).getAccountSettingsLink()).toBeVisible();
   await expect(
     home.getRow("invitations", world.displayName("inviting")),
   ).toContainText("invited you to join");
@@ -131,7 +137,7 @@ test("signing out returns to sign-in, and the session is gone after a reload", a
   await signInAs(page, world.email("full"));
   const home = new HomePage(page);
   await home.goto();
-  await home.getSignOutButton().click();
+  await new AppHeaderPage(page).getSignOutButton().click();
 
   await expect(page).toHaveURL(/\/app\/sign-in/);
   await page.reload();

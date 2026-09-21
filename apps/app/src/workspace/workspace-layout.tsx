@@ -1,15 +1,13 @@
 import { api, type Id } from "@repo/api";
-import { buttonVariants, cn } from "@repo/ui";
 import { useQuery } from "convex/react";
 import {
-  Link,
   Navigate,
   Outlet,
   useLocation,
   useOutletContext,
   useParams,
 } from "react-router";
-import { AppHeader } from "../components/app-header";
+import { AppHeader, type HeaderLink } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
 import { NotFoundPage } from "../pages/not-found";
 
@@ -66,6 +64,26 @@ export function WorkspaceLayout() {
   }
 
   const base = `/mm/${workspace.username}`;
+  // **Profile settings**, not "Settings": the header has two of them, and the
+  // other one is the account's. This is the matchmaker profile the workspace
+  // is (prd/phase-1.md §4).
+  const links: HeaderLink[] = [
+    { to: `${base}/matches`, label: "Matches", testId: "workspace-matches" },
+    { to: `${base}/settings`, label: "Profile settings" },
+  ];
+  // Only for an owner who is also somebody's candidate, which most are not.
+  if (
+    home !== undefined &&
+    home !== null &&
+    home.candidateProfiles.length > 0
+  ) {
+    links.push({
+      to: "/c",
+      label: "Your matchmakers",
+      testId: "workspace-my-matchmakers",
+    });
+  }
+
   // `h-dvh`, not `min-h-dvh`: the workspace is a chat shell, and its columns
   // scroll inside themselves. A frame that can grow is a frame that takes the
   // composer off the bottom of the screen.
@@ -73,51 +91,8 @@ export function WorkspaceLayout() {
     <div className="flex h-dvh flex-col overflow-hidden">
       <AppHeader
         name={me.name ?? ""}
-        nav={
-          <nav className="flex min-w-0 items-center gap-1 text-sm">
-            {/* Separates the workspace from the brand, so it goes with it. */}
-            <span
-              aria-hidden
-              className="hidden text-muted-foreground sm:inline"
-            >
-              /
-            </span>
-            <Link
-              to={base}
-              className="truncate rounded-md px-2 py-1 font-medium hover:bg-accent"
-              data-testid="workspace-name"
-            >
-              {workspace.displayName}
-            </Link>
-            <Link
-              to={`${base}/matches`}
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-              data-testid="workspace-matches"
-            >
-              Matches
-            </Link>
-            <Link
-              to={`${base}/settings`}
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-            >
-              Settings
-            </Link>
-            {home !== undefined &&
-              home !== null &&
-              home.candidateProfiles.length > 0 && (
-                <Link
-                  to="/c"
-                  className={cn(
-                    buttonVariants({ variant: "ghost", size: "sm" }),
-                    "hidden sm:inline-flex",
-                  )}
-                  data-testid="workspace-my-matchmakers"
-                >
-                  Your matchmakers
-                </Link>
-              )}
-          </nav>
-        }
+        workspace={{ to: base, label: workspace.displayName }}
+        links={links}
       />
       {/* Two page shapes live under this header. The chat shell fills this
           box exactly and scrolls inside its own columns, so this never

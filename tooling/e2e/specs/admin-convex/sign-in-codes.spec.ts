@@ -7,7 +7,8 @@ import {
   NotAnAdminPage,
 } from "@repo/harness/page-objects/admin/sign-in.page";
 import { SignInCodesPage } from "@repo/harness/page-objects/admin/sign-in-codes.page";
-import { HomePage } from "@repo/harness/page-objects/app/home.page";
+import { AccountSettingsPage } from "@repo/harness/page-objects/app/account-settings.page";
+import { AppHeaderPage } from "@repo/harness/page-objects/app/header.page";
 import { SignInPage } from "@repo/harness/page-objects/app/sign-in.page";
 import {
   SEED_ADMINS,
@@ -55,9 +56,14 @@ test("an admin issues a code, signs in to the app as the account, and the trail 
     await signIn.goto();
     await signIn.useExistingCode(target.email);
     await signIn.enterCode(code);
-    await expect(new HomePage(appPage).getAccountName()).toHaveText(
-      target.name,
-    );
+    // In, wherever the code landed them — then read who they are from their
+    // own settings, which is the one page that names the account.
+    await expect(
+      new AppHeaderPage(appPage).getAccountSettingsLink(),
+    ).toBeVisible();
+    const settings = new AccountSettingsPage(appPage);
+    await settings.goto();
+    await expect(settings.getNameInput()).toHaveValue(target.name);
   } finally {
     await appContext.close();
   }

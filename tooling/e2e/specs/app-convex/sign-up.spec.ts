@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { AccountSettingsPage } from "@repo/harness/page-objects/app/account-settings.page";
 import { CandidateShellPage } from "@repo/harness/page-objects/app/candidate.page";
 import {
   CompleteProfilePage,
@@ -44,7 +45,6 @@ test("a new account signs up with an emailed code and names itself", async ({
   // Straight to their own shell, with nothing in it and both ways out.
   const shell = new CandidateShellPage(page);
   await expect(page).toHaveURL(/\/app\/c$/);
-  await expect(shell.getAccountName()).toHaveText("Nova Tester");
   await expect(shell.getMatchmakerList()).toContainText(
     "You haven't joined a matchmaker yet.",
   );
@@ -55,7 +55,13 @@ test("a new account signs up with an emailed code and names itself", async ({
   // The session survives a reload: this re-reads from the backend rather than
   // trusting local state.
   await page.reload();
-  await expect(shell.getAccountName()).toHaveText("Nova Tester");
+  await expect(shell.getMatchmakerList()).toBeVisible();
+
+  // What they typed was normalised on the way in. The header no longer wears
+  // the name, so this reads it where the name is now edited.
+  const settings = new AccountSettingsPage(page);
+  await settings.goto();
+  await expect(settings.getNameInput()).toHaveValue("Nova Tester");
 });
 
 test("a wrong code is refused, and a new one can be requested", async ({
