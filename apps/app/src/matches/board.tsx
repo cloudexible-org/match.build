@@ -136,10 +136,16 @@ export function MatchBoard() {
 
   return (
     <main
-      className="flex min-w-0 flex-col gap-4 px-4 py-6"
+      // Fills the workspace's frame and scrolls inside itself, the way the
+      // chat shell does: a board is a surface you work on, and its one
+      // horizontal scrollbar belongs at the bottom of the window rather than
+      // wherever the tallest column happens to end. `min-h-*` is the safety
+      // valve — on a short or narrow viewport the frame scrolls instead of
+      // crushing the columns to nothing.
+      className="flex min-h-[28rem] min-w-0 flex-1 flex-col gap-4 px-4 py-6"
       data-testid="match-board"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="font-display text-3xl">Matches</h1>
           <p className="text-sm text-muted-foreground">
@@ -191,9 +197,11 @@ export function MatchBoard() {
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
         <>
-          {/* Scrolls sideways as a board does. The columns keep their width so
-              five of them stay readable on a laptop and swipeable on a phone. */}
-          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2">
+          {/* Scrolls sideways as a board does, and takes every pixel of height
+              the header above it didn't. The columns share the width when
+              there is enough of it and stop at a readable 18rem when there
+              isn't, which is when this starts scrolling. */}
+          <div className="-mx-4 flex min-h-0 flex-1 gap-3 overflow-x-auto px-4 pb-2">
             {MATCH_BOARD_STAGES.map((stage) => (
               <Column
                 key={stage}
@@ -248,11 +256,11 @@ function Column({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       className={cn(
-        "flex w-72 shrink-0 flex-col gap-2 rounded-xl border border-dashed p-2 transition-colors",
+        "flex min-w-72 flex-1 flex-col gap-2 rounded-xl border border-dashed p-2 transition-colors",
         over ? "border-primary bg-accent/50" : "border-transparent bg-muted/40",
       )}
     >
-      <div className="flex flex-col gap-0.5 px-1">
+      <div className="flex shrink-0 flex-col gap-0.5 px-1">
         <div className="flex items-baseline justify-between gap-2">
           <h2 id={headingId} className="text-sm font-medium">
             {MATCH_STAGE_LABELS[stage]}
@@ -268,7 +276,9 @@ function Column({
           {MATCH_STAGE_DESCRIPTIONS[stage]}
         </p>
       </div>
-      <div className="flex flex-col gap-2">
+      {/* The cards scroll, not the board: a column with thirty suggestions in
+          it should not push the other four off the bottom of the screen. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         {cards.map((card) => (
           <MatchCard key={card.matchId} card={card} actions={actions(card)} />
         ))}
@@ -303,7 +313,7 @@ function RejectedLane({
       aria-labelledby="match-lane-rejected"
       data-testid="match-lane"
       data-stage="rejected"
-      className="flex flex-col gap-2 rounded-xl border border-border bg-muted/40 p-3"
+      className="flex max-h-[45%] shrink-0 flex-col gap-2 rounded-xl border border-border bg-muted/40 p-3"
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2 id="match-lane-rejected" className="text-sm font-medium">
