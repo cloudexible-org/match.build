@@ -1,3 +1,4 @@
+import type * as React from "react";
 import type { ReactNode } from "react";
 
 /**
@@ -79,7 +80,15 @@ export function RecordRow({
         >
           <RecordLabel>{label}</RecordLabel>
           <RecordValue>{value}</RecordValue>
-          <PencilIcon className="size-3.5 shrink-0 self-center text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-visible/row:opacity-100" />
+          {/* Always drawn, faint, and firming up under the pointer. It used
+              to appear on hover alone, which on a touch screen means never:
+              the row was editable and said so only to a mouse. A column of
+              faint pencils down the right margin reads as an editable gutter
+              rather than as noise, and it is honest on every device. */}
+          <PencilIcon
+            data-testid="row-edit-hint"
+            className="size-3.5 shrink-0 self-center text-muted-foreground opacity-35 transition-opacity group-hover/row:opacity-100 group-focus-visible/row:opacity-100"
+          />
           {/* The button's name is its content — label, value, then this — so
               a screen reader hears the fact before it hears what the button
               does. An `aria-label` would replace all of it with "Edit …". */}
@@ -138,13 +147,37 @@ function RecordValue({ children }: { children: ReactNode }) {
   return <span className="min-w-0 flex-1 break-words text-sm">{children}</span>;
 }
 
-export function PencilIcon({ className }: { className?: string }) {
+export function PencilIcon({
+  className,
+  ...props
+}: React.ComponentProps<"svg">) {
   return (
-    <svg aria-hidden viewBox="0 0 16 16" fill="none" className={className}>
+    <svg
+      aria-hidden
+      viewBox="0 0 16 16"
+      fill="none"
+      className={className}
+      {...props}
+    >
       <path
         d="M11.3 2.7a1.7 1.7 0 0 1 2.4 2.4L5.6 13.2 2 14l.8-3.6 8.5-7.7Z"
         stroke="currentColor"
         strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** The one the accordion's own headers use, for a control drawn by hand. */
+export function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 12 12" fill="none" className={className}>
+      <path
+        d="M2 4.5 6 8.5 10 4.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
     </svg>

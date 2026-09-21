@@ -26,7 +26,12 @@ import { CandidateHistory } from "./candidate-history";
 import { type Membership, membershipMarker } from "./candidate-labels";
 import { CandidateMatches } from "./candidate-matches";
 import { CandidateProfile } from "./candidate-profile";
-import { RecordEditRow, RecordGroup, RecordRow } from "./panel-record";
+import {
+  ChevronDownIcon,
+  RecordEditRow,
+  RecordGroup,
+  RecordRow,
+} from "./panel-record";
 import { useWorkspace } from "./workspace-layout";
 
 export type PanelCandidate = {
@@ -172,16 +177,20 @@ function Details({ candidate }: { candidate: PanelCandidate }) {
           // A select rather than a row you click: status is a closed list of
           // three and takes effect the moment it changes, so there is nothing
           // for a Save button to do. Stripped of its box so it reads as the
-          // row's value, keeping the native arrow that says it is a control.
+          // row's value, with a chevron of our own saying it is a control.
+          //
+          // **`appearance-none`, and the arrow drawn by hand.** A native
+          // select insets its text by an amount that is the browser's, not
+          // ours, and no padding we set takes it back — the value sat a few
+          // pixels left of every other value in the column, by a different
+          // few pixels per browser. Dropping the native appearance drops the
+          // inset with it, and then the text starts exactly where `Joined`
+          // above it does.
           value={
-            <Field>
+            <Field className="relative w-fit max-w-full">
               <FieldLabel className="sr-only">Status</FieldLabel>
               <NativeSelect
-                // `self-start` or the Field's column stretches it across the
-                // whole value column and parks its arrow at the far edge.
-                // `-ms-1.5` pulls the text back onto the value column: a
-                // native select insets it past any padding we set.
-                className="-ms-1.5 h-auto w-auto max-w-full self-start rounded-sm border-0 bg-transparent p-0 text-sm shadow-none"
+                className="h-auto w-auto max-w-full appearance-none rounded-sm border-0 bg-transparent px-0 pe-5 py-0 text-sm shadow-none"
                 value={candidate.status}
                 data-testid="candidate-status"
                 onChange={(event) =>
@@ -198,6 +207,7 @@ function Details({ candidate }: { candidate: PanelCandidate }) {
                   </option>
                 ))}
               </NativeSelect>
+              <ChevronDownIcon className="pointer-events-none absolute end-0 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
             </Field>
           }
         />
