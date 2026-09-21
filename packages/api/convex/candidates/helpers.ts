@@ -26,3 +26,30 @@ export async function requireCandidateSelf(
   }
   return { user, candidate };
 }
+
+/**
+ * What to call the candidate when an agent has to address or discuss them.
+ *
+ * Lives here rather than beside either agent because both of them ask: the
+ * drafting run greets them by it, and the profile run keeps their record under
+ * it.
+ *
+ * The app falls back to the email address, which is right for a list and wrong
+ * for a greeting — "Hi sam.candidate@matchmaker-dev.test" is not a draft
+ * anybody sends. So: the matchmaker's own label for them, then the name on the
+ * account they joined with, and only then the part of the address before the
+ * `@`, which at least reads like a person.
+ */
+export async function candidateDisplayName(
+  ctx: QueryCtx,
+  candidate: Doc<"candidates">,
+): Promise<string> {
+  if (candidate.name !== undefined && candidate.name !== "") {
+    return candidate.name;
+  }
+  if (candidate.userId !== undefined) {
+    const user = await ctx.db.get("users", candidate.userId);
+    if (user?.name !== undefined && user.name !== "") return user.name;
+  }
+  return candidate.email.split("@")[0] ?? candidate.email;
+}

@@ -20,7 +20,11 @@ import {
 } from "../components/account-search";
 import { serverErrorMessage } from "../lib/server-error";
 
-type Done = { candidates: number; auditEventsRedacted: number };
+type Done = {
+  candidates: number;
+  auditEventsRedacted: number;
+  agentThreadsForgotten: number;
+};
 
 /**
  * Erasure requests (prd/phase-1.md §12), the admin-only process that resolves
@@ -113,7 +117,14 @@ export function ErasurePage() {
                 : `${done.candidates} matchmakers' records were anonymised`}
               , and {done.auditEventsRedacted} audit{" "}
               {done.auditEventsRedacted === 1 ? "entry" : "entries"} had their
-              personal values redacted. The erasure is itself in the trail.
+              personal values redacted.
+              {done.agentThreadsForgotten > 0 &&
+                ` ${
+                  done.agentThreadsForgotten === 1
+                    ? "One AI thread was"
+                    : `${done.agentThreadsForgotten} AI threads were`
+                } deleted, so the model keeps no copy of what it was shown.`}{" "}
+              The erasure is itself in the trail.
             </CardDescription>
           </CardHeader>
           <CardContent>

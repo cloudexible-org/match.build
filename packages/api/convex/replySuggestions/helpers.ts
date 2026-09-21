@@ -8,10 +8,12 @@
  * only the reads that feed it.
  */
 
+import { components } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
-import { env, type QueryCtx } from "../_generated/server";
+import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { candidateProfileFor } from "../candidateProfiles/helpers";
 import { candidateField, candidateNoteLabel } from "../candidateProfiles/rules";
+import { candidateDisplayName } from "../candidates/helpers";
 import { matchmakerProfileFor } from "../matchmakerProfiles/helpers";
 import { displayValue } from "../profiles/rules";
 import {
@@ -60,29 +62,6 @@ export function liveWindow(): number {
 
 /** An entry map as the two profile tables hold it. */
 type Entries = Doc<"candidateProfiles">["facts"];
-
-/**
- * What to call the candidate in a draft.
- *
- * The app falls back to the email address, which is right for a list and wrong
- * for a greeting — "Hi sam.candidate@matchmaker-dev.test" is not a draft
- * anybody sends. So: the matchmaker's own label for them, then the name on the
- * account they joined with, and only then the part of the address before the
- * `@`, which at least reads like a person.
- */
-async function candidateName(
-  ctx: QueryCtx,
-  candidate: Doc<"candidates">,
-): Promise<string> {
-  if (candidate.name !== undefined && candidate.name !== "") {
-    return candidate.name;
-  }
-  if (candidate.userId !== undefined) {
-    const user = await ctx.db.get("users", candidate.userId);
-    if (user?.name !== undefined && user.name !== "") return user.name;
-  }
-  return candidate.email.split("@")[0] ?? candidate.email;
-}
 
 /**
  * The filled entries, rendered the way the Profile section renders them, so
@@ -149,7 +128,7 @@ export async function briefFor(
   }));
 
   return {
-    candidateName: await candidateName(ctx, candidate),
+    candidateName: await candidateDisplayName(ctx, candidate),
     matchmakerName: matchmaker.displayName,
     voice: mine?.voice?.value ?? "",
     facts:
@@ -219,4 +198,67 @@ export async function readyDrafts(
     )
     .order("desc")
     .take(10);
+}
+
+/**
+ * Forgets everything the model was shown about one candidate: the agent's
+ * thread, and the high-water marks that say how much of the world it has been
+ * told about.
+ *
+ * **This is the door prd/phase-2.md §4 said an erasure had to knock on.** The
+ * component's tables are its own and `ctx.db` cannot see them, so the erasure
+ * in `admin/mutations.ts` cannot walk a thread the way it walks `candidates`
+ * and `auditEvents` — it has to ask the component, and the component has to be
+ * asked per thread.
+ *
+ * §4 named `components.agent.users.deleteAllForUserId`, which is the wrong
+ * door for the threads this product creates: `actions.ts` creates one per
+ * *conversation*, titled and keyed by nothing else, so no thread here is
+ * associated with a component user id and that call would find nothing to
+ * delete. Giving threads a `userId` would make it work for threads created
+ * after the change and silently miss every one created before it. Walking the
+ * conversations is exact, needs no backfill, and is bounded by the same
+ * membership ceiling the erasure already enforces.
+ *
+ * Async deletion, as the per-conversation switch uses: the component removes
+ * the thread's messages in batches in the background, which is what stops a
+ * long thread from blowing the limits of the mutation that asked.
+ *
+ * Safe to call for a candidate whose conversation was never drafted for, and
+ * safe to call twice.
+ */
+export async function forgetAgentThread(
+  ctx: MutationCtx,
+  candidateId: Id<"candidates">,
+): Promise<boolean> {
+  const conversation = await ctx.db
+    .query("conversations")
+    .withIndex("by_candidateId", (q) => q.eq("candidateId", candidateId))
+    .unique();
+  if (conversation === null) return false;
+
+  // Both of them: a conversation carries one thread for drafting and one for
+  // the profile agent that reconciles what drafting noticed. Forgetting only
+  // the first would leave the model's copy of a person standing in the other
+  // (prd/phase-2.md §4.1B).
+  const threads = [
+    conversation.agentThreadId,
+    conversation.profileThreadId,
+  ].filter((threadId): threadId is string => threadId !== undefined);
+  if (threads.length === 0) return false;
+
+  for (const threadId of threads) {
+    await ctx.runMutation(components.agent.threads.deleteAllForThreadIdAsync, {
+      threadId,
+    });
+  }
+  await ctx.db.patch("conversations", conversation._id, {
+    agentThreadId: undefined,
+    agentBriefedSeq: undefined,
+    agentBriefedVoiceAt: undefined,
+    agentBriefedProfileAt: undefined,
+    profileThreadId: undefined,
+    profileBriefedAt: undefined,
+  });
+  return true;
 }

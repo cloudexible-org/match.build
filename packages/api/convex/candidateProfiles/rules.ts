@@ -28,6 +28,7 @@
 import {
   humaniseKey,
   type ProfileFieldDef,
+  type ProfileValueKind,
   type ProfileWritePolicy,
 } from "../profiles/rules";
 
@@ -663,4 +664,235 @@ export function candidateEntryHoldsPersonalData(auditField: string): boolean {
   const dot = auditField.indexOf(".");
   if (dot === -1 || auditField.slice(0, dot) !== "facts") return false;
   return candidateField(auditField.slice(dot + 1))?.personal === true;
+}
+
+/*
+ * ─── What the profile agent is told, and what it says back ──────────────────
+ *
+ * The second half of extraction (prd/phase-2.md §4.1B). The conversation agent
+ * has already noticed things in the thread, each with the candidate's own
+ * words; this agent decides what, if anything, the registry can hold — and
+ * whether each one is new, already known, or contradicts what is there.
+ *
+ * It does **not** decide whether a value is written or proposed. That is the
+ * field's policy, applied by `applyAgentEntries`, and an agent that could
+ * choose would make the policy advisory (prd/phase-2.md §4.1B).
+ *
+ * Plain code with no Convex imports, so what leaves this deployment is
+ * readable in one file and unit-testable without a database.
+ */
+
+/** How one registry field is described to the agent. */
+function fieldLine(field: CandidateFieldDef): string {
+  const shape = valueShape(field.value);
+  const hint = field.hint === undefined ? "" : ` — ${field.hint}`;
+  return `- ${field.key} (${field.label}): ${shape}${hint}`;
+}
+
+/** What the agent is allowed to put in a field, in the words it must use. */
+function valueShape(value: ProfileValueKind): string {
+  switch (value.kind) {
+    case "text":
+      return `free text, up to ${value.maxLength} characters`;
+    case "date":
+      return "a date, written YYYY-MM-DD";
+    case "integer":
+      return `a whole number between ${value.min} and ${value.max}`;
+    case "range":
+      return `two numbers written "min-max", each between ${value.min} and ${value.max}`;
+    case "choice":
+      return `exactly one of: ${value.options.join(", ")}`;
+    case "choices":
+      return `any of, comma-separated: ${value.options.join(", ")}`;
+    case "list":
+      return `up to ${value.maxItems} comma-separated items`;
+  }
+}
+
+/**
+ * Every field and note this agent may touch, as the prompt lists them.
+ *
+ * **Fields the registry reserves for the matchmaker are left out entirely.**
+ * Listing a field only to forbid it invites the model to reach for it, and a
+ * value it emits for one is refused downstream anyway — spending output tokens
+ * on something that can only be thrown away.
+ */
+export function registryCatalogue(): string {
+  const groups = CANDIDATE_GROUP_ORDER.map((group) => {
+    const fields = CANDIDATE_PROFILE_FIELDS.filter(
+      (field) => field.group === group && field.policy !== "matchmaker",
+    );
+    if (fields.length === 0) return null;
+    return `${CANDIDATE_GROUP_LABELS[group]}\n${fields.map(fieldLine).join("\n")}`;
+  }).filter((block): block is string => block !== null);
+
+  const notes = CANDIDATE_PROFILE_NOTES.filter(
+    (note) => note.policy !== "matchmaker",
+  ).map((note) => `- ${note.key} (${note.label}): free text`);
+
+  return [
+    `FIELDS — a value must be exactly the shape given\n${groups.join("\n\n")}`,
+    `NOTES — a sentence or two in your own words\n${notes.join("\n")}`,
+  ].join("\n\n");
+}
+
+/** One thing the conversation agent noticed, as this agent is shown it. */
+export type NoticedInput = { observation: string; quote: string };
+
+/** What is already on the record, as this agent is shown it. */
+export type ProfileStateEntry = {
+  kind: CandidateEntryKind;
+  key: string;
+  label: string;
+  value: string;
+  /** Whether a person typed it, which is what makes it untouchable. */
+  byHand: boolean;
+  /** Whether a proposal is already waiting on this field. */
+  pending: boolean;
+};
+
+/**
+ * The standing picture: who this is and what is already known about them.
+ * Sent once per thread, because the thread is the memory.
+ */
+export function profileOpeningBrief(
+  candidateName: string,
+  state: ProfileStateEntry[],
+): string {
+  const parts = [
+    `You are keeping ${candidateName}'s profile, in one matchmaker's book.`,
+    registryCatalogue(),
+  ];
+  parts.push(
+    state.length > 0
+      ? `ALREADY ON ${candidateName.toUpperCase()}'S PROFILE\n${state.map(stateLine).join("\n")}`
+      : `ALREADY ON ${candidateName.toUpperCase()}'S PROFILE\nNothing yet.`,
+  );
+  return parts.join("\n\n");
+}
+
+function stateLine(entry: ProfileStateEntry): string {
+  const marks = [
+    entry.byHand ? "typed by the matchmaker — never overwrite" : null,
+    entry.pending ? "a suggestion is already waiting on this" : null,
+  ].filter((mark): mark is string => mark !== null);
+  const aside = marks.length === 0 ? "" : ` (${marks.join("; ")})`;
+  return `- ${entry.kind}.${entry.key} — ${entry.label}: ${entry.value}${aside}`;
+}
+
+/**
+ * What has changed on the record since this agent was last spoken to. Returns
+ * `null` when nothing has, so a run adds no section rather than an empty one.
+ */
+export function profileUpdateBrief(
+  changed: ProfileStateEntry[],
+): string | null {
+  if (changed.length === 0) return null;
+  return `THE PROFILE HAS CHANGED SINCE YOU LAST SAW IT\nThese are current; anything you were told earlier about the same entry is out of date.\n${changed.map(stateLine).join("\n")}`;
+}
+
+/**
+ * The task for one run: here is what was just noticed, tell me what to store.
+ *
+ * Asked for as delimited lines rather than JSON, for the reason the drafting
+ * instruction gives: every wrapper the model has to close correctly is another
+ * way for a usable answer to arrive unusable.
+ */
+export function reconcileInstruction(
+  candidateName: string,
+  noticed: NoticedInput[],
+): string {
+  return [
+    `JUST NOTICED IN THE CONVERSATION WITH ${candidateName.toUpperCase()}`,
+    noticed
+      .map((item) => `- ${item.observation} | their words: "${item.quote}"`)
+      .join("\n"),
+    "",
+    "For each one, decide whether it belongs on the profile, and where. Then write one line per entry you want stored:",
+    "<facts or notes> | <key from the lists above> | <the value, or CLEAR to empty it> | <confidence 0 to 1> | <their exact words>",
+    "",
+    "For example:",
+    "facts | wantsKids | yes | 0.9 | I'd love a couple of kids one day",
+    "notes | hobbies | Runs, and is training for a half marathon. | 0.8 | I'm up to 15k on my long run",
+    "",
+    "Rules:",
+    "- Only keys from the lists above. A key that is not there is not a key.",
+    "- A field's value must be exactly the shape its line gives. A number means digits, a choice means one of the words offered.",
+    `- Say nothing about what is already on the profile and has not changed. Repeating it is the one thing that wastes ${candidateName}'s matchmaker's attention.`,
+    "- CLEAR only when they have said something that makes the stored value untrue, never because they stopped mentioning it.",
+    "- The exact words must be copied character for character from something they said. If you cannot quote it, do not write the line.",
+    "- Confidence is yours and it is read: say 0.5 when you are half sure rather than rounding up.",
+    "- If nothing here belongs on the profile, reply with the single word NOTHING.",
+  ].join("\n");
+}
+
+/** One entry the profile agent wants stored, before anything validates it. */
+export type ReconciledEntry = {
+  kind: CandidateEntryKind;
+  key: string;
+  /** Absent for a clear. */
+  value?: string;
+  confidence?: number;
+  quote: string;
+};
+
+/** How many entries one run may apply, however many the model writes. */
+export const MAX_RECONCILED = 12;
+
+/**
+ * The entries, out of the delimited lines the model was asked for.
+ *
+ * **A malformed line is skipped, not fatal.** One bad line among five good
+ * ones is a bad generation, not a bad batch, and `applyAgentEntries` takes the
+ * same view of a value the registry refuses.
+ *
+ * The quote is everything after the fourth delimiter, so a quote containing a
+ * `|` survives. A *value* containing one does not — a free-text note is the
+ * only place that could happen, and losing an occasional note is a better
+ * trade than a format a model gets wrong more often.
+ */
+export function parseReconciled(text: string): ReconciledEntry[] {
+  const trimmed = text.trim();
+  if (trimmed === "" || trimmed.toUpperCase() === "NOTHING") return [];
+
+  const entries: ReconciledEntry[] = [];
+  for (const line of trimmed.split("\n")) {
+    const bare = line.trim().replace(/^[-*•]\s*/, "");
+    if (bare === "" || bare.toUpperCase() === "NOTHING") continue;
+
+    const parts = bare.split("|");
+    if (parts.length < 5) continue;
+
+    const kind = parts[0]?.trim().toLowerCase();
+    if (kind !== "facts" && kind !== "notes") continue;
+    const key = parts[1]?.trim() ?? "";
+    if (key === "") continue;
+
+    const rawValue = parts[2]?.trim() ?? "";
+    const quote = unquote(parts.slice(4).join("|").trim());
+    if (quote === "") continue;
+
+    const confidence = Number(parts[3]?.trim());
+    entries.push({
+      kind,
+      key,
+      value: rawValue.toUpperCase() === "CLEAR" ? undefined : rawValue,
+      confidence:
+        Number.isFinite(confidence) && confidence >= 0 && confidence <= 1
+          ? confidence
+          : undefined,
+      quote,
+    });
+    if (entries.length === MAX_RECONCILED) break;
+  }
+  return entries;
+}
+
+/** A model that wrapped a value or a quote in quotation marks. */
+function unquote(raw: string): string {
+  const quoted =
+    raw.length > 1 &&
+    ((raw.startsWith('"') && raw.endsWith('"')) ||
+      (raw.startsWith("“") && raw.endsWith("”")));
+  return (quoted ? raw.slice(1, -1) : raw).trim();
 }

@@ -279,6 +279,19 @@ export default defineSchema({
     // The debounce (§4A, ~5s). A burst of messages cancels the job the last
     // one scheduled and schedules its own, so one burst is one generation.
     draftJobId: v.optional(v.id("_scheduled_functions")),
+    //
+    // ─── The profile agent's side of this conversation (prd/phase-2.md §4.1B)
+    //
+    // A **second** thread, not the drafting one. The drafting thread's history
+    // is what the next draft is generated from, and a turn spent reconciling
+    // registry keys is not something a reply should be written in the shadow
+    // of. The cost is one extra briefing per conversation; the benefit is that
+    // neither agent's context is the other's leftovers.
+    profileThreadId: v.optional(v.string()),
+    // How much of the profile this agent has been told about, so a later run
+    // can send what has changed rather than all of it. Absent together with
+    // the thread.
+    profileBriefedAt: v.optional(v.number()),
   })
     .index("by_matchmakerId_and_lastMessageAt", [
       "matchmakerId",
@@ -314,6 +327,16 @@ export default defineSchema({
       "conversationId",
       "visibility",
       "seq",
+    ])
+    // What the voice agent reads: this matchmaker's own sent messages, newest
+    // first, across every conversation in their book (prd/phase-2.md §4.1C).
+    // It is the only read in the product that crosses conversations, and it
+    // crosses them inside one tenant — `matchmakerId` leads the index, so
+    // there is no ordering of it that reaches another matchmaker's book.
+    .index("by_matchmakerId_and_author_and_sentAt", [
+      "matchmakerId",
+      "author",
+      "sentAt",
     ]),
 
   // The matchmaker's structured record of one person (prd/phase-2.md §3):
@@ -350,6 +373,20 @@ export default defineSchema({
     matchmakerId: v.id("matchmakers"),
     voice: v.optional(profileEntry),
     updatedAt: v.number(),
+    // ─── The voice agent's cadence (prd/phase-2.md §4.1C) ───────────────────
+    //
+    // It runs on how much they have written, never per message: a voice is
+    // distilled from a body of writing and re-reading it after every sentence
+    // would cost a generation to change a comma.
+    //
+    // A running count rather than a query, because "how many messages has this
+    // matchmaker ever sent" has no index that answers it cheaply and would
+    // only get more expensive as the book they are being counted for grows.
+    sentMessages: v.optional(v.number()),
+    // What `sentMessages` stood at when the agent last read them, so the
+    // trigger is "another N since" rather than "N in total" — which would fire
+    // once and never again.
+    voiceReadThrough: v.optional(v.number()),
   }).index("by_matchmakerId", ["matchmakerId"]),
 
   // The assistant's drafted replies, waiting above the composer

@@ -3,6 +3,8 @@ import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
 import schema from "../schema";
+import { noteSentMessage } from "./helpers";
+import { VOICE_SAMPLE_MESSAGES } from "./rules";
 
 // See waitlist/mutations.test.ts for why the glob is inline and root-anchored.
 const modules = import.meta.glob([
@@ -181,6 +183,63 @@ describe("the voice-profile agent", () => {
     expect(await w.voice()).toBeUndefined();
     expect((await w.events())[1]?.action).toBe(
       "matchmaker_profile.suggestion_rejected",
+    );
+  });
+});
+
+describe("the voice agent's cadence (prd/phase-2.md §4.1C)", () => {
+  /** Sends one matchmaker message the way `messages.send` does. */
+  async function sent(w: Awaited<ReturnType<typeof world>>, times: number) {
+    for (let i = 0; i < times; i++) {
+      await w.t.run(async (ctx) => await noteSentMessage(ctx, w.matchmakerId));
+    }
+  }
+
+  const profile = (w: Awaited<ReturnType<typeof world>>) =>
+    w.t.run((ctx) =>
+      ctx.db
+        .query("matchmakerProfiles")
+        .withIndex("by_matchmakerId", (q) =>
+          q.eq("matchmakerId", w.matchmakerId),
+        )
+        .unique(),
+    );
+
+  const scheduled = (w: Awaited<ReturnType<typeof world>>) =>
+    w.t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+
+  test("counts every message they send", async () => {
+    const w = await world();
+    await sent(w, 3);
+    expect((await profile(w))?.sentMessages).toBe(3);
+  });
+
+  test("does not wake the agent before a full sample", async () => {
+    const w = await world();
+    await sent(w, VOICE_SAMPLE_MESSAGES - 1);
+    expect(await scheduled(w)).toHaveLength(0);
+    expect((await profile(w))?.voiceReadThrough).toBeUndefined();
+  });
+
+  test("wakes it once the sample is there, and not twice", async () => {
+    const w = await world();
+    await sent(w, VOICE_SAMPLE_MESSAGES);
+    expect(await scheduled(w)).toHaveLength(1);
+
+    // The mark moves with the run, so the next message is one of the *next*
+    // sample rather than another trigger. A trigger of "N in total" would
+    // fire here on every message from the twentieth onwards.
+    await sent(w, 1);
+    expect(await scheduled(w)).toHaveLength(1);
+    expect((await profile(w))?.voiceReadThrough).toBe(VOICE_SAMPLE_MESSAGES);
+  });
+
+  test("wakes it again a whole sample later", async () => {
+    const w = await world();
+    await sent(w, VOICE_SAMPLE_MESSAGES * 2);
+    expect(await scheduled(w)).toHaveLength(2);
+    expect((await profile(w))?.voiceReadThrough).toBe(
+      VOICE_SAMPLE_MESSAGES * 2,
     );
   });
 });

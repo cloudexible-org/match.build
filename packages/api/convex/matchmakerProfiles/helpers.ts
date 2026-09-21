@@ -8,8 +8,11 @@
  * candidate's birth date.
  */
 
+import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { settingNumber } from "../replySuggestions/rules";
+import { VOICE_SAMPLE_MESSAGES } from "./rules";
 
 /**
  * A profile row is created lazily, on the first value written. Until then
@@ -38,4 +41,55 @@ export async function ensureMatchmakerProfile(
   const created = await ctx.db.get("matchmakerProfiles", id);
   if (created === null) throw new Error("The profile vanished as it was made.");
   return created;
+}
+
+/** How many sent messages between voice runs, from the deployment. */
+export function voiceSampleMessages(): number {
+  return settingNumber(
+    env.AI_VOICE_SAMPLE_MESSAGES,
+    VOICE_SAMPLE_MESSAGES,
+    // Never zero: a run per message is what §4.1C says this must not be.
+    { min: 5, max: 500 },
+  );
+}
+
+/**
+ * Counts one message the matchmaker sent, and wakes the voice agent when
+ * enough of them have gone by (prd/phase-2.md §4.1C).
+ *
+ * **The count is the trigger, not a timer.** A matchmaker who writes twenty
+ * messages in an afternoon gets a voice that afternoon; one who writes two a
+ * week waits, which is right — there is nothing to distil from two messages
+ * that was not already there.
+ *
+ * Called from `messages/mutations.ts` on every message they send, so it does
+ * one read and at most one write, and schedules rather than generates.
+ */
+export async function noteSentMessage(
+  ctx: MutationCtx,
+  matchmakerId: Id<"matchmakers">,
+): Promise<void> {
+  const profile = await ensureMatchmakerProfile(ctx, matchmakerId);
+  const sentMessages = (profile.sentMessages ?? 0) + 1;
+  const every = voiceSampleMessages();
+  // `voiceReadThrough` absent means never read, so the first run waits for a
+  // full sample rather than firing on message one.
+  const due = sentMessages - (profile.voiceReadThrough ?? 0) >= every;
+
+  await ctx.db.patch("matchmakerProfiles", profile._id, {
+    sentMessages,
+    // Claimed here rather than in the action, so two messages landing either
+    // side of the threshold cannot schedule two runs over the same sample.
+    // A run that then fails costs this matchmaker one cycle's wait, which is
+    // a better failure than two generations racing into one proposal.
+    ...(due ? { voiceReadThrough: sentMessages } : {}),
+  });
+
+  if (due) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.matchmakerProfiles.actions.distil,
+      { matchmakerId },
+    );
+  }
 }

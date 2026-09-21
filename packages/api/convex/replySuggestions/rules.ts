@@ -191,25 +191,114 @@ export function voiceUpdate(
 /**
  * The instruction appended to every turn: what to produce, and in what shape.
  *
- * Asked for as numbered lines rather than JSON. A draft is prose a person will
+ * **Two jobs in one generation** (prd/phase-2.md §4A). The agent has just read
+ * the new messages to draft from them; asking it, in the same breath, what
+ * those messages revealed costs one section of output rather than a second
+ * call over the same text. What it notices goes nowhere near the profile on
+ * its own — it is handed to the profile agent, which owns that write path and
+ * decides what the registry can actually hold (§4.1B).
+ *
+ * The risk this runs, and the reason the sections are ordered this way: a
+ * prompt serving two tasks can serve neither (§4.4). REPLIES is asked for
+ * first and described first, because it is the half a matchmaker sees.
+ *
+ * Asked for as labelled lines rather than JSON. A draft is prose a person will
  * read, and every wrapper the model has to close correctly is another way for
  * a perfectly good draft to arrive unusable.
  */
 export function draftInstruction(count: number, candidateName: string): string {
   return [
-    `Draft ${count === 1 ? "one reply" : `${count} replies`} the matchmaker could send to ${candidateName} next, in their voice.`,
+    "Do two things, and label them with the headings below exactly as written.",
     "",
+    "REPLIES",
+    `Draft ${count === 1 ? "one reply" : `${count} replies`} the matchmaker could send to ${candidateName} next, in their voice.`,
     `Write ${count === 1 ? "it" : "each one"} on a single line, numbered, like:`,
     "1. <the reply>",
     count > 1 ? "2. <a different reply>" : "",
-    "",
-    "Nothing else — no preamble, no explanation, no quotation marks around the reply.",
+    "No preamble, no explanation, no quotation marks around the reply.",
     `Each one should be a complete message, ready to send. Use a newline inside a reply only if the matchmaker would have used one; write it as "\\n".`,
     "Never repeat the matchmaker's private notes back to the candidate, and never mention another candidate by name.",
-    "If there is genuinely nothing useful to say next, reply with the single word NOTHING.",
+    "If there is genuinely nothing useful to say next, write NOTHING under this heading.",
+    "",
+    "NOTICED",
+    `What the new messages reveal about ${candidateName} — who they are, how they live, what they are looking for. One per line:`,
+    "- <what it tells you> | <their exact words>",
+    "",
+    `Only what ${candidateName} said about themselves in this conversation. Their exact words must be copied character for character from a message, not paraphrased, so the matchmaker can check it.`,
+    "Nothing the matchmaker told you, nothing from their notes, and nothing you inferred beyond what the words support.",
+    "Nothing you have already been told about them that has not changed.",
+    "If they revealed nothing new, write NOTHING under this heading.",
   ]
     .filter((line) => line !== "")
     .join("\n");
+}
+
+/** One thing the agent noticed, on its way to the profile agent (§4.1B). */
+export type NoticedFact = {
+  /** What it tells you, in the agent's words. */
+  observation: string;
+  /** The candidate's own words, verbatim. */
+  quote: string;
+};
+
+/** How many observations one generation may hand on, however many it writes. */
+export const MAX_NOTICED = 12;
+
+/**
+ * Splits one generation into its two halves.
+ *
+ * **A missing or misspelled heading is not a failed generation.** A model that
+ * answered with a bare numbered list has written perfectly good drafts, so the
+ * whole text falls through to the replies parser and nothing is noticed —
+ * degrading to exactly the feature that shipped before this.
+ */
+export function splitGeneration(text: string): {
+  replies: string;
+  noticed: string;
+} {
+  const match = /^[\s>*_#-]*NOTICED\b[^\n]*$/im.exec(text);
+  if (match === null || match.index === undefined) {
+    return { replies: stripHeading(text, "REPLIES"), noticed: "" };
+  }
+  return {
+    replies: stripHeading(text.slice(0, match.index), "REPLIES"),
+    noticed: text.slice(match.index + match[0].length),
+  };
+}
+
+/** Drops a leading section heading the model was asked to write. */
+function stripHeading(section: string, heading: string): string {
+  return section.replace(
+    new RegExp(`^[\\s>*_#-]*${heading}\\b[^\\n]*\\n?`, "i"),
+    "",
+  );
+}
+
+/**
+ * The observations, out of the `- <what> | <their words>` lines.
+ *
+ * A line with no quote is dropped rather than kept with an empty one. The
+ * quote is the whole point: it is what a matchmaker checks a proposal against,
+ * and an observation nobody can trace back to a message is exactly the kind of
+ * confident invention this pipeline must not launder into a profile.
+ */
+export function parseNoticed(text: string): NoticedFact[] {
+  const trimmed = text.trim();
+  if (trimmed === "" || trimmed.toUpperCase() === "NOTHING") return [];
+
+  const noticed: NoticedFact[] = [];
+  for (const line of trimmed.split("\n")) {
+    const bare = line.trim().replace(/^[-*\u2022]\s*/, "");
+    if (bare === "" || bare.toUpperCase() === "NOTHING") continue;
+    const cut = bare.indexOf("|");
+    if (cut === -1) continue;
+    const observation = bare.slice(0, cut).trim();
+    const quote = unwrap(bare.slice(cut + 1).trim());
+    if (observation === "" || quote === "") continue;
+    noticed.push({ observation, quote });
+    if (noticed.length === MAX_NOTICED) break;
+  }
+  return noticed;
 }
 
 /**

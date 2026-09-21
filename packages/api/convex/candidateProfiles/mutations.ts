@@ -487,3 +487,35 @@ export const applyAgentEntries = internalMutation({
     return results;
   },
 });
+
+/**
+ * Remembers the thread the profile agent keeps for one conversation, and how
+ * much of the record it has now been told about (prd/phase-2.md §4.1B).
+ *
+ * Written before the entries rather than after, so a thread the component has
+ * already created is never orphaned by a failure further down: an unrecorded
+ * thread would be re-created on the next run and the first one would sit in
+ * the component's tables with nothing pointing at it — invisible to `ctx.db`,
+ * and so invisible to an erasure.
+ */
+export const rememberProfileThread = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    threadId: v.string(),
+    briefedAt: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const conversation = await ctx.db.get("conversations", args.conversationId);
+    if (conversation === null) return null;
+    // The switch may have gone off while the model was thinking, and turning
+    // it off deletes the threads. Writing this back would point the record at
+    // a thread that no longer exists.
+    if (conversation.aiOff === true) return null;
+    await ctx.db.patch("conversations", args.conversationId, {
+      profileThreadId: args.threadId,
+      profileBriefedAt: args.briefedAt,
+    });
+    return null;
+  },
+});

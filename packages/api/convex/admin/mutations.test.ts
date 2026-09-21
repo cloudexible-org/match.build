@@ -1,7 +1,9 @@
 /// <reference types="vite/client" />
+import { createThread } from "@convex-dev/agent";
+import { register as registerAgent } from "@convex-dev/agent/test";
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { api, internal } from "../_generated/api";
+import { api, components, internal } from "../_generated/api";
 import schema from "../schema";
 import { AI_AGENT_SEED } from "../seed/ai/fixture";
 
@@ -31,6 +33,9 @@ async function sha256Hex(input: string): Promise<string> {
 
 async function world() {
   const t = convexTest(schema, modules);
+  // The agent component's own tables, so an erasure that has to reach a thread
+  // is tested against a real one rather than against a stub (prd/phase-2.md §4).
+  registerAgent(t);
   const ids = await t.run(async (ctx) => ({
     admin: await ctx.db.insert("users", {
       email: "admin@example.test",
@@ -309,6 +314,33 @@ describe("admin.eraseAccount", () => {
       });
       books.push(ids);
     }
+    // What the drafting agent was shown about her, in each book: a real
+    // thread in the component's own tables, which `ctx.db` cannot see and an
+    // erasure therefore has to ask the component about (prd/phase-2.md §4).
+    const threads: string[] = [];
+    for (const book of books) {
+      // Two per conversation: the drafting agent's, and the profile agent's
+      // (prd/phase-2.md §4.1B). Forgetting only the first would leave the
+      // model's copy of her standing in the second.
+      const [agentThreadId, profileThreadId] = await base.t.run(
+        async (ctx) =>
+          await Promise.all([
+            createThread(ctx, components.agent, {}),
+            createThread(ctx, components.agent, {}),
+          ]),
+      );
+      await base.t.run(async (ctx) => {
+        await ctx.db.patch("conversations", book.conversationId, {
+          agentThreadId,
+          agentBriefedSeq: 1,
+          agentBriefedVoiceAt: 1,
+          agentBriefedProfileAt: 1,
+          profileThreadId,
+          profileBriefedAt: 1,
+        });
+      });
+      threads.push(agentThreadId, profileThreadId);
+    }
     // Things that are copies of her and nobody's record: an unsent email and
     // a marketing sign-up.
     await base.t.run(async (ctx) => {
@@ -325,7 +357,7 @@ describe("admin.eraseAccount", () => {
         source: "landing",
       });
     });
-    return { ...base, jane, books };
+    return { ...base, jane, books, threads };
   }
 
   const erase = (w: Awaited<ReturnType<typeof person>>) =>
@@ -333,6 +365,69 @@ describe("admin.eraseAccount", () => {
       userId: w.jane,
       confirmEmail: "jane@example.test",
     });
+
+  test("forgets what the model was shown, in every book", async () => {
+    const w = await person();
+    // The threads are really there before, or the assertion after proves
+    // nothing: a call that deletes nothing passes against a world with
+    // nothing in it.
+    const before = await Promise.all(
+      w.threads.map((threadId) =>
+        w.t.run((ctx) =>
+          ctx.runQuery(components.agent.threads.getThread, { threadId }),
+        ),
+      ),
+    );
+    expect(before.every((thread) => thread !== null)).toBe(true);
+
+    const result = await erase(w);
+    expect(result.agentThreadsForgotten).toBe(2);
+
+    // Gone from the component's own tables, which is the half `ctx.db` cannot
+    // see and the half prd/phase-2.md §4 made a condition of installing it.
+    const after = await Promise.all(
+      w.threads.map((threadId) =>
+        w.t.run((ctx) =>
+          ctx.runQuery(components.agent.threads.getThread, { threadId }),
+        ),
+      ),
+    );
+    expect(after).toEqual([null, null, null, null]);
+
+    // And the conversation no longer points at one, so the next drafting run
+    // starts from nothing rather than from a thread that has been emptied.
+    const conversations = await w.t.run((ctx) =>
+      ctx.db.query("conversations").collect(),
+    );
+    for (const conversation of conversations) {
+      expect(conversation.agentThreadId).toBeUndefined();
+      expect(conversation.agentBriefedSeq).toBeUndefined();
+      expect(conversation.profileThreadId).toBeUndefined();
+      expect(conversation.profileBriefedAt).toBeUndefined();
+    }
+    // The conversation itself survives: the matchmaker keeps the record, and
+    // only the model's copy of it goes.
+    expect(conversations).toHaveLength(2);
+    const messages = await w.t.run((ctx) => ctx.db.query("messages").collect());
+    expect(messages).toHaveLength(2);
+  });
+
+  test("is safe to run when no agent has ever drafted", async () => {
+    const w = await person();
+    await w.t.run(async (ctx) => {
+      for (const book of w.books) {
+        await ctx.db.patch("conversations", book.conversationId, {
+          agentThreadId: undefined,
+          agentBriefedSeq: undefined,
+          profileThreadId: undefined,
+          profileBriefedAt: undefined,
+        });
+      }
+    });
+    const result = await erase(w);
+    expect(result.agentThreadsForgotten).toBe(0);
+    expect(result.candidates).toBe(2);
+  });
 
   test("leaves no way to tell who the person was", async () => {
     const w = await person();

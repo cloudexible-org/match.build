@@ -70,6 +70,13 @@ const app = defineApp({
     // sees: there is no summariser in v1 (prd/phase-2.md §2), so a longer
     // thread is simply read from where this window starts.
     AI_REPLY_LIVE_WINDOW: v.optional(v.string()),
+    // How many messages a matchmaker sends between voice runs
+    // (prd/phase-2.md §9.2, which guessed 20 and said it was a guess). Unset
+    // means `VOICE_SAMPLE_MESSAGES` in `matchmakerProfiles/rules.ts`; a value
+    // that isn't a number falls back, and one out of range clamps — never to
+    // zero, because a run per message is the thing §4.1C says this must not
+    // be.
+    AI_VOICE_SAMPLE_MESSAGES: v.optional(v.string()),
   },
 });
 app.use(staticHosting, { name: "www" });

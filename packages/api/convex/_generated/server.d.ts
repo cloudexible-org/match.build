@@ -34,6 +34,7 @@ type Env = {
   readonly AI_REPLY_COUNT: string | undefined;
   readonly AI_REPLY_DEBOUNCE_SECONDS: string | undefined;
   readonly AI_REPLY_LIVE_WINDOW: string | undefined;
+  readonly AI_VOICE_SAMPLE_MESSAGES: string | undefined;
   readonly INVITE_LINK_SECRET: string | undefined;
   readonly NOTIFICATION_EMAIL_DELAY_SECONDS: string | undefined;
   readonly NOTIFICATION_PUSH_DELAY_SECONDS: string | undefined;

@@ -5,6 +5,7 @@ import { modelError, systemPromptError } from "../ai/rules";
 import { recordAudit } from "../audit/helpers";
 import { diffFields } from "../audit/rules";
 import { anonymiseCandidateProfile } from "../candidateProfiles/helpers";
+import { forgetAgentThread } from "../replySuggestions/helpers";
 import {
   anonymiseAccount,
   anonymiseCandidate,
@@ -58,6 +59,11 @@ export const issueSignInCodeFor = mutation({
  * it was. Each matchmaker keeps a complete history of work they did; none of
  * them can tell you who it was with.
  *
+ * It also reaches the one store `ctx.db` cannot see: the agent thread holding
+ * the model's copy of what it was shown about this person (prd/phase-2.md §4).
+ * That has to go through the component's own API, which is what
+ * `forgetAgentThread` does and why it is called per conversation.
+ *
  * Deliberately **not** covered: the bodies of messages and notes. Those are
  * free text, and a matchmaker's notes are their own words; deciding whether a
  * particular request reaches into them is the controller's call and a legal
@@ -73,6 +79,7 @@ export const eraseAccount = mutation({
   returns: v.object({
     candidates: v.number(),
     auditEventsRedacted: v.number(),
+    agentThreadsForgotten: v.number(),
   }),
   handler: async (ctx, args) => {
     const admin = await requirePlatformAdmin(ctx);
@@ -131,8 +138,16 @@ export const eraseAccount = mutation({
 
     // Then each matchmaker's record of them, each told in its own trail: their
     // book visibly changes, and an unexplained change is worse than the news.
+    let agentThreadsForgotten = 0;
     for (const candidate of memberships) {
       await anonymiseCandidate(ctx, candidate);
+      // And the model's own copy of what it was shown, which lives in the
+      // agent component's tables rather than in ours. Anonymising the record
+      // while leaving a verbatim thread standing would be an erasure in name
+      // only. Not audited separately: it is part of `candidate.anonymised`
+      // below, and a second event per candidate would say nothing the first
+      // does not.
+      if (await forgetAgentThread(ctx, candidate._id)) agentThreadsForgotten++;
       // And the matchmaker's structured profile of them (prd/phase-2.md §3):
       // a birth date, a city and an orientation identify a person as surely as
       // a name does. One row per candidate, so the `memberships` ceiling
@@ -172,7 +187,11 @@ export const eraseAccount = mutation({
       for (const row of waiting) await ctx.db.delete(row._id);
     }
 
-    return { candidates: memberships.length, auditEventsRedacted };
+    return {
+      candidates: memberships.length,
+      auditEventsRedacted,
+      agentThreadsForgotten,
+    };
   },
 });
 

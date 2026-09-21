@@ -10,6 +10,12 @@ import {
   candidateNoteLabel,
   candidateNotePolicy,
   candidateProfileFieldLabel,
+  MAX_RECONCILED,
+  parseReconciled,
+  profileOpeningBrief,
+  profileUpdateBrief,
+  reconcileInstruction,
+  registryCatalogue,
 } from "./rules";
 
 describe("the registry", () => {
@@ -110,5 +116,170 @@ describe("erasure", () => {
     expect(candidateEntryHoldsPersonalData("notes.familyBackground")).toBe(
       false,
     );
+  });
+});
+
+describe("registryCatalogue", () => {
+  test("offers every field an agent may actually write", () => {
+    const catalogue = registryCatalogue();
+    for (const field of CANDIDATE_PROFILE_FIELDS) {
+      if (field.policy === "matchmaker") continue;
+      expect(catalogue).toContain(field.key);
+    }
+  });
+
+  test("leaves out what the registry reserves for the matchmaker", () => {
+    // Listing a field only to forbid it invites the model to reach for it,
+    // and the value would be refused downstream anyway.
+    const catalogue = registryCatalogue();
+    for (const note of CANDIDATE_PROFILE_NOTES) {
+      if (note.policy !== "matchmaker") continue;
+      expect(catalogue).not.toContain(note.key);
+    }
+    expect(catalogue).not.toContain("matchmakerNotes");
+    expect(catalogue).not.toContain("matchmakerTake");
+  });
+
+  test("spells out the shape of a value, so the model can hit it", () => {
+    const catalogue = registryCatalogue();
+    // A choice lists its options; a number gives its bounds.
+    expect(catalogue).toContain("exactly one of:");
+    expect(catalogue).toContain("a whole number between");
+    expect(catalogue).toContain("YYYY-MM-DD");
+  });
+});
+
+describe("profileOpeningBrief", () => {
+  const entry = {
+    kind: "facts" as const,
+    key: "wantsKids",
+    label: "Wants children",
+    value: "yes",
+    byHand: false,
+    pending: false,
+  };
+
+  test("says what is already known, so it is not asked again", () => {
+    const brief = profileOpeningBrief("Sam", [entry]);
+    expect(brief).toContain("Wants children: yes");
+  });
+
+  test("marks what a person typed as untouchable", () => {
+    const brief = profileOpeningBrief("Sam", [{ ...entry, byHand: true }]);
+    expect(brief).toContain("never overwrite");
+  });
+
+  test("marks a field that already has a proposal waiting", () => {
+    const brief = profileOpeningBrief("Sam", [{ ...entry, pending: true }]);
+    expect(brief).toContain("already waiting");
+  });
+
+  test("says so plainly when there is nothing yet", () => {
+    expect(profileOpeningBrief("Sam", [])).toContain("Nothing yet.");
+  });
+});
+
+describe("profileUpdateBrief", () => {
+  test("is null when nothing has changed, so no section is added", () => {
+    expect(profileUpdateBrief([])).toBeNull();
+  });
+});
+
+describe("reconcileInstruction", () => {
+  const noticed = [{ observation: "Wants kids", quote: "I'd love kids" }];
+
+  test("carries the candidate's own words through to the second agent", () => {
+    expect(reconcileInstruction("Sam", noticed)).toContain("I'd love kids");
+  });
+
+  test("never asks the model whether to write or to propose", () => {
+    // That is the field's policy, applied by applyAgentEntries. An agent that
+    // could choose would make the policy advisory (prd/phase-2.md §4.1B).
+    const instruction = reconcileInstruction("Sam", noticed).toLowerCase();
+    expect(instruction).not.toContain("suggest");
+    expect(instruction).not.toContain("propose");
+  });
+
+  test("gives it a way to say nothing belongs here", () => {
+    expect(reconcileInstruction("Sam", noticed)).toContain("NOTHING");
+  });
+});
+
+describe("parseReconciled", () => {
+  test("reads the five delimited fields", () => {
+    expect(
+      parseReconciled("facts | wantsKids | yes | 0.9 | I'd love kids one day"),
+    ).toEqual([
+      {
+        kind: "facts",
+        key: "wantsKids",
+        value: "yes",
+        confidence: 0.9,
+        quote: "I'd love kids one day",
+      },
+    ]);
+  });
+
+  test("turns CLEAR into a clear rather than into a value", () => {
+    const [entry] = parseReconciled(
+      "facts | city | CLEAR | 0.8 | I've left London",
+    );
+    expect(entry?.value).toBeUndefined();
+  });
+
+  test("drops a line with no quote, because the quote is the point", () => {
+    expect(parseReconciled("facts | wantsKids | yes | 0.9 |")).toEqual([]);
+    expect(parseReconciled("facts | wantsKids | yes | 0.9")).toEqual([]);
+  });
+
+  test("refuses a kind that is not one of the two", () => {
+    expect(
+      parseReconciled("beliefs | wantsKids | yes | 0.9 | said so"),
+    ).toEqual([]);
+  });
+
+  test("keeps a pipe inside the quote", () => {
+    const [entry] = parseReconciled("notes | hobbies | Cooks | 0.7 | a | b");
+    expect(entry?.quote).toBe("a | b");
+  });
+
+  test("drops a confidence that is not a number in range", () => {
+    // Stored as absent rather than as a lie: a 0..1 field is read, and 5 would
+    // be read as certainty.
+    expect(
+      parseReconciled("facts | age | 34 | high | I'm 34")[0]?.confidence,
+    ).toBeUndefined();
+    expect(
+      parseReconciled("facts | age | 34 | 5 | I'm 34")[0]?.confidence,
+    ).toBeUndefined();
+  });
+
+  test("skips one bad line without losing the good ones", () => {
+    const entries = parseReconciled(
+      [
+        "facts | age | 34 | 0.9 | I'm 34",
+        "nonsense",
+        "notes | hobbies | Runs | 0.7 | I run",
+      ].join("\n"),
+    );
+    expect(entries).toHaveLength(2);
+  });
+
+  test("takes NOTHING for an answer", () => {
+    expect(parseReconciled("NOTHING")).toEqual([]);
+    expect(parseReconciled("   ")).toEqual([]);
+  });
+
+  test("caps what one run can apply", () => {
+    const lines = Array.from(
+      { length: MAX_RECONCILED + 4 },
+      (_, i) => `notes | k${i} | v${i} | 0.5 | said ${i}`,
+    ).join("\n");
+    expect(parseReconciled(lines)).toHaveLength(MAX_RECONCILED);
+  });
+
+  test("unwraps a value or a quote the model put in quotation marks", () => {
+    const [entry] = parseReconciled('facts | age | 34 | 0.9 | "I\'m 34"');
+    expect(entry?.quote).toBe("I'm 34");
   });
 });

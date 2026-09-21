@@ -3,11 +3,14 @@ import {
   type Brief,
   type BriefedThrough,
   draftInstruction,
+  MAX_NOTICED,
   NEVER_BRIEFED,
   openingBrief,
   parseDrafts,
+  parseNoticed,
   REPLY_DEFAULTS,
   settingNumber,
+  splitGeneration,
   updateBrief,
   voiceUpdate,
 } from "./rules";
@@ -208,6 +211,93 @@ describe("draftInstruction", () => {
 
   it("gives it a way to decline", () => {
     expect(draftInstruction(3, "Sam")).toContain("NOTHING");
+  });
+
+  it("asks for both halves, replies first", () => {
+    const instruction = draftInstruction(3, "Sam");
+    expect(instruction).toContain("REPLIES");
+    expect(instruction).toContain("NOTICED");
+    // The half a matchmaker sees is the half described first (prd §4.4).
+    expect(instruction.indexOf("REPLIES")).toBeLessThan(
+      instruction.indexOf("NOTICED"),
+    );
+  });
+
+  it("insists the quote is the candidate's own words", () => {
+    expect(draftInstruction(3, "Sam")).toContain("character for character");
+  });
+});
+
+describe("splitGeneration", () => {
+  it("cuts one generation into its two halves", () => {
+    const { replies, noticed } = splitGeneration(
+      "REPLIES\n1. Lovely!\n\nNOTICED\n- Lives in Leeds | I moved to Leeds",
+    );
+    expect(parseDrafts(replies, 3)).toEqual(["Lovely!"]);
+    expect(parseNoticed(noticed)).toEqual([
+      { observation: "Lives in Leeds", quote: "I moved to Leeds" },
+    ]);
+  });
+
+  it("degrades to drafts alone when the model ignored the headings", () => {
+    // The feature that shipped before this one still works: a bare numbered
+    // list is perfectly good drafts and nothing noticed.
+    const { replies, noticed } = splitGeneration("1. Hello there\n2. Hi Sam!");
+    expect(parseDrafts(replies, 3)).toEqual(["Hello there", "Hi Sam!"]);
+    expect(parseNoticed(noticed)).toEqual([]);
+  });
+
+  it("survives a model that decorated the headings", () => {
+    const { replies, noticed } = splitGeneration(
+      "## REPLIES\n1. Hi\n\n**NOTICED**\n- Vegan | I went vegan last year",
+    );
+    expect(parseDrafts(replies, 3)).toEqual(["Hi"]);
+    expect(parseNoticed(noticed)).toHaveLength(1);
+  });
+
+  it("never lets a noticed line become a draft", () => {
+    const { replies } = splitGeneration(
+      "REPLIES\n1. Hi\n\nNOTICED\n- Vegan | I went vegan",
+    );
+    expect(parseDrafts(replies, 3)).toEqual(["Hi"]);
+  });
+});
+
+describe("parseNoticed", () => {
+  it("reads the observation and the quote either side of the pipe", () => {
+    expect(parseNoticed("- Wants children | I'd love kids one day")).toEqual([
+      { observation: "Wants children", quote: "I'd love kids one day" },
+    ]);
+  });
+
+  it("drops a line with no quote, because the quote is the point", () => {
+    // An observation nobody can trace back to a message is the invention this
+    // pipeline must not launder into a profile.
+    expect(parseNoticed("- Probably wealthy")).toEqual([]);
+    expect(parseNoticed("- Probably wealthy |   ")).toEqual([]);
+  });
+
+  it("takes bullets, asterisks or nothing at all", () => {
+    expect(parseNoticed("* A | b\n- C | d\nE | f")).toHaveLength(3);
+  });
+
+  it("unwraps a quoted quote", () => {
+    expect(parseNoticed('- Vegan | "I went vegan last year"')).toEqual([
+      { observation: "Vegan", quote: "I went vegan last year" },
+    ]);
+  });
+
+  it("takes NOTHING for an answer", () => {
+    expect(parseNoticed("NOTHING")).toEqual([]);
+    expect(parseNoticed("  ")).toEqual([]);
+  });
+
+  it("caps what one generation can hand on", () => {
+    const lines = Array.from(
+      { length: MAX_NOTICED + 5 },
+      (_, i) => `- Thing ${i} | said ${i}`,
+    ).join("\n");
+    expect(parseNoticed(lines)).toHaveLength(MAX_NOTICED);
   });
 });
 

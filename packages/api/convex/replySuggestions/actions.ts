@@ -29,6 +29,8 @@ import {
   draftInstruction,
   openingBrief,
   parseDrafts,
+  parseNoticed,
+  splitGeneration,
   updateBrief,
   voiceUpdate,
 } from "./rules";
@@ -109,15 +111,35 @@ export const draft = internalAction({
         },
       );
 
+      // One generation, two halves (prd/phase-2.md §4A). A model that ignored
+      // the headings has still written drafts: the whole text falls through to
+      // the replies parser and nothing was noticed, which is the feature
+      // exactly as it shipped before extraction existed.
+      const { replies, noticed } = splitGeneration(text);
+
       await ctx.runMutation(internal.replySuggestions.mutations.record, {
         conversationId,
         threadId,
-        bodies: parseDrafts(text, context.count),
+        bodies: parseDrafts(replies, context.count),
         model: settings.model,
         throughSeq,
         briefedVoiceAt: voiceAt,
         briefedProfileAt: profileAt,
       });
+
+      // Hand what was noticed to the agent that owns the write path
+      // (prd/phase-2.md §4.1B). **Scheduled, not awaited**: reconciling is a
+      // second model call, and a matchmaker waiting on their drafts should
+      // never be waiting on a profile they did not ask about. It is also why
+      // a failure in there cannot reach the drafts — it is not in this try.
+      const facts = parseNoticed(noticed);
+      if (facts.length > 0) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.candidateProfiles.actions.reconcile,
+          { conversationId, noticed: facts },
+        );
+      }
     } catch (error) {
       // Logged, not thrown, and not surfaced: a matchmaker who was never
       // promised a draft has not lost one, and an error banner over the

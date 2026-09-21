@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { requireCandidateSelf } from "../candidates/helpers";
+import { noteSentMessage } from "../matchmakerProfiles/helpers";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
 import { scheduleMessageNotifications } from "../notifications/helpers";
 import { scheduleDraft, staleDrafts } from "../replySuggestions/mutations";
@@ -66,6 +67,10 @@ export const send = mutation({
     // the candidate's next message rather than after it.
     await staleDrafts(ctx, conversation._id, now);
     await scheduleDraft(ctx, conversation);
+    // And it is one more sample of how they write. Counted here, generated
+    // nowhere near here: the voice agent wakes every N messages, not every
+    // message (prd/phase-2.md §4.1C).
+    await noteSentMessage(ctx, matchmaker._id);
     return { seq };
   },
 });

@@ -189,14 +189,24 @@ export const setEnabled = mutation({
       await ctx.scheduler.cancel(conversation.draftJobId);
     }
     await staleDrafts(ctx, conversation._id, now);
-    if (conversation.agentThreadId !== undefined) {
-      // Through the component's own API: its tables are its own and `ctx.db`
-      // cannot see them. Async — it deletes the thread's messages in batches
-      // in the background, which is what keeps a long thread from blowing the
-      // limits of the mutation that asked.
+    // Both threads, because the switch says "no AI on this conversation" and
+    // there are two agents on it: the drafting one, and the profile one that
+    // reconciles what the drafting run noticed (prd/phase-2.md §4.1B).
+    //
+    // Through the component's own API: its tables are its own and `ctx.db`
+    // cannot see them. Async — it deletes a thread's messages in batches in
+    // the background, which is what keeps a long thread from blowing the
+    // limits of the mutation that asked.
+    for (const threadId of [
+      conversation.agentThreadId,
+      conversation.profileThreadId,
+    ]) {
+      if (threadId === undefined) continue;
       await ctx.runMutation(
         components.agent.threads.deleteAllForThreadIdAsync,
-        { threadId: conversation.agentThreadId },
+        {
+          threadId,
+        },
       );
     }
 
@@ -208,6 +218,8 @@ export const setEnabled = mutation({
       agentBriefedVoiceAt: undefined,
       agentBriefedProfileAt: undefined,
       draftJobId: undefined,
+      profileThreadId: undefined,
+      profileBriefedAt: undefined,
     });
     return null;
   },
