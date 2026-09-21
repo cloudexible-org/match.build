@@ -109,8 +109,8 @@ export class WorkspacePage {
 }
 
 /**
- * `/app/mm/:username/settings`: display name and business name. Rendered by
- * `apps/app/src/pages/matchmaker-settings.tsx`.
+ * `/app/mm/:username/settings`: display name, business name and their voice.
+ * Rendered by `apps/app/src/pages/matchmaker-settings.tsx`.
  */
 export class MatchmakerSettingsPage {
   constructor(public readonly page: Page) {}
@@ -137,6 +137,37 @@ export class MatchmakerSettingsPage {
 
   getSaveButton() {
     return this.page.getByRole("button", { name: "Save changes" });
+  }
+
+  // --- Voice (prd/phase-2.md §4.1C) ----------------------------------------
+
+  getVoiceForm() {
+    return this.page.getByTestId("voice-form");
+  }
+
+  getVoiceInput() {
+    return this.page.getByLabel("Voice", { exact: true });
+  }
+
+  getVoiceStatus() {
+    return this.page.getByTestId("voice-status");
+  }
+
+  async saveVoice(value: string) {
+    await this.getVoiceInput().fill(value);
+    await this.page.getByRole("button", { name: "Save voice" }).click();
+  }
+
+  getVoiceSuggestion() {
+    return this.page.getByTestId("voice-suggestion");
+  }
+
+  async acceptVoiceSuggestion() {
+    await this.page.getByTestId("voice-suggestion-accept").click();
+  }
+
+  async dismissVoiceSuggestion() {
+    await this.page.getByTestId("voice-suggestion-dismiss").click();
   }
 
   getStatus() {

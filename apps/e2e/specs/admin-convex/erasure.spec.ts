@@ -53,7 +53,12 @@ test.beforeAll(async () => {
           { author: "matchmaker", body: "Lovely to meet you, Jane." },
           { author: "candidate", body: "Looking for someone kind." },
         ],
-        notes: ["Great first call. Introduce to Sam."],
+        // The facts an erasure has to reach, the ones it must leave, and a
+        // note in the matchmaker's own words it never touches.
+        profile: {
+          facts: { dateOfBirth: "1990-04-02", wantsKids: "yes" },
+          notes: { matchmakerNotes: "Great first call. Introduce to Sam." },
+        },
       },
       // Untouched by the erasure, so the book is visibly not wiped.
       {
@@ -113,11 +118,17 @@ test("an erased person leaves the matchmaker's record of them standing", async (
     "Looking for someone kind.",
   );
 
-  // Their notes, and a history that explains the change and has lost her
-  // reason for leaving but kept everything that happened.
+  // Their profile: who she was is gone, what the matchmaker was working with
+  // stays, and their own words are untouched. Then a history that explains the
+  // change and has lost her reason for leaving but kept everything that
+  // happened.
   const panel = new CandidatePanelPage(appPage);
-  await panel.openSection("Notes");
-  await expect(panel.getNotes().first()).toContainText("Introduce to Sam");
+  await panel.openSection("Profile");
+  await expect(panel.getField("dateOfBirth")).toContainText("[erased]");
+  await expect(panel.getField("wantsKids")).toContainText("yes");
+  await expect(panel.getNote("matchmakerNotes")).toContainText(
+    "Introduce to Sam",
+  );
   await panel.openSection("History");
   await expect(panel.getHistoryEntries().first()).toContainText("Anonymised");
   const history = panel.getHistoryEntries();

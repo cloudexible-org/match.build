@@ -1,8 +1,8 @@
 # Phase 2 — AI assistance
 
-**Status:** Draft. The design below is proposed, not agreed. §9 sorts what's left into what must be settled before any code, what ships as a setting and gets tuned with the pilot, and what is still an open product question.
+**Status:** Partly built. §3 (profiles) and §4.4 (the agent settings page) are shipped and marked as such; everything else is proposed, not agreed. §9 sorts what's left into what must be settled before any code, what ships as a setting and gets tuned with the pilot, and what is still an open product question.
 **Depends on:** [phase-1.md](phase-1.md) shipped *and used by a real matchmaker* — which is gated on the terms in [#1](https://github.com/cloudexible-org/match.build/issues/1), not on engineering. The AI plumbing itself is built (§4.3); §9.1 is what is left before a feature sits on top of it.
-**Data protection:** everything this phase adds is swept in [#3](https://github.com/cloudexible-org/match.build/issues/3) before v1 ships. Facts are the matchmaker's own records, like their notes (§7).
+**Data protection:** everything this phase adds is swept in [#3](https://github.com/cloudexible-org/match.build/issues/3) before v1 ships. A profile is the matchmaker's own record, like their notes were (§7).
 **Goal:** make the matchmaker faster and sharper inside the conversation they already run in the app: suggested replies in their voice, and a candidate profile that builds itself from the conversation.
 
 **Principle:** AI is never blocking. If any of this fails, phase 1 still works exactly as before.
@@ -12,13 +12,13 @@
 ## 1. Scope
 
 1. **Reply suggestions** in the conversation, in the matchmaker's voice.
-2. **Facts:** extraction from the imported history and every candidate message; reconciliation into a structured profile; confidence-gated auto-apply vs. suggest; undo.
-3. **Profile tab** in the candidate panel: facts grouped by category, with provenance and manual add/edit/remove.
-4. **Voice profile** from samples pasted in matchmaker settings, refined from sent messages.
+2. **Candidate profiles (§3, built):** a structured record per candidate — registry-typed facts and free-text notes — with a per-field rule about who may write it, provenance on every value, and an agent's proposal sitting beside a value rather than replacing it. What is left is the extraction that feeds it.
+3. **Profile section (built)** in the candidate panel: filled fields grouped by the registry, their source and quote, manual add/edit/clear, and suggestions above the record.
+4. **Voice (§3, built)** in matchmaker settings, one `suggest` field the voice-profile agent may draft but never change under them.
 5. **Thread summaries** for long conversations.
 6. **Eval harness** for reconciliation.
 
-All fact changes and voice-profile changes are written to the phase-1 audit trail.
+Every profile change and voice change is written to the phase-1 audit trail, with the agent as the actor where it made the change.
 
 ---
 
@@ -26,140 +26,134 @@ All fact changes and voice-profile changes are written to the phase-1 audit trai
 
 - On each candidate message (debounced, §4A), the reply suggester produces 1–3 suggested replies, rendered inline as a visually distinct card (never styled like a real message), each with **Send**, **Edit**, **Dismiss**. A matchmaker must never mistake an AI suggestion for something the candidate said.
 - When a candidate accepts an invitation, a suggested welcome message appears.
-- Fact extraction runs in the background. High-confidence facts auto-apply and surface as a private system note ("Added to profile: prefers partners 6'0\"+ · Undo"). Low-confidence facts surface as an inline suggestion card with **Add** / **Dismiss**.
+- Fact extraction runs in the background. What the agent may write it writes, and what it may only propose lands in the Profile section as a suggestion (§3.2); the field's policy decides, not the model's confidence.
 - The composer always works without AI.
 
 ---
 
-## 3. Data model additions (proposed)
+## 3. Data model additions
 
 Written in the conventions `packages/api/convex/schema.ts` actually uses, which are not the ones the first draft of this file guessed at: rows have no `createdAt` (Convex's built-in `_creationTime` carries it), and indexes name every field in full, joined with `_and_` — `by_conversationId_and_seq`, not `by_conversation_seq`.
 
+**This section replaced an earlier `facts` design** — one row per fact, with `confidence`, `status`, `supersededBy` and a separate key registry. The shape below is simpler and does the same work: the audit trail is already append-only and already records before-and-after per field, so the history of a value does not need supersession rows to exist, and a second copy of that history would be less trustworthy than the one that already refuses to be rewritten. What the old design got right and this one keeps: provenance, a verbatim source quote, and the difference between a value and a proposal.
+
 ```ts
-// Added to convex/schema.ts in phase 2
+// Added to convex/schema.ts
 
-matchmakers: {
-  // …phase-1 fields
-  voiceProfile: v.optional(v.string()),          // distilled prose description of tone/style
-  voiceSamples: v.optional(v.array(v.string())), // pasted in matchmaker settings
-}
-
-// The table is `conversations`; the domain that owns its functions is
-// `convex/messages/` (prd/phase-1.md §7). The summariser lands there.
-conversations: {
-  // …phase-1 fields
-  summary: v.optional(v.string()),               // rolling summary of messages outside the live window
-  summarisedThroughSeq: v.optional(v.number()),
-}
-
-messages.source: add v.literal("ai_suggestion")  // matchmaker sent an AI suggestion (edited or not)
-
-// A third variant of the `auditActor` union in schema.ts, alongside `user`
-// (whose roles are already account | matchmaker | candidate | platform_admin)
-// and `system`. The renderer in audit/rules.ts needs a case for it, and
-// apps/admin's trail shows it too.
-auditEvents.actor: add
-  v.object({
-    type: v.literal("agent"),
-    agent: v.union(v.literal("fact_reconciler"), v.literal("voice_profile")),
-    model: v.string(),
-  })
-auditEvents: add sourceMessageId: v.optional(v.id("messages")), undoOf: v.optional(v.id("auditEvents"))
-
-// One row per agent (§4.4). The ONLY source of an agent's model and standing
-// instruction: nothing in the code supplies a default, so an agent with no row
-// — or an empty string, or enabled false — is simply off. Seeded once from
-// convex/seed/ai/, then owned by a platform admin. Global, not per
-// matchmaker. BUILT.
-aiAgentSettings: defineTable({
-  agent: v.union(
-    v.literal("conversation"),
-    v.literal("candidate_profile"),
-    v.literal("voice_profile"),
+// One value, and everything that is true *about* the value.
+const profileEntry = v.object({
+  value: v.string(),                 // normalised by profiles/rules.ts; "" = nothing recorded
+  source: v.union(                   // who put the current value there
+    v.literal("matchmaker"),
+    v.literal("agent"),
+    v.literal("agent_approved"),
   ),
-  enabled: v.boolean(),
-  model: v.string(),        // "" means off
-  systemPrompt: v.string(), // "" means off
   updatedAt: v.number(),
-  updatedByUserId: v.optional(v.id("users")), // absent when seeded
-}).index("by_agent", ["agent"]),
-
-// AI reply suggestions. Persisted so they survive reloads and can be marked stale.
-replySuggestions: defineTable({
-  matchmakerId: v.id("matchmakers"),
-  conversationId: v.id("conversations"),
-  triggerSeq: v.number(),               // the candidate message that triggered generation
-  status: v.union(
-    v.literal("generating"),
-    v.literal("ready"),
-    v.literal("used"),
-    v.literal("dismissed"),
-    v.literal("stale"),                 // a newer message arrived, or the matchmaker replied manually
-    v.literal("failed"),
-  ),
-  replies: v.array(v.string()),
-}).index("by_conversationId_and_status", ["conversationId", "status"]),
-
-facts: defineTable({
-  matchmakerId: v.id("matchmakers"),
-  candidateId: v.id("candidates"),
-  category: v.union(
-    v.literal("hard_constraint"),  // age range, location, wants kids, gender preference
-    v.literal("preference"),       // soft desires in a partner
-    v.literal("attribute"),        // about the candidate themselves
-    v.literal("lifestyle"),
-    v.literal("background"),
-    v.literal("logistics"),        // availability, timeline, budget
-    v.literal("note"),
-  ),
-  key: v.optional(v.string()),     // from the key registry (§3.1); required for hard_constraint
-  value: v.string(),               // structured value (per the registry) or free text
-  text: v.string(),                // human-readable rendering
-  confidence: v.number(),          // 0..1 from the extracting agent
-  status: v.union(
-    v.literal("active"),
-    v.literal("suggested"),        // awaiting matchmaker approval
-    v.literal("superseded"),
-    v.literal("rejected"),
-  ),
-  supersededBy: v.optional(v.id("facts")),
+  updatedByUserId: v.optional(v.id("users")),
+  model: v.optional(v.string()),
   sourceMessageId: v.optional(v.id("messages")),
   sourceQuote: v.optional(v.string()),
-  origin: v.union(v.literal("ai"), v.literal("manual")),
+  confidence: v.optional(v.number()),
+  // An agent's proposal, waiting on the matchmaker. BESIDE the value, never
+  // instead of it. At most one open per field: a newer one replaces it.
+  pending: v.optional(v.object({
+    action: v.union(v.literal("set"), v.literal("clear")),
+    value: v.string(),               // "" when the action is "clear"
+    suggestedAt: v.number(),
+    model: v.string(),
+    confidence: v.optional(v.number()),
+    sourceMessageId: v.optional(v.id("messages")),
+    sourceQuote: v.optional(v.string()),
+  })),
+});
+
+candidateProfiles: defineTable({
+  matchmakerId: v.id("matchmakers"),
+  candidateId: v.id("candidates"),
+  facts: v.record(v.string(), profileEntry),  // keyed by the registry
+  notes: v.record(v.string(), profileEntry),  // keyed by whatever anyone names
+  updatedAt: v.number(),
 })
-  .index("by_candidateId_and_status", ["candidateId", "status"])
-  .index("by_candidateId_and_key", ["candidateId", "key"]),
+  .index("by_candidateId", ["candidateId"])
+  .index("by_matchmakerId", ["matchmakerId"]),
+
+matchmakerProfiles: defineTable({
+  matchmakerId: v.id("matchmakers"),
+  voice: v.optional(profileEntry),
+  updatedAt: v.number(),
+}).index("by_matchmakerId", ["matchmakerId"]),
+
+// A third variant of the `auditActor` union in schema.ts, alongside `user`
+// and `system`. Carries the model, because "the assistant changed this" is
+// only half an answer once the model behind an agent has moved on.
+auditEvents.actor: add
+  v.object({ type: v.literal("agent"), agent: aiAgentId, model: v.string() })
+
+messages.source: add v.literal("ai_suggestion")  // a sent AI suggestion, edited or not
+
+conversations: {
+  summary: v.optional(v.string()),
+  summarisedThroughSeq: v.optional(v.number()),
+}
 ```
 
-**Modelling notes:**
+**The `notes` table is gone.** Its timestamped journal is replaced by a keyed `notes.matchmakerNotes` entry. A one-off internal mutation folded the surviving rows into it, oldest first — removed notes stayed removed, since the History tab already records that they were removed — and the table then came out of the schema. Prod held no rows; dev's two were migrated before the narrowing. The `note.*` audit actions stay in the vocabulary because the trail is append-only and those events still have to render.
 
-- Facts are discrete records, not a profile blob. Reconciliation, provenance, supersession, and later retrieval all depend on it. Do not "simplify" this into a JSON document.
-- A fact a candidate contradicts is never deleted: it is marked `superseded` and linked forward. The history of change is matchmaking signal ("was certain about kids in March, wavering in September").
-- There is no in-place update. Every change produces a new fact plus an audit event, so every change can be undone from the audit trail. That is also why `facts` carries no `updatedAt`: a row that is never edited has nothing to stamp.
-- **Facts are the matchmaker's record, not the candidate's profile.** They are collected and maintained by the matchmaker with the AI's help, exactly like their notes, and the matchmaker is the controller (prd/phase-1.md §9.3). An erasure therefore anonymises them and leaves them standing, like everything else in that matchmaker's book — but `admin.mutations.eraseAccount` walks an **explicit** list of tables with a ceiling per table (`ERASURE_LIMITS`), so a new table is invisible to it until it is added. Adding `facts` to the erasure in the same change that adds the table is not optional; [#3](https://github.com/cloudexible-org/match.build/issues/3) holds the decision and the rest of the sweep.
-- **`sourceQuote` is a verbatim copy of message text**, which prd/phase-1.md §12 deliberately leaves outside an erasure's reach. Whatever [#2](https://github.com/cloudexible-org/match.build/issues/2) concludes has to hold for both places at once, or the product's answer is incoherent.
-- Fact audit actions: `fact.created`, `fact.edited`, `fact.accepted` (suggested → active), `fact.rejected`, `fact.superseded`, `fact.undone`. Voice: `matchmaker.voice_samples_changed`, `matchmaker.voice_profile_regenerated`. **`ai_agent.updated` is built** (§4.4) — a platform-level event with no `matchmakerId`.
+### 3.1 Why one document per candidate, not one row per fact
 
-### 3.1 Fact key registry
+- **Every value carries metadata**: who wrote it, when, from which message, and whether a proposal is waiting on it. Forty typed columns would be forty nested objects, and adding a field would be a schema migration every time. The table holds two maps; `convex/candidateProfiles/rules.ts` holds the types. Adding a field is an edit to one file.
+- **The cost is that a stored value is a string** — a *normalised* one. `valueError` then `normaliseValue` is the only way a value reaches the database, from a matchmaker's form and from an agent alike, so "yes", "1987-03-14" and "28-36" mean exactly one thing each. Phase 3's hard pre-filter reads these keys, which is why a key, once used, is a migration rather than an edit.
+- **Change history is the audit trail**, which was going to be written either way. `profile.updated`, `profile.suggested`, `profile.suggestion_accepted`, `profile.suggestion_rejected`, and the matchmaker-side `matchmaker_profile.*`. Which entry moved is `changes[].field`, written as `facts.wantsKids` or `notes.idealWeekend`, and rendered through the registry so the trail says "Wants children" rather than a key.
+- **Erasure** anonymises the identifying and special-category facts — the registry marks them `personal` — and leaves the rest standing, exactly as `status` and `membership` survive in the trail (prd/phase-1.md §12). Free-text notes are **not** redacted, on the same grounds the note and message bodies were left alone: they are the matchmaker's own words. `admin.mutations.eraseAccount` calls `anonymiseCandidateProfile` in the same loop as `anonymiseCandidate`; one row per candidate, so the `memberships` ceiling already bounds it.
 
-`hard_constraint` facts carry a `key` from a fixed registry in `convex/facts/rules.ts` and a machine-comparable `value`; these drive the cheap pre-filter in phase-3 matching. Without a registry the model will emit `wants_kids` in one place and `wants_children` in another. Proposed starting set:
+### 3.2 Who may write what
 
-| Key | Value format |
+Three ways a value gets written, declared **per field in the registry** — not configurable per matchmaker, and not a confidence threshold:
+
+| Policy | The agent may |
 |---|---|
-| `age` | integer |
-| `partner_age_range` | `"<min>-<max>"` |
-| `gender` | free text, normalised |
-| `seeking_gender` | comma-separated list |
-| `location_city` | free text, normalised |
-| `willing_to_relocate` | `yes` / `no` / `maybe` |
-| `has_kids` | `yes` / `no` |
-| `wants_kids` | `yes` / `no` / `maybe` |
-| `religion` | free text |
-| `religion_importance` | `low` / `medium` / `high` |
+| `matchmaker` | nothing. Not write, not propose. |
+| `agent` | write it directly. |
+| `suggest` | propose only; the value does not move until a matchmaker approves. |
 
-A `hard_constraint` with an unknown key is downgraded to `note`.
+Plus one rule that holds whatever the policy says: **an agent never overwrites what a person typed.** An `agent` field whose current `source` is `matchmaker` degrades to a proposal. A conversation that contradicts something entered by hand is exactly the thing worth telling someone about (`agentWriteMode` in `convex/profiles/rules.ts`).
 
----
+`matchmaker` is for the matchmaker's own judgement (`incomeBand`, `matchmakerNotes`, `matchmakerTake`). `suggest` is for the special categories and anything a wrong guess costs a real person: `orientation`, `religion`, `politics`, `ethnicity`, `drugs`, `dateOfBirth` — and `voice`, because how someone writes is theirs. A note key nobody has named defaults to `suggest`: a key nobody has thought about is exactly the one an agent should be asking about rather than inventing.
+
+### 3.3 A proposal, and everything that can happen to it
+
+There is **at most one open proposal per field**, and the newest wins. Two open questions about one field is a worse thing to hand someone than the current best answer; the one it replaced reaches the audit trail as a `profile.suggested` event whose `before` names it and whose `reason` says so.
+
+A proposal can be a **removal** as well as a value (`pending.action`), because an agent learns that something has stopped being true as often as it learns what is — and `value: ""` could not say so, since an entry whose value is `""` is one nothing has been recorded for.
+
+What resolves a proposal:
+
+| What happens | The proposal |
+|---|---|
+| A later agent run proposes something else for the field | replaced; the old one is audited |
+| A later agent run proposes the same thing | ignored — it doesn't nag |
+| Someone writes a different value | **survives.** Writing a value is not answering the question, and they may never have seen it |
+| Someone writes exactly what it proposed | answered — leaving it up would nag about a change already made |
+| Someone clears the entry, with a removal proposed | answered |
+| Someone clears the entry, with a *value* proposed | **survives** |
+| Accepted | applied; the value's `source` becomes `agent_approved` — they agreed with it, they did not write it, and a later run may revise its own work but never theirs |
+| Rejected | dropped, and the entry with it when nothing was underneath |
+
+### 3.4 The registry
+
+`convex/candidateProfiles/rules.ts` holds ~48 fields in seven groups — **about them** (birth date, age, gender, pronouns, height, ethnicity, languages, occupation, education, income band), **where they are** (city, country, nationality, relocation, living situation), **relationships** (orientation, status, previous marriages, longest relationship, looking for, timeline), **family** (has kids, how many, at home, wants kids, how many they want, importance), **lifestyle** (smoking, drinking, drugs, diet, exercise, pets), **beliefs** (religion + importance, politics + importance) and **what they're looking for** (seeking gender, partner age and height ranges, kids, religion, education, location, distance, dealbreakers).
+
+Each field declares a value kind — `text`, `date`, `integer`, `range`, `choice`, `choices`, `list` — which is what the form renders and what the server validates. Splitting *them* from *what they want* matters because phase 3 matches one side against the other.
+
+Free-text note keys are open. The registry names eleven suggested ones (`idealWeekend`, `hobbies`, `whatTheyreLookingFor`, `matchmakerNotes`, …) with labels and policies; anything else is allowed, labelled by humanising the key, and policed as `suggest`.
+
+`convex/matchmakerProfiles/rules.ts` holds one field, `voice`, under the same rules. Named columns rather than a map, because what the product knows about a matchmaker is a short deliberate list rather than a bag that grows with whatever a conversation turns up.
+
+### 3.5 Where it lives
+
+Two domains and a shared kernel, which is one more directory than `CLAUDE.md` §8's one-per-domain but the honest shape: `convex/candidateProfiles/` and `convex/matchmakerProfiles/` each own a table and its functions, and `convex/profiles/` registers **no functions at all** — it holds the entry type, validation and the write engine, so "an agent never overwrites what a person typed" means the same thing for a candidate's birth date and a matchmaker's voice.
+
+A fourth writer — **the candidate editing their own profile** — is deliberately absent rather than stubbed (§9.3). It would be a policy the registry grows and a `writer` the mutations pass; nothing else would move.
 
 ## 4. Agents and jobs (proposed)
 
@@ -169,7 +163,7 @@ They communicate **through the database**, never by sharing context. Phase 3's m
 
 | Component | What it does here |
 |---|---|
-| `@convex-dev/workpool` | Every background job below. Gives §4C its "one job per candidate at a time" as configuration rather than as a lock invented in a `facts` row. |
+| `@convex-dev/workpool` | Every background job below. Gives §4B its "one job per candidate at a time" as configuration rather than as a lock invented in a profile row. |
 | `@convex-dev/persistent-text-streaming` | §4A's streamed replies. A mutation per token is a database write per token, which is what "streamed into a `replySuggestions` row" would otherwise mean. |
 | `@convex-dev/rate-limiter` | §6's per-matchmaker AI budget. |
 | `@convex-dev/agent` | Threads, message history, tool calls and usage tracking for the AI side. **Installed** (§4.3). |
@@ -194,7 +188,7 @@ An earlier draft listed five jobs (A reply suggester, B fact extractor, C fact r
 
 **The summariser is not its own agent.** It reads the same thread to write another derived artefact, on a different trigger (thread length rather than a new message). One agent, three outputs.
 
-**What the product learns about the *matchmaker* lands in the voice profile.** `facts` stays keyed to a candidate. So the voice profile is wider than its name suggests: not only how they write, but how they work and what they care about in a match. Its §3 comment says "tone/style"; take this paragraph as the definition.
+**What the product learns about the *matchmaker* lands in their voice.** `candidateProfiles` stays keyed to a candidate, and `matchmakerProfiles` is where the other half goes. So `voice` is wider than its name suggests: not only how they write, but how they work and what they care about in a match. Take this paragraph as its definition, and `convex/matchmakerProfiles/rules.ts` as where it is written down.
 
 **Each agent has one model and one standing instruction, platform-wide, stored in the database and edited at `/admin/ai`** (§4.4). A matchmaker's own character does not vary the prompt — it is the voice profile, which is *data a prompt reads*.
 
@@ -206,16 +200,15 @@ An earlier draft listed five jobs (A reply suggester, B fact extractor, C fact r
 - Earlier `ready` suggestions become `stale` when a new message arrives or the matchmaker replies manually.
 - Never receives another candidate's data.
 
-**B. `candidate_profile`** (background)
+**B. `candidate_profile`** (background) — *the write path is built (§3); what feeds it is not.*
 - Runs once per message over all the facts the conversation agent noticed, serialised per candidate — a `workpool` with a per-candidate key, one job at a time. Parallel per-fact jobs would race: two facts from one message could both add a duplicate or both supersede the same fact.
-- Input: those candidate facts + the source message + the candidate's `active` and `suggested` facts, plus recently `rejected` ones, so dismissed suggestions do not keep coming back.
-- Output per fact: `ADD`, `DISCARD_DUPLICATE`, or `SUPERSEDE(id)`.
-- Auto-applies at or above the confidence threshold (§9.2); otherwise writes `status: "suggested"`.
-- **Never auto-supersedes a `manual` fact: that change is always a suggestion, and a suggestion is allowed.** A matchmaker who typed something themselves has to be the one to change it, but a conversation that contradicts what they typed is exactly the thing worth telling them about.
-- Writes through internal mutations that call `recordAudit` with the agent as actor. **Undo** reverses the audit event: the superseded fact is restored and the new one marked `rejected`.
+- Input: those candidate facts + the source message + the candidate's current profile, including any open proposals, so it does not keep asking the same question.
+- Output per entry: a registry key and a value, or a removal. It does **not** say whether to write or to suggest — `candidateProfiles.mutations:applyAgentEntries` decides that from the field's policy, and an agent that could choose would make the policy advisory.
+- **Never overwrites what a person typed**, whatever the policy says. That change is always a proposal (§3.2).
+- Writes through one internal mutation per batch, not per entry: two entries from the same message must not race each other into the same document.
 
-**C. `voice_profile`** (background, batched)
-- Input: the matchmaker's pasted samples, then their own sent messages (§9.2 sets how many).
+**C. `voice_profile`** (background, batched) — *the write path is built (§3); what feeds it is not.*
+- Input: what they wrote in settings, then their own sent messages (§9.2 sets how many).
 - Output: a prose voice profile — register, warmth, sentence length, greeting and sign-off habits, characteristic phrases, things they never say — plus what the product has learned about them.
 - Runs on a schedule or after every N sent messages, never per message.
 
@@ -226,12 +219,12 @@ Facts are never appended into message history. They're read live at prompt time:
 ```
 [system prompt: role, guardrails, output format]
 [matchmaker voice profile]
-[candidate facts: active facts, grouped by category, rendered as a compact list]
+[candidate profile: the filled entries, grouped by the registry, as a compact list]
 [conversation summary: if the thread exceeds the live window]
 [last N messages verbatim]
 ```
 
-A newly written fact is reflected in the very next generation.
+A newly written entry is reflected in the very next generation. An open proposal is **not** part of the context: nobody has agreed to it.
 
 **Guardrails:** candidate messages are untrusted input — instructions inside them are content, not commands. Suggested replies must not reveal facts the candidate hasn't stated in this conversation, or the matchmaker's notes.
 
@@ -270,9 +263,9 @@ The plumbing is in, with no product feature on top of it yet:
 ## 5. UI additions
 
 - **Conversation:** reply-suggestion cards, fact-suggestion cards, system notes with Undo (all private to the matchmaker).
-- **Candidate panel:** a **Profile** tab, second after Details: active facts grouped by category, source quote on hover/expand, manual add/edit/remove, a pending section for suggested facts. *The first draft made it the default, which contradicts prd/phase-1.md §4.1 and what shipped.* **Details stays the default:** it holds membership state and the invite controls — what a matchmaker needs on opening a thread they haven't touched in a week — while Profile is a reading surface. Moving the default is a pilot-tuned call, not one to make in a draft.
-- **History tab:** gains fact and agent entries, with a link to the source message and Undo where possible. New filter: Profile.
-- **Matchmaker settings:** voice samples.
+- **Candidate panel (built):** a **Profile** section, second after Details. It renders **what is filled in, not the whole registry** — forty-odd empty rows would bury the four that say something — grouped by the registry, each with its source and its verbatim quote, and an inline editor whose control comes from the field's value kind. Suggestions sit above the record, visually apart, because a proposal nobody has answered is not part of it. **Details stays open by default:** it holds membership state and the invite controls, which is what a matchmaker needs on opening a thread they haven't touched in a week.
+- **History tab (built):** profile and agent entries, the agent's actor line naming the model it ran on. New filter: **Profile**, which also covers the `note.*` events the old table left behind.
+- **Matchmaker settings (built):** their voice, with the agent's draft above the box rather than in it.
 - **`/admin/ai` (built):** the three agents, each with a switch, the model it runs on and its standing instruction, and a line saying which of the four ways it is off when it isn't running. Says plainly when the deployment can't reach a model at all, rather than implying the settings are already doing something.
 
 The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invites/`, which owns accepting an invitation (prd/phase-1.md §7).
@@ -287,22 +280,23 @@ The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invit
 ## 7. Privacy
 
 - **Model calls go through the Convex AI gateway** (§4.3), which holds the provider credentials. There is no API key in this deployment and no provider contract of our own, so **Convex is the sub-processor** the DPA in [#1](https://github.com/cloudexible-org/match.build/issues/1) names — the same one it already names for the database. What remains is to confirm the gateway's own training and retention terms, and what it says about the providers behind it, rather than to negotiate with a provider ourselves.
-- **Facts are the matchmaker's records**, collected and maintained by them with the AI's help, like their notes. The matchmaker is the controller (prd/phase-1.md §9.3); an erasure anonymises facts and leaves them standing (§3).
-- **`facts` is keyed to a candidate.** What the product learns about the *matchmaker* lands in their voice profile instead (§4.1), so there is no table of facts about a matchmaker to reason about separately.
-- **Candidates never see their facts.** That is a UI decision and not a legal one: facts are personal data about the candidate, so an access request reaches them whether or not a screen does. Whether *showing* them would improve the data enough to be worth it is still open (§9.3); whether they must be *disclosable* is not, and is part of [#3](https://github.com/cloudexible-org/match.build/issues/3).
+- **Profiles are the matchmaker's records**, collected and maintained by them with the AI's help, like their notes. The matchmaker is the controller (prd/phase-1.md §9.3); an erasure anonymises the identifying and special-category facts and leaves the rest standing (§3.1).
+- **`candidateProfiles` is keyed to a candidate.** What the product learns about the *matchmaker* lands in `matchmakerProfiles` instead, which is a different table with a different owner and no candidate in it.
+- **Candidates never see their profile.** That is a UI decision and not a legal one: facts are personal data about the candidate, so an access request reaches them whether or not a screen does. Whether *showing* them would improve the data enough to be worth it is still open (§9.3); whether they must be *disclosable* is not, and is part of [#3](https://github.com/cloudexible-org/match.build/issues/3).
 - **Candidate messages are untrusted input** (§4.1). Instructions inside them are content, never commands.
 
 ## 8. Build order
 
-**Where it lands.** One new domain, `convex/facts/` (`rules.ts` carrying the key registry, plus mutations, queries and helpers per `CLAUDE.md`). Everything else extends a domain phase 1 already built: reply suggestions and the summariser go in `messages/`, the voice profile in `matchmakers/`, the welcome trigger in `invites/`, the agent actor and the new actions in `audit/`, and the erasure branch for `facts` in `admin/`.
+**Where it lands.** Two new domains and a shared kernel (§3.5). Everything else extends a domain phase 1 already built: reply suggestions and the summariser go in `messages/`, the welcome trigger in `invites/`, the agent actor and the new actions in `audit/`, and the profile branch of the erasure in `admin/`.
 
 0. *Done.* **AI plumbing** (§4.5) and **the settings page** (§4.4): the `agent` component, the gateway, `convex/ai/`, the three agents seeded from `convex/seed/ai/`, `/admin/ai`, and `ai:setup`. No product feature on it yet.
-1. Voice samples in settings + reply suggester (streaming, debounce, stale handling).
-2. Facts schema, key registry, manual facts in the Profile tab, audit integration — **and the `facts` branch of the erasure in the same change** (§3).
-3. Extractor + reconciler + auto-apply/suggest + undo.
+1. *Done.* **Profiles** (§3): the two tables, the registry, the write engine with its per-field policy, the three write paths, the Profile section, voice in settings, audit integration, the erasure branch, and the migration off `notes`. **No agent calls the write path yet** — the door is built, nobody has come through it.
+2. Reply suggester (streaming, debounce, stale handling), reading the voice.
+3. Extractor feeding `candidateProfiles.mutations:applyAgentEntries`, and the voice-profile agent feeding `matchmakerProfiles.mutations:applyAgentVoice`.
 4. Extraction from the imported history at onboarding.
 5. Summariser.
 6. Eval harness.
+*Also done:* the migration off `notes` and the removal of the table (§3).
 
 ---
 
@@ -314,7 +308,7 @@ The first draft listed eleven of these flat, which made a number that wants a we
 
 - ~~**LLM provider and models.**~~ *Resolved by building it (§4.3).* Calls go through the Convex AI gateway, so there is no provider to choose, no key to hold and no second contract: Convex is the sub-processor, and the models are `anthropic/claude-opus-5` for drafting and `anthropic/claude-haiku-4-5` for extraction, both overridable per deployment. **What is left is a question for [#1](https://github.com/cloudexible-org/match.build/issues/1), not for this phase:** confirm the gateway's training and retention terms and what they say about the providers behind it. Still do that before the DPA is drafted — amending a signed DPA means going back to every matchmaker who signed it — but it is now a paragraph to verify rather than a vendor to pick.
 - **Prompt injection and leakage.** Not "is a system-prompt guardrail enough" — that framing invites a yes. Special-category data, plus an LLM drafting messages a human sends under their own name, is the one place in this product where a leak harms a real person. It needs a mechanism: what checks a suggestion before it can reach the Send button, and what a failed check does.
-- **Key registry contents, and who owns adding keys** (§3.1). Phase 3's hard filter runs on these keys, so changing one later is a migration rather than an edit.
+- ~~**Key registry contents**~~ *Resolved by building it (§3.4).* The registry is ~48 fields in `convex/candidateProfiles/rules.ts`; adding a key is an edit to that file and renaming one is still a migration, which is the part that has not changed.
 - **Eval data.** Where realistic but synthetic or consented conversations come from (§4.2). The reconciler cannot be built honestly without them, and it must never be raw candidate data.
 
 ### 9.2 Ship as a setting, tune with the pilot
@@ -323,7 +317,7 @@ None of these blocks a line of code: each ships as a deployment env var with the
 
 | Setting | Starting value | Why it's a guess |
 |---|---|---|
-| Auto-apply threshold | 0.8 | Too low is presumptuous, too high nags. Nobody knows which until a matchmaker is annoyed by one of them. |
+| ~~Auto-apply threshold~~ | — | *Resolved by building it (§3.2):* whether a change is applied or proposed is a property of the **field**, not of a number the model produces. A model's confidence is not calibrated across fields, and a threshold would have let a bad 0.9 on `orientation` through while blocking a good 0.7 on `pets`. `confidence` is still stored, as something to show and to tune against later. |
 | Suggested replies shown | 3 | Three may be choice paralysis on a phone. |
 | Debounce window | ~5 s | Depends how people actually type in bursts. |
 | Voice samples required | 20 sent messages | Unknown whether fewer already stops sounding generic. |
@@ -332,6 +326,6 @@ None of these blocks a line of code: each ships as a deployment env var with the
 
 ### 9.3 Open product question
 
-- **Fact visibility to candidates.** Currently none. Would letting a candidate review and correct their own profile improve the data enough to be worth it? This is the only item here that changes the product's shape rather than a number, and it is a product question only — the legal half is settled (§7) and swept in [#3](https://github.com/cloudexible-org/match.build/issues/3).
+- **Profile visibility to candidates.** Currently none. Would letting a candidate review and correct their own profile improve the data enough to be worth it? This is the only item here that changes the product's shape rather than a number, and it is a product question only — the legal half is settled (§7) and swept in [#3](https://github.com/cloudexible-org/match.build/issues/3). The write engine is ready for the answer to be yes: a candidate would be a third `ProfileWriter` and a policy the registry grows (§3.5).
 
-*Closed by §4C:* whether the AI may ever change a manually entered fact. It may suggest, never auto-apply.
+*Closed by §3.2:* whether the AI may ever change a value a person typed. It may propose, never overwrite.

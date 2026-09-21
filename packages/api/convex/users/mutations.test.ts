@@ -513,10 +513,17 @@ describe("what a deleted account leaves behind", () => {
           sentAt: seq + 1,
         });
       }
-      await ctx.db.insert("notes", {
+      await ctx.db.insert("candidateProfiles", {
         matchmakerId,
         candidateId: id,
-        body: "Loves hiking. Introduce to Sam.",
+        facts: {},
+        notes: {
+          matchmakerTake: {
+            value: "Loves hiking. Introduce to Sam.",
+            source: "matchmaker",
+            updatedAt: 1,
+          },
+        },
         updatedAt: 1,
       });
       return id;
@@ -552,18 +559,20 @@ describe("what a deleted account leaves behind", () => {
       "Imported: Jane is 34.",
     ]);
 
-    // Their notes, still editable — these are the matchmaker's own records.
-    const notes = await asOwner.query(api.notes.queries.list, {
+    // Their profile, still editable — these are the matchmaker's own records.
+    const profile = await asOwner.query(api.candidateProfiles.queries.get, {
       matchmakerId,
       candidateId,
     });
-    expect(notes.map((note) => note.body)).toEqual([
+    expect(profile.notes.matchmakerTake?.value).toBe(
       "Loves hiking. Introduce to Sam.",
-    ]);
-    await asOwner.mutation(api.notes.mutations.create, {
+    );
+    await asOwner.mutation(api.candidateProfiles.mutations.setEntry, {
       matchmakerId,
       candidateId,
-      body: "Deleted their account in March.",
+      kind: "facts",
+      key: "wantsKids",
+      value: "maybe",
     });
 
     // And the history, which now ends with them going.
@@ -605,10 +614,17 @@ describe("what a deleted account leaves behind", () => {
         body: "Hello",
         sentAt: 1,
       });
-      await ctx.db.insert("notes", {
+      await ctx.db.insert("candidateProfiles", {
         matchmakerId: alpha,
         candidateId,
-        body: "A note",
+        facts: {},
+        notes: {
+          matchmakerTake: {
+            value: "A note",
+            source: "matchmaker",
+            updatedAt: 1,
+          },
+        },
         updatedAt: 1,
       });
     });
@@ -623,7 +639,7 @@ describe("what a deleted account leaves behind", () => {
       candidates: (await ctx.db.query("candidates").collect()).length,
       conversations: (await ctx.db.query("conversations").collect()).length,
       messages: (await ctx.db.query("messages").collect()).length,
-      notes: (await ctx.db.query("notes").collect()).length,
+      profiles: (await ctx.db.query("candidateProfiles").collect()).length,
     }));
     expect(counts).toEqual({
       // The deleted account and the matchmaker's owner.
@@ -631,7 +647,7 @@ describe("what a deleted account leaves behind", () => {
       candidates: 1,
       conversations: 1,
       messages: 1,
-      notes: 1,
+      profiles: 1,
     });
   });
 });

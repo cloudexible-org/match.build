@@ -237,10 +237,32 @@ describe("admin.eraseAccount", () => {
           body: "Looking for someone kind.",
           sentAt: 1,
         });
-        await ctx.db.insert("notes", {
+        // Their profile: the personal facts an erasure has to reach, the
+        // workflow ones it must leave, and a note in the matchmaker's own
+        // words, which it never touches (prd/phase-2.md §3).
+        await ctx.db.insert("candidateProfiles", {
           matchmakerId,
           candidateId,
-          body: "Great first call.",
+          facts: {
+            dateOfBirth: {
+              value: "1990-04-02",
+              source: "matchmaker",
+              updatedAt: 1,
+            },
+            locationCity: {
+              value: "Lisbon",
+              source: "matchmaker",
+              updatedAt: 1,
+            },
+            wantsKids: { value: "yes", source: "matchmaker", updatedAt: 1 },
+          },
+          notes: {
+            matchmakerTake: {
+              value: "Great first call.",
+              source: "matchmaker",
+              updatedAt: 1,
+            },
+          },
           updatedAt: 1,
         });
         // The trail as the product would have written it: her details, her
@@ -368,12 +390,16 @@ describe("admin.eraseAccount", () => {
       expect(thread.page.map((message) => message.body)).toEqual([
         "Looking for someone kind.",
       ]);
-      // Their own notes.
-      const notes = await asOwner.query(api.notes.queries.list, {
+      // Their profile: who she was is gone, what they were working with
+      // stays, and their own words are untouched.
+      const profile = await asOwner.query(api.candidateProfiles.queries.get, {
         matchmakerId: book.matchmakerId,
         candidateId: book.candidateId,
       });
-      expect(notes.map((note) => note.body)).toEqual(["Great first call."]);
+      expect(profile.facts.dateOfBirth?.value).toBe("[erased]");
+      expect(profile.facts.locationCity?.value).toBe("[erased]");
+      expect(profile.facts.wantsKids?.value).toBe("yes");
+      expect(profile.notes.matchmakerTake?.value).toBe("Great first call.");
 
       // And the history: every event still there, still readable, with the
       // workflow values intact and only the personal ones gone.

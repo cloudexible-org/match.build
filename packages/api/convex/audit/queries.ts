@@ -3,7 +3,7 @@ import {
   paginationResultValidator,
 } from "convex/server";
 import { type Infer, v } from "convex/values";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
 import { matchesAuditFilter } from "./rules";
@@ -31,6 +31,10 @@ const auditEvent = v.object({
       name: v.string(),
     }),
     v.object({ kind: v.literal("system"), name: v.string() }),
+    // An AI agent (prd/phase-2.md §3). `name` is the model it ran on, so a
+    // matchmaker reading the trail can tell a change made by a model they are
+    // using now from one made by a model that has since been replaced.
+    v.object({ kind: v.literal("agent"), name: v.string() }),
   ),
   changes: v.array(
     v.object({
@@ -42,6 +46,24 @@ const auditEvent = v.object({
   reason: v.optional(v.string()),
 });
 
+type AuditActorDoc = Doc<"auditEvents">["actor"];
+type RenderedActor = Infer<typeof auditEvent>["actor"];
+
+/** One rendering of an actor, shared by every query that reads the trail. */
+async function describeActor(
+  actor: AuditActorDoc,
+  nameOf: (userId: Id<"users">) => Promise<string>,
+): Promise<RenderedActor> {
+  switch (actor.type) {
+    case "system":
+      return { kind: "system", name: actor.job };
+    case "agent":
+      return { kind: "agent", name: actor.model };
+    default:
+      return { kind: actor.role, name: await nameOf(actor.userId) };
+  }
+}
+
 export const candidateHistory = query({
   args: {
     matchmakerId: v.id("matchmakers"),
@@ -50,7 +72,7 @@ export const candidateHistory = query({
       v.literal("all"),
       v.literal("details"),
       v.literal("membership"),
-      v.literal("notes"),
+      v.literal("profile"),
     ),
     paginationOpts: paginationOptsValidator,
   },
@@ -86,13 +108,7 @@ export const candidateHistory = query({
         _id: event._id,
         _creationTime: event._creationTime,
         action: event.action,
-        actor:
-          event.actor.type === "system"
-            ? { kind: "system" as const, name: event.actor.job }
-            : {
-                kind: event.actor.role,
-                name: await nameOf(event.actor.userId),
-              },
+        actor: await describeActor(event.actor, nameOf),
         changes: event.changes ?? [],
         reason: event.reason,
       });

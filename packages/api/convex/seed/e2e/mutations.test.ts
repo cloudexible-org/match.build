@@ -23,7 +23,7 @@ afterEach(() => {
 const spec = {
   ns: "abcd1234",
   users: [{ key: "maya" }, { key: "jane", name: "Jane Member" }],
-  matchmakers: [{ key: "book", ownerKey: "maya" }],
+  matchmakers: [{ key: "book", ownerKey: "maya", voice: "Warm but brief." }],
   candidates: [
     {
       key: "member",
@@ -39,7 +39,13 @@ const spec = {
           body: "Private history",
         },
       ],
-      notes: ["A note"],
+      profile: {
+        facts: { wantsKids: "yes" },
+        notes: { matchmakerNotes: "A note" },
+        suggestions: [
+          { kind: "facts" as const, key: "heightCm", value: "178" },
+        ],
+      },
     },
     { key: "invited", matchmakerKey: "book", invitesSentToday: 2 },
     { key: "stale", matchmakerKey: "book", invite: "expired" as const },
@@ -78,6 +84,20 @@ describe("seed.e2e.scenario", () => {
       candidateId: world.candidates.member.id,
     });
     expect(view?.candidate.membership).toBe("joined");
+
+    // The profile, including a suggestion no UI could have produced.
+    const profile = await asMaya.query(api.candidateProfiles.queries.get, {
+      matchmakerId: world.matchmakers.book.id as never,
+      candidateId: world.candidates.member.id as never,
+    });
+    expect(profile.facts.wantsKids?.value).toBe("yes");
+    expect(profile.notes.matchmakerNotes?.value).toBe("A note");
+    expect(profile.facts.heightCm?.pending?.value).toBe("178");
+
+    const voice = await asMaya.query(api.matchmakerProfiles.queries.get, {
+      matchmakerId: world.matchmakers.book.id as never,
+    });
+    expect(voice.voice?.value).toBe("Warm but brief.");
     const thread = await asMaya.query(api.messages.queries.thread, {
       matchmakerId: world.matchmakers.book.id as never,
       candidateId: world.candidates.member.id as never,

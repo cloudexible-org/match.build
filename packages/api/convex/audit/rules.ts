@@ -7,6 +7,11 @@
  * label History entries.
  */
 
+import {
+  candidateEntryHoldsPersonalData,
+  candidateProfileFieldLabel,
+} from "../candidateProfiles/rules";
+
 export const AUDIT_ACTIONS = [
   // The account itself. Account-level events have no matchmakerId; the
   // `account.name_changed` event is also fanned out to each matchmaker the
@@ -58,7 +63,24 @@ export const AUDIT_ACTIONS = [
   // product behaves for every tenant, which is exactly why it is recorded.
   "ai_agent.updated",
 
-  // Notes.
+  // The candidate's profile (prd/phase-2.md §3). One vocabulary covers every
+  // field: which entry moved is `changes[].field`, written as
+  // `facts.wantsKids` or `notes.idealWeekend`.
+  "profile.updated",
+  "profile.suggested", // an agent proposed a value; nothing has moved yet
+  "profile.suggestion_accepted",
+  "profile.suggestion_rejected",
+
+  // The matchmaker's own profile — their voice. No candidateId; it appears in
+  // their profile history, not in anyone's book.
+  "matchmaker_profile.updated",
+  "matchmaker_profile.suggested",
+  "matchmaker_profile.suggestion_accepted",
+  "matchmaker_profile.suggestion_rejected",
+
+  // Historical: the `notes` table these replaced (prd/phase-2.md §3), which
+  // no longer exists. The trail is append-only, so events recorded before the
+  // change still have to render. Nothing writes these any more.
   "note.created",
   "note.edited",
   "note.removed",
@@ -70,8 +92,10 @@ export const AUDIT_ENTITY_TABLES = [
   "users",
   "matchmakers",
   "candidates", // includes invitations, which live on the candidate row
-  "notes",
+  "candidateProfiles",
+  "matchmakerProfiles",
   "aiAgentSettings",
+  "notes", // historical; the table is gone, its events are not
 ] as const;
 
 export type AuditEntityTable = (typeof AUDIT_ENTITY_TABLES)[number];
@@ -121,7 +145,7 @@ export const AUDIT_FILTERS = {
   all: "All",
   details: "Details",
   membership: "Invitations & membership",
-  notes: "Notes",
+  profile: "Profile",
 } as const;
 
 export type AuditFilter = keyof typeof AUDIT_FILTERS;
@@ -147,7 +171,16 @@ const FILTER_ACTIONS: Record<Exclude<AuditFilter, "all">, AuditAction[]> = {
     "membership.account_deleted",
     "membership.reinvited",
   ],
-  notes: ["note.created", "note.edited", "note.removed"],
+  profile: [
+    "profile.updated",
+    "profile.suggested",
+    "profile.suggestion_accepted",
+    "profile.suggestion_rejected",
+    // The notes the profile replaced still belong under this filter.
+    "note.created",
+    "note.edited",
+    "note.removed",
+  ],
 };
 
 /** Whether an event belongs under a filter. `all` keeps everything. */
@@ -170,6 +203,7 @@ const FIELD_LABELS: Record<string, string> = {
   membership: "membership",
   acceptedAs: "accepted as",
   expiresAt: "expiry",
+  voice: "voice",
 };
 
 /** Sentences for the events that speak for themselves, without a diff. */
@@ -186,6 +220,15 @@ const PLAIN_SENTENCES: Partial<Record<AuditAction, string>> = {
   "membership.left": "Left",
   "membership.account_deleted": "Deleted their account",
   "membership.reinvited": "Re-invited them",
+  "profile.updated": "Updated their profile",
+  "profile.suggested": "The assistant suggested a change to their profile",
+  "profile.suggestion_accepted": "Accepted a suggestion",
+  "profile.suggestion_rejected": "Dismissed a suggestion",
+  "matchmaker_profile.updated": "Updated your profile",
+  "matchmaker_profile.suggested":
+    "The assistant suggested a change to your profile",
+  "matchmaker_profile.suggestion_accepted": "Accepted a suggestion",
+  "matchmaker_profile.suggestion_rejected": "Dismissed a suggestion",
   "note.created": "Added a note",
   "note.edited": "Edited a note",
   "note.removed": "Removed a note",
@@ -229,7 +272,7 @@ const PERSONAL_FIELDS = new Set([
 ]);
 
 export function fieldHoldsPersonalData(field: string): boolean {
-  return PERSONAL_FIELDS.has(field);
+  return PERSONAL_FIELDS.has(field) || candidateEntryHoldsPersonalData(field);
 }
 
 /** One recorded change, as stored: JSON-encoded values. */
@@ -256,7 +299,10 @@ export function describeAuditEvent(
 }
 
 function describeChange(change: AuditChange): string {
-  const label = FIELD_LABELS[change.field] ?? change.field;
+  const label =
+    FIELD_LABELS[change.field] ??
+    candidateProfileFieldLabel(change.field) ??
+    change.field;
   const before = decodeAuditValue(change.before);
   const after = decodeAuditValue(change.after);
   if (before === undefined && after !== undefined) {

@@ -54,7 +54,7 @@ test.beforeAll(async () => {
         membership: "joined",
         name: "Bea Byegone",
         messages: [{ author: "matchmaker", body: "Lovely to meet you, Bea." }],
-        notes: ["Loves hiking."],
+        profile: { notes: { matchmakerNotes: "Loves hiking." } },
       },
       {
         key: "stay",
@@ -165,15 +165,15 @@ test("the matchmaker keeps the thread, sees why, and can re-invite", async ({
   );
   await expect(conversation.getMessages()).toHaveCount(1);
 
-  // Their reason is in the History, and the notes are still the matchmaker's.
+  // Their reason is in the History, and the profile is still the matchmaker's.
   const panel = new CandidatePanelPage(mmPage);
   await panel.openSection("History");
   await expect(panel.getHistoryEntries().first()).toContainText("Left");
   await expect(panel.getHistoryEntries().first()).toContainText(
     "Met someone, thank you!",
   );
-  await panel.openSection("Notes");
-  await expect(panel.getNotes().first()).toContainText("Loves hiking");
+  await panel.openSection("Profile");
+  await expect(panel.getNote("matchmakerNotes")).toContainText("Loves hiking");
 
   // And they can invite her back.
   await conversation.getReinviteButton().click();

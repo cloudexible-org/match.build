@@ -342,7 +342,7 @@ describe("candidates.leave", () => {
     const { t, asOwner, asMember, candidateId, matchmakerId } = await joined();
     await asMember.mutation(api.candidates.mutations.leave, { candidateId });
 
-    // The matchmaker still reads the thread, and can still write notes.
+    // The matchmaker still reads the thread, and can still write the profile.
     const view = await asOwner.query(api.candidates.queries.conversation, {
       matchmakerId,
       candidateId,
@@ -354,18 +354,20 @@ describe("candidates.leave", () => {
       paginationOpts: { numItems: 10, cursor: null },
     });
     expect(thread.page).toHaveLength(1);
-    await asOwner.mutation(api.notes.mutations.create, {
+    await asOwner.mutation(api.candidateProfiles.mutations.setEntry, {
       matchmakerId,
       candidateId,
-      body: "Left in March. Lovely to work with.",
+      kind: "notes",
+      key: "matchmakerTake",
+      value: "Left in March. Lovely to work with.",
     });
 
-    // The messages and the notes survive; only the membership moved.
+    // The messages and the profile survive; only the membership moved.
     const counts = await t.run(async (ctx) => ({
       messages: (await ctx.db.query("messages").take(10)).length,
-      notes: (await ctx.db.query("notes").take(10)).length,
+      profiles: (await ctx.db.query("candidateProfiles").take(10)).length,
     }));
-    expect(counts).toEqual({ messages: 1, notes: 1 });
+    expect(counts).toEqual({ messages: 1, profiles: 1 });
 
     // Their own side is closed: no thread, and no composer.
     await expect(

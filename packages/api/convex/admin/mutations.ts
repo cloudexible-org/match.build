@@ -4,6 +4,7 @@ import { agentSettings, storedAgentSettings } from "../ai/helpers";
 import { modelError, systemPromptError } from "../ai/rules";
 import { recordAudit } from "../audit/helpers";
 import { diffFields } from "../audit/rules";
+import { anonymiseCandidateProfile } from "../candidateProfiles/helpers";
 import {
   anonymiseAccount,
   anonymiseCandidate,
@@ -132,6 +133,11 @@ export const eraseAccount = mutation({
     // book visibly changes, and an unexplained change is worse than the news.
     for (const candidate of memberships) {
       await anonymiseCandidate(ctx, candidate);
+      // And the matchmaker's structured profile of them (prd/phase-2.md §3):
+      // a birth date, a city and an orientation identify a person as surely as
+      // a name does. One row per candidate, so the `memberships` ceiling
+      // already bounds this.
+      await anonymiseCandidateProfile(ctx, candidate._id);
       await recordAudit(ctx, {
         matchmakerId: candidate.matchmakerId,
         candidateId: candidate._id,

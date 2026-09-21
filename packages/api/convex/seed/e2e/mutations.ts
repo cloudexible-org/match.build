@@ -25,6 +25,7 @@ import { v } from "convex/values";
 import type { Id } from "../../_generated/dataModel";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { inviteTokenFor, newInvite } from "../../invites/helpers";
+import type { ProfileEntries } from "../../profiles/helpers";
 import {
   SEED_ADMINS,
   SEED_CODE_TARGET,
@@ -59,6 +60,78 @@ import {
  * It is an `internalQuery`, so it is unreachable from the public API and reads
  * nothing.
  */
+const scenarioProfile = v.object({
+  facts: v.optional(v.record(v.string(), v.string())),
+  notes: v.optional(v.record(v.string(), v.string())),
+  suggestions: v.optional(
+    v.array(
+      v.object({
+        kind: v.union(v.literal("facts"), v.literal("notes")),
+        key: v.string(),
+        value: v.string(),
+        current: v.optional(v.string()),
+        /** The agent proposing the entry go, rather than a new value. */
+        remove: v.optional(v.boolean()),
+      }),
+    ),
+  ),
+});
+
+type ScenarioProfileSpec = {
+  facts?: Record<string, string>;
+  notes?: Record<string, string>;
+  suggestions?: {
+    kind: "facts" | "notes";
+    key: string;
+    value: string;
+    current?: string;
+    remove?: boolean;
+  }[];
+};
+
+/**
+ * A scenario's profile, as two entry maps.
+ *
+ * Values go in **as written**: a scenario is the suite's way of reaching a
+ * state, and normalising here would quietly disagree with what the spec asked
+ * for. Keep scenario values in the registry's stored form.
+ *
+ * A `suggestion` is the state no UI can produce without an agent — a proposal
+ * nobody has answered — so it is written directly rather than through
+ * `applyWrite`.
+ */
+function profileEntries(
+  spec: ScenarioProfileSpec | undefined,
+  now: number,
+): { facts: ProfileEntries; notes: ProfileEntries } {
+  const maps: { facts: ProfileEntries; notes: ProfileEntries } = {
+    facts: {},
+    notes: {},
+  };
+  for (const [key, value] of Object.entries(spec?.facts ?? {})) {
+    maps.facts[key] = { value, source: "matchmaker", updatedAt: now };
+  }
+  for (const [key, value] of Object.entries(spec?.notes ?? {})) {
+    maps.notes[key] = { value, source: "matchmaker", updatedAt: now };
+  }
+  for (const suggestion of spec?.suggestions ?? []) {
+    const map = maps[suggestion.kind];
+    const existing = map[suggestion.key];
+    map[suggestion.key] = {
+      value: suggestion.current ?? existing?.value ?? "",
+      source: existing?.source ?? "agent",
+      updatedAt: now,
+      pending: {
+        action: suggestion.remove === true ? "clear" : "set",
+        value: suggestion.remove === true ? "" : suggestion.value,
+        suggestedAt: now,
+        model: "seed/model",
+      },
+    };
+  }
+  return maps;
+}
+
 export const ping = internalQuery({
   args: {},
   returns: v.literal("matchmaker-e2e"),
@@ -87,7 +160,8 @@ const SEEDED_TABLES = [
   "candidates",
   "conversations",
   "messages",
-  "notes",
+  "candidateProfiles",
+  "matchmakerProfiles",
   "auditEvents",
   "pushSubscriptions",
   "notificationSettings",
@@ -269,6 +343,8 @@ export const scenario = internalMutation({
           username: v.optional(v.string()),
           displayName: v.optional(v.string()),
           businessName: v.optional(v.string()),
+          voice: v.optional(v.string()),
+          voiceSuggestion: v.optional(v.string()),
         }),
       ),
     ),
@@ -330,7 +406,7 @@ export const scenario = internalMutation({
             ),
           ),
           unreadForMatchmaker: v.optional(v.boolean()),
-          notes: v.optional(v.array(v.string())),
+          profile: v.optional(scenarioProfile),
         }),
       ),
     ),
@@ -427,6 +503,30 @@ export const scenario = internalMutation({
           { field: "displayName", after: JSON.stringify(displayName) },
         ],
       });
+
+      if (
+        profile.voice !== undefined ||
+        profile.voiceSuggestion !== undefined
+      ) {
+        await ctx.db.insert("matchmakerProfiles", {
+          matchmakerId: id,
+          voice: {
+            value: profile.voice ?? "",
+            source: "matchmaker",
+            updatedAt: now,
+            pending:
+              profile.voiceSuggestion === undefined
+                ? undefined
+                : {
+                    action: "set",
+                    value: profile.voiceSuggestion,
+                    suggestedAt: now,
+                    model: "seed/model",
+                  },
+          },
+          updatedAt: now,
+        });
+      }
     }
 
     const candidates: ScenarioManifest["candidates"] = {};
@@ -605,11 +705,13 @@ export const scenario = internalMutation({
         candidateLastReadSeq: 0,
       });
 
-      for (const body of spec.notes ?? []) {
-        await ctx.db.insert("notes", {
+      if (spec.profile !== undefined) {
+        const { facts, notes } = profileEntries(spec.profile, now);
+        await ctx.db.insert("candidateProfiles", {
           matchmakerId,
           candidateId,
-          body,
+          facts,
+          notes,
           updatedAt: now,
         });
       }

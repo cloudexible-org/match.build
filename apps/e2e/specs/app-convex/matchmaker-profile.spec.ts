@@ -12,7 +12,7 @@ import { signInAs } from "../../session";
 
 /**
  * Creating a matchmaker profile, opening its workspace and editing it
- * (prd/phase-1.md §1, §4).
+ * (prd/phase-1.md §1, §4) — including their voice (prd/phase-2.md §4.1C).
  *
  * A separate seeded account per test that writes: the creator has no profile
  * yet, the editor has one to change, the stranger owns nothing.
@@ -27,10 +27,18 @@ test.beforeAll(async () => {
       { key: "editor" },
       { key: "stranger" },
       { key: "owner" },
+      { key: "voiced" },
     ],
     matchmakers: [
       { key: "editable", ownerKey: "editor", displayName: "Editable Book" },
       { key: "taken", ownerKey: "owner" },
+      {
+        key: "drafted",
+        ownerKey: "voiced",
+        // A draft the agent left and nobody has answered: the state no amount
+        // of clicking could reach.
+        voiceSuggestion: "Brisk, dry, never more than two sentences.",
+      },
     ],
   });
 });
@@ -147,4 +155,36 @@ test("someone else's profile and a username nobody has look the same", async ({
 
   await workspace.goto("nobody.has.this.name");
   await expect(workspace.getNotFound()).toBeVisible();
+});
+
+test("their voice is theirs to write, and the assistant only ever drafts", async ({
+  page,
+}) => {
+  await signInAs(page, world.email("voiced"));
+  const settings = new MatchmakerSettingsPage(page);
+  await settings.goto(world.username("drafted"));
+
+  // The draft sits above the box, not in it: a suggestion that overwrote what
+  // it is suggesting a change to would not be a suggestion.
+  await expect(settings.getVoiceSuggestion()).toContainText("Brisk, dry");
+  await expect(settings.getVoiceInput()).toHaveValue("");
+
+  await settings.saveVoice("Warm but brief. I never say 'reach out'.");
+  await expect(settings.getVoiceStatus()).toHaveText("Saved.");
+  await page.reload();
+  await expect(settings.getVoiceInput()).toHaveValue(
+    "Warm but brief. I never say 'reach out'.",
+  );
+  await expect(settings.getVoiceStatus()).toHaveText("You added this");
+
+  // Their own words stand until they take the draft themselves.
+  await expect(settings.getVoiceSuggestion()).toBeVisible();
+  await settings.acceptVoiceSuggestion();
+  await expect(settings.getVoiceSuggestion()).toBeHidden();
+  await expect(settings.getVoiceInput()).toHaveValue(
+    "Brisk, dry, never more than two sentences.",
+  );
+  await expect(settings.getVoiceStatus()).toHaveText(
+    "Suggested by the assistant, approved by you",
+  );
 });

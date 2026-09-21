@@ -5,8 +5,8 @@ import { type Scenario, seedScenario } from "../../scenario";
 import { signInAs } from "../../session";
 
 /**
- * The candidate panel (prd/phase-1.md §4.1, §5.2): the Details, Notes and
- * History sections, the last one over the audit trail.
+ * The candidate panel (prd/phase-1.md §4.1, §5.2; prd/phase-2.md §3, §5): the
+ * Details, Profile and History sections, the last one over the audit trail.
  *
  * One seeded candidate per test that writes, so an edit in one test can't
  * change what another sees.
@@ -31,14 +31,13 @@ test.beforeAll(async () => {
         socialHandles: [{ platform: "instagram", handle: "dana.details" }],
       },
       { key: "status", matchmakerKey: "book", name: "Stan Status" },
-      { key: "notes", matchmakerKey: "book", name: "Nina Notes" },
       {
         key: "history",
         matchmakerKey: "book",
         name: "Hugo History",
         userKey: "jane",
         membership: "joined",
-        notes: ["Seeded note"],
+        profile: { notes: { matchmakerNotes: "Seeded note" } },
       },
     ],
   });
@@ -100,37 +99,6 @@ test("status moves the candidate between the list's filters", async ({
   await expect(panel.getStatusSelect()).toHaveValue("archived");
 });
 
-test("Notes are added, edited and removed", async ({ page }) => {
-  const panel = await openPanel(page, "notes");
-  await panel.openSection("Notes");
-
-  await panel.addNote("Prefers mornings.");
-  await expect(panel.getNotes()).toHaveCount(1);
-  await expect(panel.getNotes().first()).toContainText("Prefers mornings.");
-
-  await panel.getNotes().first().getByRole("button", { name: "Edit" }).click();
-  await page.getByLabel("Edit note").fill("Prefers mornings and hiking.");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(panel.getNotes().first()).toContainText(
-    "Prefers mornings and hiking.",
-  );
-
-  await panel
-    .getNotes()
-    .first()
-    .getByRole("button", { name: "Remove" })
-    .click();
-  await expect(panel.getNotes()).toHaveCount(0);
-  await expect(page.getByText("No notes yet.")).toBeVisible();
-});
-
-test("an empty note is refused", async ({ page }) => {
-  const panel = await openPanel(page, "notes");
-  await panel.openSection("Notes");
-  await page.getByRole("button", { name: "Add note" }).click();
-  await expect(page.getByText("Write something first.")).toBeVisible();
-});
-
 test("History reads the trail, and filters it", async ({ page }) => {
   const panel = await openPanel(page, "history");
   await panel.openSection("History");
@@ -142,23 +110,24 @@ test("History reads the trail, and filters it", async ({ page }) => {
   await expect(entries.last()).toContainText("Onboarded them");
   await expect(entries.last()).toContainText("You ·");
 
-  // A change made now appears at the top, attributed and explained.
-  await panel.openSection("Notes");
-  await panel.addNote("A note for the trail");
+  // A change made now appears at the top, attributed and explained — with the
+  // registry's label for the field, not its key.
+  await panel.openSection("Profile");
+  await panel.addField("heightCm", "178");
   await panel.openSection("History");
-  await expect(entries.first()).toContainText("Added a note");
-  await expect(entries.first()).toContainText("A note for the trail");
+  await expect(entries.first()).toContainText("Updated their profile");
+  await expect(entries.first()).toContainText("Height (cm): 178");
 
   await panel.getHistoryFilter("Invitations & membership").click();
   await expect(entries.first()).toContainText("Accepted the invitation");
   // The whole list, not one entry: `not.toContainText` on a multi-element
   // locator is strict.
   await expect(page.getByTestId("candidate-history")).not.toContainText(
-    "Added a note",
+    "Updated their profile",
   );
 
-  await panel.getHistoryFilter("Notes").click();
-  await expect(entries.first()).toContainText("Added a note");
+  await panel.getHistoryFilter("Profile").click();
+  await expect(entries.first()).toContainText("Updated their profile");
 });
 
 test("the panel collapses on a phone and opens on demand", async ({ page }) => {

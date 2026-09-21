@@ -25,6 +25,13 @@ export const socialPlatform = v.union(
   v.literal("other"),
 );
 
+/** The three agents (prd/phase-2.md §4.1), as `ai/rules.ts` names them. */
+export const aiAgentId = v.union(
+  v.literal("conversation"),
+  v.literal("candidate_profile"),
+  v.literal("voice_profile"),
+);
+
 export const auditActor = v.union(
   v.object({
     type: v.literal("user"),
@@ -39,7 +46,64 @@ export const auditActor = v.union(
   }),
   // A scheduled job, e.g. "invite_expiry".
   v.object({ type: v.literal("system"), job: v.string() }),
+  // An AI agent, writing to a record it owns (prd/phase-2.md §3). Carries the
+  // model it ran on, because "the assistant changed this" is only half an
+  // answer once the model behind an agent has moved on.
+  v.object({
+    type: v.literal("agent"),
+    agent: aiAgentId,
+    model: v.string(),
+  }),
 );
+
+/**
+ * One value in a profile, and everything that is true *about* the value
+ * (prd/phase-2.md §3).
+ *
+ * `value` is the normalised string `profiles/rules.ts` produced — never raw
+ * input. An entry with an empty `value` is one nothing has been recorded for
+ * yet, held open only by a `pending` proposal; `source` on such an entry says
+ * nothing and nothing renders it.
+ */
+export const profileEntry = v.object({
+  value: v.string(),
+  // Who put the current value there. Distinct from the field's write policy,
+  // which is the rule and lives in `profiles/rules.ts`.
+  source: v.union(
+    v.literal("matchmaker"),
+    v.literal("agent"),
+    v.literal("agent_approved"),
+  ),
+  updatedAt: v.number(),
+  updatedByUserId: v.optional(v.id("users")), // absent when an agent wrote it
+  model: v.optional(v.string()),
+  sourceMessageId: v.optional(v.id("messages")),
+  sourceQuote: v.optional(v.string()), // verbatim, so a matchmaker can check
+  confidence: v.optional(v.number()), // 0..1, from the agent that proposed it
+  // An agent's proposal, waiting on the matchmaker. It sits BESIDE the current
+  // value rather than replacing it — a suggestion that overwrote what it is
+  // suggesting a change to would not be a suggestion.
+  //
+  // **At most one at a time.** A later run that finds something newer about
+  // the same field replaces the proposal rather than queuing behind it: two
+  // open questions about one field is a worse thing to hand someone than the
+  // current best answer. The one it replaced is in the audit trail.
+  pending: v.optional(
+    v.object({
+      // What is being proposed: a value, or that the entry go entirely. An
+      // agent learns that something is no longer true as often as it learns
+      // what is, and "" would not be a way of saying so — an entry whose
+      // value is "" is one nothing has been recorded for.
+      action: v.union(v.literal("set"), v.literal("clear")),
+      value: v.string(), // "" when the action is "clear"
+      suggestedAt: v.number(),
+      model: v.string(),
+      confidence: v.optional(v.number()),
+      sourceMessageId: v.optional(v.id("messages")),
+      sourceQuote: v.optional(v.string()),
+    }),
+  ),
+});
 
 export default defineSchema({
   // Convex Auth's sessions, accounts, verification codes, refresh tokens, …
@@ -181,13 +245,41 @@ export default defineSchema({
       "seq",
     ]),
 
-  notes: defineTable({
+  // The matchmaker's structured record of one person (prd/phase-2.md §3):
+  // `facts` keyed by the registry in `profiles/rules.ts`, `notes` keyed by
+  // whatever a matchmaker or an agent names.
+  //
+  // **One document per candidate, not one row per fact.** Every value carries
+  // who wrote it, when, and an agent's proposal waiting on it — forty columns
+  // would be forty nested objects, and adding a field would be a migration
+  // every time. The registry holds the types instead, so a value is always a
+  // normalised string and adding a field is an edit to one file.
+  //
+  // The history of a value is the audit trail, which is append-only and
+  // already refuses to be rewritten — there is no supersession chain here,
+  // because a second, less trustworthy copy of that history is worse than
+  // none.
+  candidateProfiles: defineTable({
     matchmakerId: v.id("matchmakers"),
     candidateId: v.id("candidates"),
-    body: v.string(),
-    removedAt: v.optional(v.number()), // "removed" in the UI; the row stays
+    facts: v.record(v.string(), profileEntry),
+    notes: v.record(v.string(), profileEntry),
     updatedAt: v.number(),
-  }).index("by_candidateId", ["candidateId"]),
+  })
+    .index("by_candidateId", ["candidateId"])
+    .index("by_matchmakerId", ["matchmakerId"]),
+
+  // What the product knows about the *matchmaker* (prd/phase-2.md §4.1C). The
+  // same entry shape, and so the same rules about who may write it — but named
+  // columns rather than a map, because this is a short, deliberate list rather
+  // than a bag that grows with whatever a conversation turns up. So far there
+  // is one: their voice, edited in their own settings and written by the
+  // voice-profile agent only as a proposal they approve.
+  matchmakerProfiles: defineTable({
+    matchmakerId: v.id("matchmakers"),
+    voice: v.optional(profileEntry),
+    updatedAt: v.number(),
+  }).index("by_matchmakerId", ["matchmakerId"]),
 
   // Append-only audit trail (prd/phase-1.md §5). Written only through
   // `recordAudit` in `audit/helpers.ts`, in the same mutation as the change.
@@ -255,11 +347,7 @@ export default defineSchema({
   // its own. Every edit is audited with the old text in the event, which is
   // what keeps the prompt's history.
   aiAgentSettings: defineTable({
-    agent: v.union(
-      v.literal("conversation"),
-      v.literal("candidate_profile"),
-      v.literal("voice_profile"),
-    ),
+    agent: aiAgentId,
     enabled: v.boolean(),
     model: v.string(), // "" means off
     systemPrompt: v.string(), // "" means off

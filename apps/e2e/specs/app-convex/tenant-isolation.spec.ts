@@ -43,7 +43,11 @@ test.beforeAll(async () => {
         userKey: "jane",
         membership: "joined",
         name: "Jane Member",
-        notes: ["Private note: only Maya should ever read this."],
+        profile: {
+          notes: {
+            matchmakerNotes: "Private note: only Maya should ever read this.",
+          },
+        },
         messages: [
           {
             author: "matchmaker",
@@ -112,7 +116,7 @@ test("a candidate can't open the workspace of the matchmaker they joined", async
   await expect(page.locator("body")).not.toContainText("Private note");
 });
 
-test("a candidate's own chat shows the matchmaker, not the matchmaker's notes", async ({
+test("a candidate's own chat shows the matchmaker, not their profile", async ({
   page,
 }) => {
   await signInAs(page, world.email("jane"));

@@ -1,8 +1,9 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 /**
- * The candidate panel beside a conversation: Details, Notes and History.
- * Rendered by `apps/app/src/workspace/candidate-panel.tsx`.
+ * The candidate panel beside a conversation: Details, Profile and History.
+ * Rendered by `apps/app/src/workspace/candidate-panel.tsx` and
+ * `candidate-profile.tsx`.
  */
 export class CandidatePanelPage {
   constructor(public readonly page: Page) {}
@@ -21,15 +22,15 @@ export class CandidatePanelPage {
   }
 
   /**
-   * Each section's header button. By test id, not by name: "Notes" also
+   * Each section's header button. By test id, not by name: "Profile" also
    * labels a filter inside the History section.
    */
-  getSection(name: "Details" | "Notes" | "History") {
+  getSection(name: "Details" | "Profile" | "History") {
     return this.page.getByTestId(`accordion-${name.toLowerCase()}`);
   }
 
   /** Expands a section, unless it is already open. */
-  async openSection(name: "Details" | "Notes" | "History") {
+  async openSection(name: "Details" | "Profile" | "History") {
     const header = this.getSection(name);
     if ((await header.getAttribute("aria-expanded")) !== "true") {
       await header.click();
@@ -62,19 +63,109 @@ export class CandidatePanelPage {
     return this.page.getByTestId("candidate-status");
   }
 
-  // --- Notes ---------------------------------------------------------------
+  // --- Profile: structured facts -------------------------------------------
+
+  getProfile() {
+    return this.page.getByTestId("candidate-profile");
+  }
+
+  /** Every field that has a value; the panel renders no empty ones. */
+  getFields() {
+    return this.page.getByTestId("profile-field");
+  }
+
+  getField(key: string) {
+    return this.page.locator(
+      `[data-testid="profile-field"][data-field="${key}"]`,
+    );
+  }
+
+  /** The add-a-field form's own value control, whatever kind it is. */
+  getAddFieldValue() {
+    return this.page
+      .getByTestId("profile-add-field-form")
+      .getByTestId("profile-value");
+  }
+
+  async addField(key: string, value: string) {
+    await this.page.getByTestId("profile-add-field").selectOption(key);
+    await this.fillValue(this.getAddFieldValue(), value);
+    await this.page.getByRole("button", { name: "Add", exact: true }).click();
+  }
+
+  /**
+   * The registry decides what control a field gets — a select, a date box or a
+   * text box — so the page object asks the element rather than the field.
+   */
+  private async fillValue(control: Locator, value: string) {
+    const tag = await control.evaluate((node) => node.tagName);
+    if (tag === "SELECT") await control.selectOption(value);
+    else await control.fill(value);
+  }
+
+  async editField(key: string, value: string) {
+    const row = this.getField(key);
+    await row.getByRole("button", { name: "Edit" }).click();
+    await this.fillValue(row.getByTestId("profile-value"), value);
+    await row.getByRole("button", { name: "Save" }).click();
+  }
+
+  async clearField(key: string) {
+    await this.getField(key).getByRole("button", { name: "Clear" }).click();
+  }
+
+  // --- Profile: free-text notes --------------------------------------------
 
   getNotes() {
-    return this.page.getByTestId("candidate-note");
+    return this.page.getByTestId("profile-note");
   }
 
-  getNewNoteInput() {
-    return this.page.getByLabel("New note");
+  getNote(key: string) {
+    return this.page.locator(
+      `[data-testid="profile-note"][data-note="${key}"]`,
+    );
   }
 
-  async addNote(body: string) {
-    await this.getNewNoteInput().fill(body);
+  async addNote(key: string, body: string) {
+    await this.page.getByTestId("profile-add-note-key").selectOption(key);
+    await this.page.getByTestId("profile-add-note-body").fill(body);
     await this.page.getByRole("button", { name: "Add note" }).click();
+  }
+
+  async editNote(key: string, body: string) {
+    const row = this.getNote(key);
+    await row.getByRole("button", { name: "Edit" }).click();
+    await row.getByTestId("profile-note-body").fill(body);
+    await row.getByRole("button", { name: "Save" }).click();
+  }
+
+  async removeNote(key: string) {
+    await this.getNote(key).getByRole("button", { name: "Remove" }).click();
+  }
+
+  // --- Profile: suggestions ------------------------------------------------
+
+  getSuggestions() {
+    return this.page.getByTestId("profile-suggestion");
+  }
+
+  /** By the entry it is about, so a test never depends on their order. */
+  getSuggestion(kind: "facts" | "notes", key: string) {
+    return this.page.locator(
+      `[data-testid="profile-suggestion"][data-kind="${kind}"][data-field="${key}"]`,
+    );
+  }
+
+  async acceptSuggestion(kind: "facts" | "notes", key: string) {
+    await this.getSuggestion(kind, key)
+      .getByTestId("profile-suggestion-accept")
+      .click();
+  }
+
+  async dismissSuggestion(kind: "facts" | "notes", key: string) {
+    await this.getSuggestion(kind, key)
+      .getByTestId("profile-suggestion-dismiss")
+      .click();
   }
 
   // --- History -------------------------------------------------------------

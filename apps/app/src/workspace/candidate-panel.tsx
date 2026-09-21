@@ -4,8 +4,6 @@ import {
   candidateNameError,
   handleError,
   type Id,
-  NOTE_LIMITS,
-  noteBodyError,
   SOCIAL_PLATFORM_LABELS,
   SOCIAL_PLATFORMS,
   type SocialPlatform,
@@ -15,18 +13,17 @@ import {
   AccordionSection,
   Button,
   Field,
-  FieldError,
   FieldLabel,
   Input,
   NativeSelect,
-  Textarea,
 } from "@repo/ui";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { type FormEvent, useId, useState } from "react";
 import { serverErrorMessage } from "../lib/server-error";
 import { PanelHeader } from "../shell/panel-header";
 import { CandidateHistory } from "./candidate-history";
 import { type Membership, membershipMarker } from "./candidate-labels";
+import { CandidateProfile } from "./candidate-profile";
 import { useWorkspace } from "./workspace-layout";
 
 export type PanelCandidate = {
@@ -44,9 +41,10 @@ export type PanelCandidate = {
 const STATUSES = ["active", "paused", "archived"] as const;
 
 /**
- * The candidate panel (prd/phase-1.md §4.1): Details, Notes and History,
- * everything the matchmaker knows about one person that isn't the thread.
- * Private to them — a candidate has no route to any of it.
+ * The candidate panel (prd/phase-1.md §4.1, prd/phase-2.md §5): Details,
+ * Profile and History — everything the matchmaker knows about one person that
+ * isn't the thread. Private to them: a candidate has no route to any of it,
+ * including to their own profile (prd/phase-2.md §7).
  */
 export function CandidatePanel({
   candidate,
@@ -67,8 +65,13 @@ export function CandidatePanel({
         closeTestId="close-candidate-panel"
       />
       {/* Sections rather than tabs: a matchmaker reading a thread wants the
-          details and their notes at once, not one at a time. They scroll as
-          this column, under its header — never as the page. */}
+          details and what they know at once, not one at a time. They scroll as
+          this column, under its header — never as the page.
+
+          Details stays open by default: it holds membership and the invite
+          controls, which is what you want on opening a thread you haven't
+          touched in a week, while Profile is a reading surface
+          (prd/phase-2.md §5). */}
       <Accordion
         defaultValue={["details"]}
         className="min-h-0 flex-1 overflow-y-auto"
@@ -77,8 +80,8 @@ export function CandidatePanel({
         <AccordionSection value="details" title="Details">
           <Details candidate={candidate} />
         </AccordionSection>
-        <AccordionSection value="notes" title="Notes">
-          <Notes candidateId={candidate.candidateId} />
+        <AccordionSection value="profile" title="Profile">
+          <CandidateProfile candidateId={candidate.candidateId} />
         </AccordionSection>
         <AccordionSection value="history" title="History">
           <CandidateHistory candidateId={candidate.candidateId} />
@@ -304,138 +307,6 @@ function Details({ candidate }: { candidate: PanelCandidate }) {
           ))}
         </NativeSelect>
       </Field>
-    </div>
-  );
-}
-
-function Notes({ candidateId }: { candidateId: Id<"candidates"> }) {
-  const workspace = useWorkspace();
-  const notes = useQuery(api.notes.queries.list, {
-    matchmakerId: workspace.matchmakerId,
-    candidateId,
-  });
-  const create = useMutation(api.notes.mutations.create);
-  const edit = useMutation(api.notes.mutations.edit);
-  const remove = useMutation(api.notes.mutations.remove);
-  const [draft, setDraft] = useState("");
-  const [editing, setEditing] = useState<Id<"notes"> | null>(null);
-  const [editBody, setEditBody] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  async function add(event: FormEvent) {
-    event.preventDefault();
-    const invalid = noteBodyError(draft);
-    setError(invalid);
-    if (invalid) return;
-    try {
-      await create({
-        matchmakerId: workspace.matchmakerId,
-        candidateId,
-        body: draft,
-      });
-      setDraft("");
-    } catch (caught) {
-      setError(serverErrorMessage(caught, "We couldn't save that note."));
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-4" data-testid="candidate-notes">
-      <form noValidate onSubmit={add} className="flex flex-col gap-2">
-        <Field invalid={error !== null}>
-          <FieldLabel className="sr-only">New note</FieldLabel>
-          <Textarea
-            aria-label="New note"
-            placeholder="Only you can see your notes."
-            rows={3}
-            maxLength={NOTE_LIMITS.body}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          {error && <FieldError match>{error}</FieldError>}
-        </Field>
-        <Button type="submit" size="sm" className="self-start">
-          Add note
-        </Button>
-      </form>
-
-      {notes === undefined ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : notes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No notes yet.</p>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {notes.map((note) => (
-            <li
-              key={note._id}
-              className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3"
-              data-testid="candidate-note"
-            >
-              {editing === note._id ? (
-                <>
-                  <Textarea
-                    aria-label="Edit note"
-                    rows={3}
-                    value={editBody}
-                    onChange={(event) => setEditBody(event.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        void edit({
-                          matchmakerId: workspace.matchmakerId,
-                          noteId: note._id,
-                          body: editBody,
-                        }).then(() => setEditing(null))
-                      }
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditing(null)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="whitespace-pre-wrap break-words text-sm">
-                    {note.body}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setEditing(note._id);
-                        setEditBody(note.body);
-                      }}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        void remove({
-                          matchmakerId: workspace.matchmakerId,
-                          noteId: note._id,
-                        })
-                      }
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

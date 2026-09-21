@@ -34,11 +34,11 @@ export const AI_AGENT_LABELS: Record<
   },
   candidate_profile: {
     label: "Candidate profile",
-    does: "Adds, supersedes and discards facts on a candidate's profile.",
+    does: "Writes a candidate's profile, or proposes a change for the matchmaker to approve — whichever the field allows.",
   },
   voice_profile: {
     label: "Voice profile",
-    does: "Maintains the matchmaker's voice profile from their samples and sent messages.",
+    does: "Drafts the matchmaker's voice from what they have written and sent. They decide it sounds like them.",
   },
 };
 

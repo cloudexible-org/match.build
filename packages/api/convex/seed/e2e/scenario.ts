@@ -74,6 +74,10 @@ export type ScenarioMatchmaker = {
   /** Default: `<Key> <ns>`, so it can't collide in an assertion. */
   displayName?: string;
   businessName?: string;
+  /** Their voice (prd/phase-2.md §4.1C), as if they had written it themselves. */
+  voice?: string;
+  /** A voice the agent has drafted and nobody has answered yet. */
+  voiceSuggestion?: string;
 };
 
 export type ScenarioCandidate = {
@@ -105,7 +109,28 @@ export type ScenarioCandidate = {
   messages?: ScenarioMessage[];
   /** Left unread by the matchmaker, as if the candidate had just written. */
   unreadForMatchmaker?: boolean;
-  notes?: string[];
+  /**
+   * The matchmaker's profile of them (prd/phase-2.md §3). `facts` are keyed by
+   * the registry in `profiles/rules.ts` and their values have to pass its
+   * validation; `notes` take any key. `suggestions` reach a state the UI can't
+   * produce without an agent: a value an agent has proposed and nobody has
+   * answered yet.
+   */
+  profile?: ScenarioProfile;
+};
+
+export type ScenarioProfile = {
+  facts?: Record<string, string>;
+  notes?: Record<string, string>;
+  suggestions?: {
+    kind: "facts" | "notes";
+    key: string;
+    value: string;
+    /** Default: the agent wrote nothing here before. */
+    current?: string;
+    /** The agent proposing the entry go, rather than a new value. */
+    remove?: boolean;
+  }[];
 };
 
 export type ScenarioSpec = {
