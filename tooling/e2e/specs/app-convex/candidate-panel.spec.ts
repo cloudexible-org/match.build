@@ -143,6 +143,12 @@ test("the panel collapses on a phone and opens on demand", async ({ page }) => {
   // carries its own way out.
   await page.getByTestId("close-candidate-panel").click();
   await expect(panel.getRoot()).toBeHidden();
+
+  // Widen past `lg` and the panel is simply there, with no Details button to
+  // open what is already open.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(panel.getRoot()).toBeVisible();
+  await expect(panel.getToggle()).toBeHidden();
 });
 
 /** Like `openPanel`, but the panel starts collapsed at phone width. */
