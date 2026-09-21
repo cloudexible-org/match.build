@@ -3,6 +3,7 @@ import { internal } from "../_generated/api";
 import { internalMutation, mutation } from "../_generated/server";
 import { requireUser } from "../users/helpers";
 import { notificationSettingsFor, readSeqFor } from "./helpers";
+import { DEFAULT_NOTIFICATION_SETTINGS } from "./rules";
 
 /*
  * Notifications (prd/phase-1.md §8.1). Nothing here sends anything: sending
@@ -194,6 +195,38 @@ export const dropSubscription = internalMutation({
       .withIndex("by_endpoint", (q) => q.eq("endpoint", args.endpoint))
       .unique();
     if (existing !== null) await ctx.db.delete(existing._id);
+    return null;
+  },
+});
+
+/**
+ * Records that the notifications panel has just been opened, which is the
+ * whole of "read" for it (rules.ts, "The in-app panel").
+ *
+ * Deliberately **not** a read marker on any conversation: opening the bell is
+ * not reading the message, so the thread stays unread, the workspace keeps
+ * its count, and a push or email already scheduled still fires. Not audited,
+ * for the same reason a channel preference isn't (§5.1).
+ */
+export const markFeedSeen = mutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+    const existing = await ctx.db
+      .query("notificationSettings")
+      .withIndex("by_userId", (q) => q.eq("userId", user._id))
+      .unique();
+    const feedSeenAt = Date.now();
+    if (existing === null) {
+      await ctx.db.insert("notificationSettings", {
+        userId: user._id,
+        ...DEFAULT_NOTIFICATION_SETTINGS,
+        feedSeenAt,
+      });
+    } else {
+      await ctx.db.patch("notificationSettings", existing._id, { feedSeenAt });
+    }
     return null;
   },
 });

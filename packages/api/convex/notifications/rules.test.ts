@@ -1,13 +1,20 @@
 import { describe, expect, test } from "vitest";
 import {
   EMAIL_DELAY_MS,
+  isNew,
+  MAX_FEED_ITEMS,
+  MEMBERSHIP_WINDOW_MS,
   membershipEmail,
+  membershipFeedEntry,
+  newestFirst,
   newMessageEmail,
   newMessagePush,
   nextPushAt,
   PUSH_DELAY_MS,
   PUSH_INTERVAL_MS,
   skipScheduling,
+  unreadMessageBody,
+  withinMembershipWindow,
 } from "./rules";
 
 describe("when a push may go out", () => {
@@ -142,5 +149,59 @@ describe("the delays themselves", () => {
     expect(PUSH_DELAY_MS).toBe(30 * 1000);
     expect(EMAIL_DELAY_MS).toBe(5 * 60 * 1000);
     expect(PUSH_DELAY_MS).toBeLessThan(EMAIL_DELAY_MS);
+  });
+});
+
+describe("the in-app panel", () => {
+  test("says how many messages, never what they say", () => {
+    expect(unreadMessageBody(1)).toBe("Sent you a message");
+    expect(unreadMessageBody(4)).toBe("4 new messages");
+  });
+
+  test("three membership changes are news, the rest aren't", () => {
+    expect(membershipFeedEntry("joined")).toEqual({
+      kind: "invite",
+      body: "Accepted your invitation",
+    });
+    expect(membershipFeedEntry("left")?.kind).toBe("system");
+    expect(membershipFeedEntry("account_deleted")?.kind).toBe("system");
+    // An invitation going out, or being turned down, is not a thing the
+    // matchmaker is told about (§8.1 names three).
+    expect(membershipFeedEntry("invited")).toBeNull();
+    expect(membershipFeedEntry("declined")).toBeNull();
+  });
+
+  test("newest first, and the cap falls on the oldest", () => {
+    const items = Array.from({ length: MAX_FEED_ITEMS + 5 }, (_, index) => ({
+      id: String(index),
+      kind: "message" as const,
+      title: "Someone",
+      body: "Sent you a message",
+      at: index, // oldest first going in
+      href: "/",
+    }));
+    const sorted = newestFirst(items);
+    expect(sorted).toHaveLength(MAX_FEED_ITEMS);
+    expect(sorted[0]?.at).toBe(MAX_FEED_ITEMS + 4);
+    expect(sorted.at(-1)?.at).toBe(5);
+    // The input is left alone: callers build one array and read it twice.
+    expect(items[0]?.at).toBe(0);
+  });
+
+  test("new means since the panel was last opened", () => {
+    expect(isNew(100, 90)).toBe(true);
+    expect(isNew(100, 100)).toBe(false); // opened at the same instant
+    expect(isNew(100, 110)).toBe(false);
+    // Never opened: everything is new.
+    expect(isNew(100, undefined)).toBe(true);
+  });
+
+  test("a membership change stops being news after a month", () => {
+    const now = 1_000 * MEMBERSHIP_WINDOW_MS;
+    expect(withinMembershipWindow(now, now)).toBe(true);
+    expect(withinMembershipWindow(now - MEMBERSHIP_WINDOW_MS + 1, now)).toBe(
+      true,
+    );
+    expect(withinMembershipWindow(now - MEMBERSHIP_WINDOW_MS, now)).toBe(false);
   });
 });

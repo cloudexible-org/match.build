@@ -198,6 +198,12 @@ export default defineSchema({
     ),
   })
     .index("by_matchmakerId_and_status", ["matchmakerId", "status"])
+    // The notifications panel: this matchmaker's most recent membership
+    // changes, newest first, without reading every candidate they have.
+    .index("by_matchmakerId_and_membershipChangedAt", [
+      "matchmakerId",
+      "membershipChangedAt",
+    ])
     .index("by_matchmakerId_and_email", ["matchmakerId", "email"])
     .index("by_userId_and_matchmakerId", ["userId", "matchmakerId"])
     // Home page invitations: every matchmaker's open invite to one address.
@@ -329,6 +335,15 @@ export default defineSchema({
     userId: v.id("users"),
     emailEnabled: v.boolean(),
     pushEnabled: v.boolean(),
+    // When this account last opened the in-app notifications panel. The whole
+    // of "read" for that panel: its list is derived from conversations and
+    // memberships, so an item is new when it happened after this, and there is
+    // nothing per item to mark. Absent for an account that has never opened
+    // it, which reads as "everything is new".
+    //
+    // Separate from the read markers on `conversations`: glancing at the bell
+    // is not reading the message, and clearing one must never clear the other.
+    feedSeenAt: v.optional(v.number()),
   }).index("by_userId", ["userId"]),
 
   // One row per AI agent (prd/phase-2.md §4.4). **The only source of an agent's

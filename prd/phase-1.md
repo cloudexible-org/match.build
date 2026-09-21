@@ -9,7 +9,7 @@
 
 ## 1. Accounts and profiles
 
-**Account (user).** One per email address. Sign-up asks only for a **name** and an **email**, verified with a one-time code (§8.3). An account has no role of its own: roles live on the profiles it owns.
+**Account (user).** One per email address. Sign-up asks only for a **name** and an **email**, verified with a one-time code (§8.4). An account has no role of its own: roles live on the profiles it owns.
 
 **Anyone can create a matchmaker profile.** There is no waitlist gate or approval step.
 
@@ -464,7 +464,7 @@ Domains under `packages/api/convex/`, each split into `rules.ts` / `mutations.ts
 | `messages/` | The thread: reading and writing `messages`, and the `conversations` counters and read markers they move (§3.3, §8.1). |
 | `notes/` | The matchmaker's private notes on a candidate (§4.1). |
 | `audit/` | `recordAudit`, the fixed action list and the renderer behind the History tab (§5). Queries only — nothing writes an event except through the helper, inside the caller's own transaction. |
-| `notifications/` | Both channels: the per-account `notificationSettings`, push subscriptions, the coalescing table, the delay and throttle rules, and the sending action (§8.1, §8.2). |
+| `notifications/` | All three channels: the per-account `notificationSettings` (both switches and the panel's seen watermark), push subscriptions, the coalescing table, the delay and throttle rules, the sending action, and the derived in-app feed (§8.1–§8.3). |
 | `email/` | Outgoing mail: the message bodies, the `emailOutbox` record of what was sent, and the Resend hand-off. Sign-in codes included, so `auth.ts` and the admin app share one sender. |
 | `admin/` | The platform admin app's cross-tenant functions (audit trail, sign-in codes, erasure), each behind `requirePlatformAdmin`. See §9.3 and §12. |
 | `waitlist/` | The marketing site's sign-up form. No tenant, no auth: the one domain `apps/www` talks to. |
@@ -490,17 +490,20 @@ Email is used for exactly three things, all sent from `match.build` through the 
 
 Only `match.build` needs DNS setup for sending (SPF, DKIM, DMARC).
 
+There are **three notification channels**, in the order someone meets them: the **in-app panel** under the bell (§8.3), **web push** (§8.2), and **email**. The first is always there and costs nothing to deliver; the other two leave the app and so carry delays, throttles and a switch each.
+
 ### 8.1 Notification rules
 
-Web push and email are both driven by **read markers**:
+All three channels are driven by **read markers**:
 
 - **Seen** means the conversation is open and the tab is visible (`document.visibilityState === "visible"`). While that is true, the app calls `markRead(seq)` for the latest message shown, updating `matchmakerLastReadSeq` or `candidateLastReadSeq`.
 - When a message is sent, the other participant becomes a notification target. Private messages and system notes never notify the candidate. Nobody is notified for a candidate whose membership isn't `joined`.
 - **Web push** is scheduled **~30 s** later; **email** **~5 min** later. When the job fires it re-reads the conversation; if the recipient's read marker has reached the message it records `skipped_seen` and sends nothing.
 - **Coalescing:** at most one scheduled job per (conversation, recipient, channel). Later messages ride on the pending job.
 - **Throttling:** after an email is sent for a conversation, no further email for that conversation until the recipient has read it. Push: at most one per conversation per minute.
-- Users can switch each channel off in `/settings`.
+- Users can switch **push and email** off in `/settings`. The in-app panel has no switch: it shows what the app would show anyway, one screen further in.
 - Matchmakers are also notified when an invitation is accepted, and when a candidate leaves or deletes their account.
+- The delays, coalescing and throttling above are about *leaving* the app. The panel has none of them: it is read from the same state at the moment it is opened (§8.3).
 
 ### 8.2 Web push
 
@@ -509,7 +512,17 @@ Web push and email are both driven by **read markers**:
 - **iOS only supports web push for home-screen-installed web apps** (iOS 16.4+). Prompt iOS users to "Add to Home Screen" before asking for push permission; email is their fallback until then.
 - Ask for push permission after a meaningful moment (e.g. after sending the first message), not on first load.
 
-### 8.3 Sign-in
+### 8.3 In-app notifications
+
+The bell in the app's header, on every signed-in page: what is waiting on this account, newest first, capped at twenty.
+
+- **Derived, never stored.** There is no feed table and nothing writes a feed row. The list is a projection of `conversations`, `candidates` and the same read markers the other two channels run on: conversations with messages past this reader's marker, memberships that changed recently, and invitations open for their address. A stored "you have unread messages" is a copy that can be wrong, and a notification for a message that isn't there is worse than no notification.
+- **One item per conversation**, saying how many messages are waiting and who from — **never what they say**. The reason the email doesn't quote a message doesn't stop at the inbox: a panel is read over someone's shoulder too.
+- **Seen is not read.** Opening the panel sets one watermark for the account (`notificationSettings.feedSeenAt`) and marks nothing else. A conversation's own read marker still moves only while its thread is open, so quieting the bell leaves the workspace's unread count standing and does not cancel a push or email already scheduled. The badge means "new since you last looked".
+- **Both roles at once.** An account that is a matchmaker *and* somebody else's candidate sees all of it in one list. A candidate who has left is told nothing, the same rule the send path applies.
+- **A membership change stops being news after 30 days** — nothing ever "reads" an acceptance, so without a window a quiet workspace would list who joined it last year. An open invitation has no window: it is waiting on an answer for as long as it is open, and it expires on its own.
+
+### 8.4 Sign-in
 
 Convex Auth with the Resend email provider, **one-time code** rather than a magic link. A magic link opened from a mail app often lands in a different browser than an installed home-screen app, which breaks sign-in there; a typed code does not. Sign-up collects name and email; the verified email is what matches pending invitations.
 

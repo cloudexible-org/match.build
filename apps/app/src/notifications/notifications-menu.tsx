@@ -1,4 +1,4 @@
-import { Button, cn, Popover, PopoverClose, PopoverTitle } from "@repo/ui";
+import { Button, cn, Popover, PopoverTitle } from "@repo/ui";
 import { useState } from "react";
 import { Link } from "react-router";
 import {
@@ -44,6 +44,7 @@ export function NotificationsMenu({
   // Read when the panel opens, so "3m" is three minutes ago now rather than
   // when the page loaded. A ticking clock would re-render the whole header
   // once a minute to change a character nobody is looking at.
+  const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [wasUnread, setWasUnread] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -51,8 +52,14 @@ export function NotificationsMenu({
 
   return (
     <Popover
-      onOpenChange={(open) => {
-        if (!open) return;
+      open={open}
+      // Controlled, so following a notification can close the panel behind
+      // itself: the popup is portalled and outlives the route change that
+      // clicking one causes, so navigating alone would leave it hanging over
+      // the page it just opened.
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) return;
         setNow(Date.now());
         setWasUnread(unreadIds(items));
         onOpen?.();
@@ -60,33 +67,36 @@ export function NotificationsMenu({
       className="w-[min(22rem,calc(100vw-1.5rem))]"
       trigger={bellTrigger(unreadCount(items))}
     >
-      <div className="border-b border-border px-3 py-2">
-        <PopoverTitle>Notifications</PopoverTitle>
-      </div>
+      <div data-testid="notifications-panel">
+        <div className="border-b border-border px-3 py-2">
+          <PopoverTitle>Notifications</PopoverTitle>
+        </div>
 
-      {items.length === 0 ? (
-        <p
-          className="px-3 py-8 text-center text-sm text-muted-foreground"
-          data-testid="notifications-empty"
-        >
-          You're all caught up.
-        </p>
-      ) : (
-        <ul
-          className="max-h-[min(24rem,60vh)] overflow-y-auto py-1"
-          data-testid="notifications-list"
-        >
-          {items.map((item) => (
-            <li key={item.id}>
-              <NotificationRow
-                item={item}
-                now={now}
-                unread={wasUnread.has(item.id)}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+        {items.length === 0 ? (
+          <p
+            className="px-3 py-8 text-center text-sm text-muted-foreground"
+            data-testid="notifications-empty"
+          >
+            You're all caught up.
+          </p>
+        ) : (
+          <ul
+            className="max-h-[min(24rem,60vh)] overflow-y-auto py-1"
+            data-testid="notifications-list"
+          >
+            {items.map((item) => (
+              <li key={item.id}>
+                <NotificationRow
+                  item={item}
+                  now={now}
+                  unread={wasUnread.has(item.id)}
+                  onFollow={() => setOpen(false)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </Popover>
   );
 }
@@ -147,6 +157,10 @@ const ROW =
  * text where there isn't, rather than a control that looks clickable and
  * isn't.
  *
+ * A real `<Link>`, not Base UI's own close button rendering one: that stamps
+ * button semantics onto whatever it renders, and this is a link. Opening it
+ * in a new tab has to keep working.
+ *
  * `unread` comes from the panel's snapshot rather than `item.read`, which by
  * the time this renders is already true of everything.
  */
@@ -154,10 +168,12 @@ function NotificationRow({
   item,
   now,
   unread,
+  onFollow,
 }: {
   item: Notification;
   now: number;
   unread: boolean;
+  onFollow: () => void;
 }) {
   const body = (
     <>
@@ -203,13 +219,9 @@ function NotificationRow({
     );
   }
   return (
-    <PopoverClose
-      render={
-        <Link to={item.href} className={ROW} {...shared}>
-          {body}
-        </Link>
-      }
-    />
+    <Link to={item.href} onClick={onFollow} className={ROW} {...shared}>
+      {body}
+    </Link>
   );
 }
 

@@ -77,5 +77,8 @@ export function PopoverTitle({
   );
 }
 
-/** Closes the popover. Renders whatever it is given, like `Popover`'s trigger. */
-export const PopoverClose = BasePopover.Close;
+/*
+ * No `Close` is exported: Base UI's stamps button semantics onto whatever it
+ * renders, so a link inside a popup would stop being a link. Control `open`
+ * instead — that is what the prop is for.
+ */

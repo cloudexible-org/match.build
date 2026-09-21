@@ -10,7 +10,7 @@ import {
 import { upsertAuthUser } from "./users/helpers";
 
 /**
- * Convex Auth (prd/phase-1.md §8.3): sign-in and sign-up are the same flow —
+ * Convex Auth (prd/phase-1.md §8.4): sign-in and sign-up are the same flow —
  * enter an email, then the six-digit code sent to it. A code, not a magic
  * link, because a link opened from a mail app often lands in a different
  * browser than an installed home-screen app.
