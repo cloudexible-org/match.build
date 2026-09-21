@@ -1,14 +1,16 @@
 import { Button, cn } from "@repo/ui";
 
 /**
- * The furniture of a carousel: an arrow either side, and a counter.
+ * The furniture of a carousel: two arrows and a counter.
  *
  * Shared so the suggestion cards above the composer and the matches in the
  * candidate panel look like the same control, because they are one. The
- * counter is separate from the arrows rather than built into them: on a
- * suggestion card it belongs in the card's own header, and in the panel it
- * belongs in the section heading, and a component that insisted on one
- * position would be used in neither.
+ * counter is separate from the arrows rather than built into them, because
+ * the two places arrange them differently: the panel puts an arrow either
+ * side of the card and the counter in the heading above it, while a
+ * suggestion card is full width and gathers all three into its own header as
+ * `‹ 1/2 ›`. A component that insisted on one arrangement would be used in
+ * neither.
  *
  * Neither holds state. Which item is showing is the caller's, and the
  * arithmetic is `lib/carousel.ts`.
@@ -19,18 +21,21 @@ export function CarouselArrow({
   label,
   disabled,
   onClick,
+  className,
 }: {
   direction: "previous" | "next";
   /** Named for a screen reader: an arrow glyph alone says nothing. */
   label: string;
   disabled: boolean;
   onClick: () => void;
+  /** For a tighter arrangement — the pair inside a card's header. */
+  className?: string;
 }) {
   return (
     <Button
       variant="ghost"
       size="sm"
-      className="size-8 shrink-0 p-0"
+      className={cn("size-8 shrink-0 p-0", className)}
       aria-label={label}
       disabled={disabled}
       data-testid={`carousel-${direction}`}
@@ -76,9 +81,4 @@ export function CarouselCounter({
       {index + 1}/{count}
     </span>
   );
-}
-
-/** The space an arrow would take, in a row with nowhere to go. */
-export function CarouselGutter() {
-  return <div aria-hidden className="size-8 shrink-0" />;
 }
