@@ -58,29 +58,3 @@ describe("matchmakers.workspace", () => {
     expect(await t.query(workspace, { username: "jane.smith" })).toBeNull();
   });
 });
-
-describe("matchmakers.profileHistory", () => {
-  test("lists the profile's events newest first, to the owner only", async () => {
-    const { asOwner, asStranger, matchmakerId } = await world();
-    await asOwner.mutation(api.matchmakers.mutations.update, {
-      matchmakerId,
-      displayName: "Jane Smith",
-      businessName: "",
-    });
-
-    const history = await asOwner.query(
-      api.matchmakers.queries.profileHistory,
-      { matchmakerId },
-    );
-    expect(history.map((event) => event.action)).toEqual([
-      "matchmaker.updated",
-      "matchmaker.created",
-    ]);
-
-    await expect(
-      asStranger.query(api.matchmakers.queries.profileHistory, {
-        matchmakerId,
-      }),
-    ).rejects.toThrow("Matchmaker profile not found.");
-  });
-});

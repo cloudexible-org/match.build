@@ -89,9 +89,18 @@ describe("seed.e2e.scenario", () => {
       "everyone",
     ]);
 
-    const history = await asMaya.query(api.matchmakers.queries.profileHistory, {
-      matchmakerId: world.matchmakers.book.id as never,
-    });
+    // The profile's own audit trail, read from the table: nothing in the app
+    // renders it any more, but seeding still has to write it.
+    const history = await t.run(async (ctx) =>
+      ctx.db
+        .query("auditEvents")
+        .withIndex("by_entityTable_and_entityId", (q) =>
+          q
+            .eq("entityTable", "matchmakers")
+            .eq("entityId", world.matchmakers.book.id as never),
+        )
+        .collect(),
+    );
     expect(history.map((event) => event.action)).toEqual([
       "matchmaker.created",
     ]);
