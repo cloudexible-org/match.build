@@ -77,11 +77,7 @@ export function MatchCard({
   const score = scoreLine(card);
   const tone = scoreTone(card.score);
   const isNew = card.stage === "proposed" && !isSeen(card);
-
-  /** Reading a card is what makes it no longer new. */
-  function look() {
-    if (isNew) actions.onSeen();
-  }
+  const canExpand = (card.signals?.length ?? 0) > cardReasons(card).length;
 
   return (
     <article
@@ -95,7 +91,6 @@ export function MatchCard({
       data-stage={card.stage}
       data-score={card.score ?? ""}
       data-new={isNew}
-      onPointerDown={look}
       className={cn(
         "flex cursor-grab flex-col gap-2 rounded-xl border bg-card p-3 text-left shadow-sm transition-opacity active:cursor-grabbing",
         dimmed && "opacity-60",
@@ -135,10 +130,7 @@ export function MatchCard({
         <CardMenu
           card={card}
           actions={actions}
-          onClose={() => {
-            look();
-            setClosing(true);
-          }}
+          onClose={() => setClosing(true)}
         />
       </div>
 
@@ -233,19 +225,34 @@ export function MatchCard({
         </p>
       )}
 
-      {(card.signals?.length ?? 0) > cardReasons(card).length && (
-        <button
-          type="button"
-          onClick={() => {
-            look();
-            setOpen(!open);
-          }}
-          className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
-          data-testid="match-card-expand"
-          aria-expanded={open}
-        >
-          {open ? "Fewer reasons" : `All ${card.signals?.length} reasons`}
-        </button>
+      {/* The two things you can do to a card without moving it. Reading one
+          deliberately does *not* mark it seen: a card that reordered itself
+          out from under the cursor of the person reading it would be teaching
+          them not to read one. */}
+      {(canExpand || isNew) && (
+        <div className="flex flex-wrap items-center gap-3">
+          {canExpand && (
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+              data-testid="match-card-expand"
+              aria-expanded={open}
+            >
+              {open ? "Fewer reasons" : `All ${card.signals?.length} reasons`}
+            </button>
+          )}
+          {isNew && (
+            <button
+              type="button"
+              onClick={actions.onSeen}
+              className="text-xs text-primary underline-offset-2 hover:underline"
+              data-testid="match-card-mark-seen"
+            >
+              Mark seen
+            </button>
+          )}
+        </div>
       )}
 
       {closing && (

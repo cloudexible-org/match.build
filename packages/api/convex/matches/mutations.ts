@@ -314,12 +314,16 @@ export const close = mutation({
 });
 
 /**
- * Marks a card as looked at, which is the whole of what the Reviewing column
- * used to say — without a card having to be dragged through a column to say it.
+ * Marks a card as seen, which is the whole of what the Reviewing column used to
+ * say — without a card having to be dragged through a column to say it.
  *
- * Idempotent, and deliberately one-way: a matchmaker who has read a card has
- * read it, and a way to mark it unread again would be a second kind of
- * bookkeeping about cards rather than about people.
+ * Driven by a button on the card and never by reading one: unseen cards sort
+ * first, so marking on read would reorder a card out from under the cursor of
+ * the person reading it. Moving or closing a card still counts, because both
+ * of those are decisions rather than a glance.
+ *
+ * Idempotent, and deliberately one-way: a way to mark a card unread again would
+ * be a second kind of bookkeeping about cards rather than about people.
  */
 export const markSeen = mutation({
   args: { matchmakerId: v.id("matchmakers"), matchId: v.id("matches") },

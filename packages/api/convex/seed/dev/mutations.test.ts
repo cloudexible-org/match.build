@@ -301,6 +301,33 @@ describe("seed.dev.mutations.apply", () => {
     });
   });
 
+  test("the board can be emptied, so the next seed builds a fresh one", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.dev.mutations.apply, {});
+    expect(
+      (await t.run((ctx) => ctx.db.query("matches").collect())).length,
+    ).toBeGreaterThan(0);
+
+    const reset = await t.mutation(internal.seed.dev.mutations.resetBoard, {});
+    expect(reset.done).toBe(true);
+    expect(reset.removed).toBeGreaterThan(0);
+    expect(await t.run((ctx) => ctx.db.query("matches").collect())).toEqual([]);
+
+    // And the seed builds one again, which is the whole point of emptying it.
+    await t.mutation(internal.seed.dev.mutations.apply, {});
+    expect(
+      (await t.run((ctx) => ctx.db.query("matches").collect())).length,
+    ).toBeGreaterThan(0);
+  });
+
+  test("the reset refuses to run outside a dev deployment too", async () => {
+    vi.stubEnv("SITE_URL", "https://www.match.build/app");
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(internal.seed.dev.mutations.resetBoard, {}),
+    ).rejects.toThrow(/not a dev deployment/);
+  });
+
   test("refuses to run where SITE_URL is not on .localhost", async () => {
     vi.stubEnv("SITE_URL", "https://www.match.build/app");
     const t = convexTest(schema, modules);

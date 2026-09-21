@@ -46,6 +46,15 @@ const WOMAN = {
 /** Nobody in this book is looking for him, so no filter lets him through. */
 const UNMATCHABLE = { ...MAN, age: "60", seekingGender: "men" };
 
+/** More than a card shows at once, so it has an "All N reasons" to open. */
+const MANY_SIGNALS = [
+  { key: "lookingFor", weight: 6, earned: 1, detail: "Both want marriage" },
+  { key: "location", weight: 6, earned: 1, detail: "Both in Toronto" },
+  { key: "wantsKids", weight: 6, earned: 1, detail: "Both want children" },
+  { key: "age", weight: 3, earned: 0.8, detail: "31 and 34" },
+  { key: "smoking", weight: 4, earned: 0, detail: "never and regularly" },
+];
+
 const SIGNALS = [
   { key: "lookingFor", weight: 6, earned: 1, detail: "Both want marriage" },
   { key: "location", weight: 6, earned: 1, detail: "Both in Toronto" },
@@ -144,6 +153,7 @@ test.beforeAll(async () => {
         bKey: "newb",
         score: 68,
         coverage: 0.5,
+        signals: MANY_SIGNALS,
       },
       {
         key: "closed",
@@ -284,15 +294,19 @@ test("a card comes back onto the board without what closing recorded", async ({
   await expect(board.getClosingLine(moved)).toHaveCount(0);
 });
 
-test("a card is new until you look at it", async ({ page }) => {
+test("a card is new until you say you have seen it", async ({ page }) => {
   const board = await openBoard(page);
   const card = board.getCard("Newa One", "Newb Two");
   await expect(board.getNewDot(card)).toBeVisible();
 
-  // Touching the card at all is looking at it. (Not the names, which are
-  // links to the two conversations.)
-  await board.getScore(card).click();
+  // Reading the card does *not* mark it: unseen cards sort first, so marking
+  // on read would reorder a card out from under whoever is reading it.
+  await board.getExpand(card).click();
+  await expect(board.getNewDot(card)).toBeVisible();
+
+  await board.markSeen(card);
   await expect(board.getNewDot(card)).toHaveCount(0);
+  await expect(board.getMarkSeen(card)).toHaveCount(0);
 
   await page.reload();
   await expect(
@@ -337,4 +351,28 @@ test("Find matches runs the algorithm and says what it looked at", async ({
   await board.findMatches();
   await expect(board.getRunSummary()).toContainText("nothing new to suggest");
   await expect(board.getCard("Sam Seeker", "Joan Jones")).toHaveCount(1);
+});
+
+test("the board fills the frame, and never scrolls past it", async ({
+  page,
+}) => {
+  const board = await openBoard(page);
+  await expect(board.getCards().first()).toBeVisible();
+  await board.openClosed();
+
+  for (const height of [900, 700, 600, 460]) {
+    await page.setViewportSize({ width: 1400, height });
+    // A page scrollbar on a board is a page scrollbar into nothing: the
+    // columns have already given up their slack, so there is nothing under
+    // the bottom of the board to find.
+    expect(await board.frameOverflow(), `at ${height}px tall`).toBe(0);
+  }
+
+  // The height goes somewhere: a column out of room scrolls its own cards.
+  const column = board.getColumn("proposed");
+  const scrolls = await column.evaluate((el) => {
+    const list = el.lastElementChild;
+    return list !== null && list.scrollHeight > list.clientHeight;
+  });
+  expect(scrolls).toBe(true);
 });

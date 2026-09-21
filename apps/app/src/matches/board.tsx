@@ -129,10 +129,20 @@ export function MatchBoard() {
       // Fills the workspace's frame and scrolls inside itself, the way the
       // chat shell does: a board is a surface you work on, and its one
       // horizontal scrollbar belongs at the bottom of the window rather than
-      // wherever the tallest column happens to end. `min-h-*` is the safety
-      // valve — on a short or narrow viewport the frame scrolls instead of
-      // crushing the columns to nothing.
-      className="flex min-h-[28rem] min-w-0 flex-1 flex-col gap-4 px-4 py-6"
+      // wherever the tallest column happens to end.
+      //
+      // **No minimum height, and `min-h-0` so there is no implied one either.**
+      // A minimum used to sit here, and on a short window it made the frame
+      // scroll past the bottom of the board into nothing at all: the columns
+      // had already given up their slack, so there was nothing under there to
+      // find. `min-h-0` is the other half of it — a flex item will not shrink
+      // below its content by default, and everything inside this one scrolls,
+      // so its content must not be allowed to set a floor.
+      //
+      // Being exactly the frame's height is also what makes the percentage
+      // caps below work: a percentage resolves against a definite height and
+      // is ignored against an automatic one.
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-4 py-6"
       data-testid="match-board"
     >
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
@@ -190,8 +200,10 @@ export function MatchBoard() {
           {/* Scrolls sideways as a board does, and takes every pixel of height
               the header above it didn't. The columns share the width when
               there is enough of it and stop at a readable 18rem when there
-              isn't, which is when this starts scrolling. */}
-          <div className="-mx-4 flex min-h-0 flex-1 gap-3 overflow-x-auto px-4 pb-2">
+              isn't, which is when this starts scrolling. No floor: a column
+              that runs out of room scrolls its own cards, which is a better
+              answer than a page that scrolls to reach it. */}
+          <div className="-mx-4 flex min-h-0 min-w-0 flex-1 gap-3 overflow-x-auto px-4 pb-2">
             {MATCH_BOARD_STAGES.map((stage) => (
               <Column
                 key={stage}
@@ -332,7 +344,7 @@ function ClosedSection({
         <span id="match-closed-heading">{closedSummary(cards)}</span>
       </button>
       {open && (
-        <div className="-mx-1 flex max-h-[45%] gap-2 overflow-x-auto px-1 pb-1">
+        <div className="-mx-1 flex max-h-[min(45%,18rem)] gap-2 overflow-y-auto overflow-x-auto px-1 pb-1">
           {cards.map((card) => (
             <div key={card.matchId} className="w-72 shrink-0">
               <MatchCard card={card} actions={actions(card)} />

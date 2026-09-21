@@ -98,7 +98,10 @@ export function WorkspaceLayout() {
           box exactly and scrolls inside its own columns, so this never
           scrolls; the workspace's settings and onboard are ordinary pages
           taller than the screen, and this is what scrolls them. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+        data-testid="workspace-frame"
+      >
         <Outlet context={workspace satisfies Workspace} />
       </div>
     </div>

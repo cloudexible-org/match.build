@@ -46,6 +46,19 @@ function isLocalhostSite(siteUrl: string | undefined): boolean {
   }
 }
 
+/**
+ * Throws unless this is unmistakably a dev deployment: SITE_URL on
+ * `.localhost` (only the dev app runs there) and no RESEND_API_KEY (the
+ * `.test` accounts can only sign in through the outbox).
+ */
+function requireDevDeployment(): void {
+  if (!isLocalhostSite(env.SITE_URL) || env.RESEND_API_KEY !== undefined) {
+    throw new ConvexError(
+      "Refusing to seed: SITE_URL is not on .localhost or RESEND_API_KEY is set, so this is not a dev deployment.",
+    );
+  }
+}
+
 function devUser(slug: string): DevUser {
   const user = DEV_USERS.find((u) => u.slug === slug);
   if (user === undefined) throw new Error(`Unknown dev user "${slug}"`);
@@ -224,6 +237,41 @@ async function seedMember(
   return candidateId;
 }
 
+/** One page of deletions, so an unbounded table never lands in one transaction. */
+const RESET_PAGE_SIZE = 200;
+
+/**
+ * Empties the match board, so the next `seed:dev` builds a fresh one.
+ *
+ * The seed is additive everywhere else — it adds what is missing and changes
+ * nothing that is there — and the board is the one thing that cannot work that
+ * way: it is only built when it is empty, because a seed that reshuffled cards
+ * would undo an afternoon of moving them. So emptying it is a separate,
+ * deliberate command rather than a flag on the seed.
+ *
+ * **This deletes rows, which nothing else in the product does** (prd/phase-1.md
+ * §5). It is allowed here because it only ever runs against a dev deployment —
+ * `requireDevDeployment` — and because a seeded board is not anybody's record
+ * of anything. The audit events the old cards wrote are left alone: the trail
+ * is append-only, and a dev trail with a few stale match events in it is a
+ * smaller lie than a trail this function had edited.
+ *
+ * Returns `done: false` when there was more than one page, so the caller knows
+ * to run it again.
+ */
+export const resetBoard = internalMutation({
+  args: {},
+  returns: v.object({ removed: v.number(), done: v.boolean() }),
+  handler: async (ctx) => {
+    requireDevDeployment();
+    const page = await ctx.db.query("matches").take(RESET_PAGE_SIZE);
+    for (const match of page) {
+      await ctx.db.delete(match._id);
+    }
+    return { removed: page.length, done: page.length < RESET_PAGE_SIZE };
+  },
+});
+
 /**
  * Pairs two seeded people by hand, scored by the same algorithm the run uses
  * (prd/phase-3.md §2) — the state a matchmaker reaches with "Pair two people".
@@ -267,11 +315,7 @@ export const apply = internalMutation({
     accounts: v.array(v.object({ email: v.string(), role: v.string() })),
   }),
   handler: async (ctx) => {
-    if (!isLocalhostSite(env.SITE_URL) || env.RESEND_API_KEY !== undefined) {
-      throw new ConvexError(
-        "Refusing to seed: SITE_URL is not on .localhost or RESEND_API_KEY is set, so this is not a dev deployment.",
-      );
-    }
+    requireDevDeployment();
 
     const now = Date.now();
     const created: string[] = [];
