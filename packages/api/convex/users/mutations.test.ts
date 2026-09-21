@@ -451,3 +451,187 @@ describe("users.deleteAccount", () => {
     expect(user?.deletedAt).toBeUndefined();
   });
 });
+
+describe("what a deleted account leaves behind", () => {
+  /**
+   * The guarantee the product is sold on (prd/phase-1.md §3.4, §3.5): the
+   * matchmaker's record of a person is *theirs*, and someone leaving the
+   * platform does not reach into it. Asserted through the matchmaker's own
+   * query paths, not row counts, because "the row still exists" is not the
+   * promise — "they can still open it" is.
+   */
+  test("the matchmaker can still read the whole conversation, notes and trail", async () => {
+    const t = newTest();
+    const userId = await seedAccount(t, "jane@example.test");
+    const ownerId = await t.run((ctx) =>
+      ctx.db.insert("users", {
+        email: "maya@example.test",
+        name: "Maya Maker",
+        emailVerificationTime: 1,
+      }),
+    );
+    const matchmakerId = await t.run((ctx) =>
+      ctx.db.insert("matchmakers", {
+        ownerUserId: ownerId,
+        username: "maya.matches",
+        usernameKey: "mayamatches",
+        displayName: "Maya's Book",
+      }),
+    );
+    const candidateId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("candidates", {
+        matchmakerId,
+        userId,
+        name: "Jane Doe",
+        email: "jane@example.test",
+        socialHandles: [{ platform: "instagram", handle: "jane.doe" }],
+        membership: "joined",
+        membershipChangedAt: 1,
+        status: "active",
+      });
+      const conversationId = await ctx.db.insert("conversations", {
+        matchmakerId,
+        candidateId: id,
+        lastSeq: 2,
+        lastPublicSeq: 2,
+        lastMessageAt: 2,
+        matchmakerLastReadSeq: 2,
+        candidateLastReadSeq: 2,
+      });
+      for (const [seq, message] of [
+        { author: "matchmaker" as const, body: "Imported: Jane is 34." },
+        { author: "candidate" as const, body: "Looking forward to it!" },
+      ].entries()) {
+        await ctx.db.insert("messages", {
+          matchmakerId,
+          conversationId,
+          seq: seq + 1,
+          author: message.author,
+          visibility: seq === 0 ? "matchmaker" : "everyone",
+          source: seq === 0 ? "imported" : "typed",
+          body: message.body,
+          sentAt: seq + 1,
+        });
+      }
+      await ctx.db.insert("notes", {
+        matchmakerId,
+        candidateId: id,
+        body: "Loves hiking. Introduce to Sam.",
+        updatedAt: 1,
+      });
+      return id;
+    });
+
+    const asOwner = t.withIdentity({ subject: `${ownerId}|s` });
+    const { code } = await requestCode(t, userId, "jane@example.test");
+    expect(
+      await t
+        .withIdentity({ subject: `${userId}|s` })
+        .mutation(api.users.mutations.deleteAccount, { code }),
+    ).toEqual({ kind: "deleted" });
+
+    // Their details, including the name and handles the matchmaker recorded.
+    const view = await asOwner.query(api.candidates.queries.conversation, {
+      matchmakerId,
+      candidateId,
+    });
+    expect(view?.candidate.membership).toBe("account_deleted");
+    expect(view?.candidate.name).toBe("Jane Doe");
+    expect(view?.candidate.socialHandles).toEqual([
+      { platform: "instagram", handle: "jane.doe" },
+    ]);
+
+    // Both messages, the private one included.
+    const thread = await asOwner.query(api.messages.queries.thread, {
+      matchmakerId,
+      candidateId,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(thread.page.map((message) => message.body)).toEqual([
+      "Looking forward to it!",
+      "Imported: Jane is 34.",
+    ]);
+
+    // Their notes, still editable — these are the matchmaker's own records.
+    const notes = await asOwner.query(api.notes.queries.list, {
+      matchmakerId,
+      candidateId,
+    });
+    expect(notes.map((note) => note.body)).toEqual([
+      "Loves hiking. Introduce to Sam.",
+    ]);
+    await asOwner.mutation(api.notes.mutations.create, {
+      matchmakerId,
+      candidateId,
+      body: "Deleted their account in March.",
+    });
+
+    // And the history, which now ends with them going.
+    const history = await asOwner.query(api.audit.queries.candidateHistory, {
+      matchmakerId,
+      candidateId,
+      filter: "all",
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(
+      history.page.some(
+        (event) => event.action === "membership.account_deleted",
+      ),
+    ).toBe(true);
+  });
+
+  test("nothing in the product tables is actually removed", async () => {
+    const t = newTest();
+    const userId = await seedAccount(t, "jane@example.test");
+    const alpha = await seedMatchmaker(t, "alpha");
+    const candidateId = await addCandidate(t, alpha, userId, "joined");
+    await t.run(async (ctx) => {
+      const conversationId = await ctx.db.insert("conversations", {
+        matchmakerId: alpha,
+        candidateId,
+        lastSeq: 1,
+        lastPublicSeq: 1,
+        lastMessageAt: 1,
+        matchmakerLastReadSeq: 1,
+        candidateLastReadSeq: 1,
+      });
+      await ctx.db.insert("messages", {
+        matchmakerId: alpha,
+        conversationId,
+        seq: 1,
+        author: "matchmaker",
+        visibility: "everyone",
+        source: "typed",
+        body: "Hello",
+        sentAt: 1,
+      });
+      await ctx.db.insert("notes", {
+        matchmakerId: alpha,
+        candidateId,
+        body: "A note",
+        updatedAt: 1,
+      });
+    });
+    const { code } = await requestCode(t, userId, "jane@example.test");
+    await t
+      .withIdentity({ subject: `${userId}|s` })
+      .mutation(api.users.mutations.deleteAccount, { code });
+
+    // Row for row: only auth plumbing goes (prd §6).
+    const counts = await t.run(async (ctx) => ({
+      users: (await ctx.db.query("users").collect()).length,
+      candidates: (await ctx.db.query("candidates").collect()).length,
+      conversations: (await ctx.db.query("conversations").collect()).length,
+      messages: (await ctx.db.query("messages").collect()).length,
+      notes: (await ctx.db.query("notes").collect()).length,
+    }));
+    expect(counts).toEqual({
+      // The deleted account and the matchmaker's owner.
+      users: 2,
+      candidates: 1,
+      conversations: 1,
+      messages: 1,
+      notes: 1,
+    });
+  });
+});

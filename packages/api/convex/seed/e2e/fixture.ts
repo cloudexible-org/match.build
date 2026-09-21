@@ -77,6 +77,11 @@ export const SEED_ADMINS: SeedUser[] = [
     email: "admin.codes@matchmaker-e2e.test",
     name: "Cody Codes",
   },
+  {
+    slug: "admin-erasure",
+    email: "admin.erasure@matchmaker-e2e.test",
+    name: "Eve Erasure",
+  },
 ];
 
 /**

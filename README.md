@@ -212,6 +212,21 @@ pnpm --filter @repo/api invites:setup
 Add `--prod` for the production deployment. Rotating it (`--force`) breaks
 every open invite link; the candidates can be re-invited.
 
+### Erasure requests
+
+`/admin/erasure` handles a right-to-erasure request by **anonymising, not
+deleting**. The person's name, address and handles are replaced everywhere —
+their account, every matchmaker's record of them, and the values inside the
+audit trail — while the conversations, notes and events stay where they are.
+Each matchmaker keeps a full record of the work they did with an anonymous
+candidate.
+
+It is irreversible and takes the account's own address typed back to run. Two
+deliberate limits: an account that owns a matchmaker profile can't be erased
+(its candidates' data hangs off that profile), and message and note **text** is
+left alone — whether a request reaches into what was written is the
+matchmaker's call as data controller, not the platform's.
+
 ### Notifications
 
 Email notifications work as soon as `RESEND_API_KEY` is set. **Web push needs

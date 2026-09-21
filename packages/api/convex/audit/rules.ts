@@ -20,6 +20,10 @@ export const AUDIT_ACTIONS = [
   "account.deleted",
   // A platform admin issued a sign-in code for the account (apps/admin).
   "account.sign_in_code_issued",
+  // A platform admin erased the person at their request (prd/phase-1.md §12).
+  // Their identifiers are gone everywhere; the matchmakers' conversations,
+  // notes and trails stay, attached to an anonymous record.
+  "account.erased",
 
   // Matchmaker profile. Shown in profile settings, not a candidate's trail.
   "matchmaker.created",
@@ -44,6 +48,9 @@ export const AUDIT_ACTIONS = [
   "membership.left",
   "membership.account_deleted",
   "membership.reinvited",
+  // The candidate record this matchmaker holds was anonymised by an erasure
+  // request. Recorded in their trail because their records visibly change.
+  "candidate.anonymised",
 
   // Notes.
   "note.created",
@@ -120,6 +127,7 @@ const FILTER_ACTIONS: Record<Exclude<AuditFilter, "all">, AuditAction[]> = {
     "account.name_changed",
   ],
   membership: [
+    "candidate.anonymised",
     "invite.created",
     "invite.sent",
     "invite.resent",
@@ -181,7 +189,40 @@ const PLAIN_SENTENCES: Partial<Record<AuditAction, string>> = {
   "candidate.status_changed": "Changed their status",
   "account.created": "Created their account",
   "account.deleted": "Deleted their account",
+  "account.erased": "Erased their personal data at their request",
+  "candidate.anonymised":
+    "Anonymised them at their request — the conversation, notes and history are unchanged",
 };
+
+/*
+ * ─── Erasure ────────────────────────────────────────────────────────────────
+ *
+ * A trail that records "changed email from jane@gmial.com to jane@gmail.com"
+ * is itself a copy of the person (prd/phase-1.md §12). Erasing them has to
+ * reach it, but §5.3 promises the trail is append-only — so an erasure
+ * redacts the *values* inside an event and never touches the event itself.
+ * What happened, when, and who did it all survive; only the person does not.
+ */
+
+/** The stand-in an erased value is replaced with, before JSON encoding. */
+export const ERASED_VALUE = "[erased]";
+
+/**
+ * The `changes` fields that hold a person's own details rather than a
+ * matchmaker's workflow. `status`, `membership` and `expiresAt` say nothing
+ * about who someone is, so they stay readable after an erasure; a username or
+ * display name belongs to the matchmaker, not the candidate.
+ */
+const PERSONAL_FIELDS = new Set([
+  "name",
+  "email",
+  "socialHandles",
+  "acceptedAs",
+]);
+
+export function fieldHoldsPersonalData(field: string): boolean {
+  return PERSONAL_FIELDS.has(field);
+}
 
 /** One recorded change, as stored: JSON-encoded values. */
 export type AuditChange = {

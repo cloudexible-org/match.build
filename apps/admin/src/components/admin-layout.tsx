@@ -7,6 +7,7 @@ import { NavLink, Outlet } from "react-router";
 const NAV = [
   { to: "/audit", label: "Audit trail" },
   { to: "/sign-in-codes", label: "Sign-in codes" },
+  { to: "/erasure", label: "Erasure" },
 ] as const;
 
 /** Top bar and page frame for every signed-in admin page. */

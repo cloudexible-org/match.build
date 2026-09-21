@@ -3,7 +3,13 @@ import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { recordAudit } from "../audit/helpers";
+import { ERASED_VALUE, fieldHoldsPersonalData } from "../audit/rules";
 import { normaliseEmail } from "../waitlist/rules";
+import {
+  ERASED_ACCOUNT_NAME,
+  ERASED_CANDIDATE_NAME,
+  erasedEmail,
+} from "./rules";
 
 /**
  * The signed-in user, or `null` when signed out or the account was deleted.
@@ -191,4 +197,102 @@ export async function removeSignInCredentials(
     for (const code of codes) await ctx.db.delete(code._id);
     await ctx.db.delete(account._id);
   }
+}
+
+/*
+ * ─── Erasing a person (prd/phase-1.md §12) ──────────────────────────────────
+ */
+
+/** A short random tag, so two erased records can never collide on email. */
+function erasureTag(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(6)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+/**
+ * Replaces everything on a `users` row that identifies the person, and marks
+ * the account deleted if it isn't already — an account whose owner has been
+ * erased cannot be signed into, so its credentials go with it.
+ *
+ * Returns the address it had, which is the only way to find the rows keyed by
+ * it (the outbox, the waitlist) once it is gone.
+ */
+export async function anonymiseAccount(
+  ctx: MutationCtx,
+  user: Doc<"users">,
+  now: number,
+): Promise<{ previousEmail: string | undefined }> {
+  await ctx.db.patch("users", user._id, {
+    name: ERASED_ACCOUNT_NAME,
+    email: erasedEmail(erasureTag()),
+    phone: undefined,
+    image: undefined,
+    deletedAt: user.deletedAt ?? now,
+    deletionCode: undefined,
+  });
+  await removeSignInCredentials(ctx, user._id);
+  return { previousEmail: user.email };
+}
+
+/**
+ * Replaces everything on one matchmaker's record of the person. Their
+ * membership, status, conversation, notes and history are all left alone:
+ * this is the matchmaker's record of a relationship, and only the person in
+ * it is erased.
+ */
+export async function anonymiseCandidate(
+  ctx: MutationCtx,
+  candidate: Doc<"candidates">,
+): Promise<void> {
+  await ctx.db.patch("candidates", candidate._id, {
+    name: ERASED_CANDIDATE_NAME,
+    email: erasedEmail(erasureTag()),
+    socialHandles: [],
+    leaveReason: undefined,
+    // An open invite is a live link to their address; it cannot outlive them.
+    invite: undefined,
+  });
+}
+
+/**
+ * Redacts the personal values inside a set of audit events, leaving every
+ * event, its action, its actor and its timing in place (see `audit/rules.ts`
+ * for why that is the shape erasure takes here).
+ *
+ * Returns how many events it changed, so the caller can report it.
+ */
+export async function redactAuditEvents(
+  ctx: MutationCtx,
+  events: Doc<"auditEvents">[],
+): Promise<number> {
+  let redacted = 0;
+  for (const event of events) {
+    const changes = event.changes?.map((change) =>
+      fieldHoldsPersonalData(change.field)
+        ? {
+            field: change.field,
+            before:
+              change.before === undefined
+                ? undefined
+                : JSON.stringify(ERASED_VALUE),
+            after:
+              change.after === undefined
+                ? undefined
+                : JSON.stringify(ERASED_VALUE),
+          }
+        : change,
+    );
+    // `reason` is free text the person wrote about themselves when leaving.
+    const changed =
+      JSON.stringify(changes) !== JSON.stringify(event.changes) ||
+      event.reason !== undefined;
+    if (!changed) continue;
+    await ctx.db.patch("auditEvents", event._id, {
+      changes,
+      reason: undefined,
+    });
+    redacted += 1;
+  }
+  return redacted;
 }

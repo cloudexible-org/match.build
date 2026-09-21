@@ -74,3 +74,32 @@ export function auditFiltersError(
   }
   return null;
 }
+
+/*
+ * ─── Erasure (prd/phase-1.md §12) ───────────────────────────────────────────
+ */
+
+/**
+ * Ceilings for one erasure. It runs in a single transaction, so exceeding one
+ * rolls the whole thing back and nothing is half-erased: an erasure that
+ * quietly stopped part-way is worse than one that refused and said so.
+ *
+ * Phase-1 volumes are nowhere near these — a candidate's trail runs to tens of
+ * events — so hitting one means something needs designing, not raising.
+ */
+export const ERASURE_LIMITS = {
+  memberships: 100,
+  auditEvents: 1000,
+  outboxEmails: 500,
+} as const;
+
+/** What an admin must type to confirm an erasure: the account's own address. */
+export function erasureConfirmationError(
+  typed: string,
+  email: string | undefined,
+): string | null {
+  if (email === undefined) return "This account has no address to confirm.";
+  return typed.trim().toLowerCase() === email.toLowerCase()
+    ? null
+    : "Type the account's email address exactly to confirm.";
+}

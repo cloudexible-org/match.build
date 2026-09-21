@@ -174,3 +174,296 @@ describe("admin.issueSignInCodeFor", () => {
     ).rejects.toThrow("different account");
   });
 });
+
+describe("admin.eraseAccount", () => {
+  /**
+   * A person with two matchmakers, each holding a full record of them: a
+   * thread, a private note, and a trail with their name, address and handles
+   * in it. Erasure has to reach every copy of *them* without touching any of
+   * the record.
+   */
+  async function person() {
+    const base = await world();
+    const jane = await base.t.run((ctx) =>
+      ctx.db.insert("users", {
+        email: "jane@example.test",
+        name: "Jane Doe",
+        emailVerificationTime: 1,
+      }),
+    );
+    const books = [];
+    for (const label of ["alpha", "bravo"]) {
+      const ids = await base.t.run(async (ctx) => {
+        const ownerUserId = await ctx.db.insert("users", {
+          email: `${label}@example.test`,
+          name: `${label} owner`,
+          emailVerificationTime: 1,
+        });
+        const matchmakerId = await ctx.db.insert("matchmakers", {
+          ownerUserId,
+          username: `${label}.matches`,
+          usernameKey: `${label}matches`,
+          displayName: `${label} Book`,
+        });
+        const candidateId = await ctx.db.insert("candidates", {
+          matchmakerId,
+          userId: jane,
+          name: "Jane Doe",
+          email: "jane@example.test",
+          socialHandles: [{ platform: "instagram", handle: "jane.doe" }],
+          membership: "left",
+          membershipChangedAt: 3,
+          leaveReason: "Met someone through a friend called Sam.",
+          status: "active",
+        });
+        const conversationId = await ctx.db.insert("conversations", {
+          matchmakerId,
+          candidateId,
+          lastSeq: 1,
+          lastPublicSeq: 1,
+          lastMessageAt: 1,
+          matchmakerLastReadSeq: 1,
+          candidateLastReadSeq: 1,
+        });
+        await ctx.db.insert("messages", {
+          matchmakerId,
+          conversationId,
+          seq: 1,
+          author: "candidate",
+          authorUserId: jane,
+          visibility: "everyone",
+          source: "typed",
+          body: "Looking for someone kind.",
+          sentAt: 1,
+        });
+        await ctx.db.insert("notes", {
+          matchmakerId,
+          candidateId,
+          body: "Great first call.",
+          updatedAt: 1,
+        });
+        // The trail as the product would have written it: her details, her
+        // reason for leaving, and a status change that is the matchmaker's
+        // own workflow rather than anything about her.
+        await ctx.db.insert("auditEvents", {
+          matchmakerId,
+          candidateId,
+          actor: { type: "user", userId: ownerUserId, role: "matchmaker" },
+          action: "candidate.details_changed",
+          entityTable: "candidates",
+          entityId: candidateId,
+          changes: [
+            {
+              field: "email",
+              before: '"jane@gmial.test"',
+              after: '"jane@example.test"',
+            },
+            { field: "name", after: '"Jane Doe"' },
+          ],
+        });
+        await ctx.db.insert("auditEvents", {
+          matchmakerId,
+          candidateId,
+          actor: { type: "user", userId: ownerUserId, role: "matchmaker" },
+          action: "candidate.status_changed",
+          entityTable: "candidates",
+          entityId: candidateId,
+          changes: [{ field: "status", before: '"active"', after: '"paused"' }],
+        });
+        await ctx.db.insert("auditEvents", {
+          matchmakerId,
+          candidateId,
+          actor: { type: "user", userId: jane, role: "candidate" },
+          action: "membership.left",
+          entityTable: "candidates",
+          entityId: candidateId,
+          changes: [
+            { field: "membership", before: '"joined"', after: '"left"' },
+          ],
+          reason: "Met someone through a friend called Sam.",
+        });
+        return { matchmakerId, candidateId, conversationId, ownerUserId };
+      });
+      books.push(ids);
+    }
+    // Things that are copies of her and nobody's record: an unsent email and
+    // a marketing sign-up.
+    await base.t.run(async (ctx) => {
+      await ctx.db.insert("emailOutbox", {
+        to: "jane@example.test",
+        kind: "sign_in_code",
+        subject: "123456 is your sign-in code",
+        text: "123456",
+      });
+      await ctx.db.insert("waitlist", {
+        email: "jane@example.test",
+        name: "Jane Doe",
+        instagram: "jane.doe",
+        source: "landing",
+      });
+    });
+    return { ...base, jane, books };
+  }
+
+  const erase = (w: Awaited<ReturnType<typeof person>>) =>
+    w.asAdmin.mutation(api.admin.mutations.eraseAccount, {
+      userId: w.jane,
+      confirmEmail: "jane@example.test",
+    });
+
+  test("leaves no way to tell who the person was", async () => {
+    const w = await person();
+    const result = await erase(w);
+    expect(result.candidates).toBe(2);
+    expect(result.auditEventsRedacted).toBe(4); // two details + two left
+
+    const state = await w.t.run(async (ctx) => ({
+      user: await ctx.db.get("users", w.jane),
+      candidates: await ctx.db.query("candidates").collect(),
+      events: await ctx.db.query("auditEvents").collect(),
+      outbox: await ctx.db.query("emailOutbox").collect(),
+      waitlist: await ctx.db.query("waitlist").collect(),
+    }));
+
+    // Nothing anywhere still says "Jane", her address, or her handle.
+    const everything = JSON.stringify(state);
+    for (const trace of [
+      "Jane Doe",
+      "jane@example.test",
+      "jane.doe",
+      "jane@gmial.test",
+    ]) {
+      expect(everything).not.toContain(trace);
+    }
+    // Including the free text she wrote about herself when she left.
+    expect(everything).not.toContain("friend called Sam");
+
+    expect(state.user?.name).toBe("Erased account");
+    expect(state.user?.email).toMatch(/^erased-[0-9a-f]{12}@erased\.invalid$/);
+    expect(state.user?.deletedAt).toBeDefined();
+    for (const candidate of state.candidates) {
+      expect(candidate.name).toBe("Erased candidate");
+      expect(candidate.socialHandles).toEqual([]);
+      expect(candidate.leaveReason).toBeUndefined();
+    }
+    // Two erased candidates must not collide on the one-per-email rule.
+    expect(new Set(state.candidates.map((row) => row.email)).size).toBe(2);
+    expect(state.outbox).toHaveLength(0);
+    expect(state.waitlist).toHaveLength(0);
+  });
+
+  test("leaves every matchmaker's record of the relationship intact", async () => {
+    const w = await person();
+    await erase(w);
+
+    for (const book of w.books) {
+      const asOwner = w.t.withIdentity({ subject: `${book.ownerUserId}|s` });
+      // The thread, including what she wrote.
+      const thread = await asOwner.query(api.messages.queries.thread, {
+        matchmakerId: book.matchmakerId,
+        candidateId: book.candidateId,
+        paginationOpts: { numItems: 10, cursor: null },
+      });
+      expect(thread.page.map((message) => message.body)).toEqual([
+        "Looking for someone kind.",
+      ]);
+      // Their own notes.
+      const notes = await asOwner.query(api.notes.queries.list, {
+        matchmakerId: book.matchmakerId,
+        candidateId: book.candidateId,
+      });
+      expect(notes.map((note) => note.body)).toEqual(["Great first call."]);
+
+      // And the history: every event still there, still readable, with the
+      // workflow values intact and only the personal ones gone.
+      const history = await asOwner.query(api.audit.queries.candidateHistory, {
+        matchmakerId: book.matchmakerId,
+        candidateId: book.candidateId,
+        filter: "all",
+        paginationOpts: { numItems: 20, cursor: null },
+      });
+      const actions = history.page.map((event) => event.action);
+      expect(actions).toContain("candidate.details_changed");
+      expect(actions).toContain("membership.left");
+      expect(actions).toContain("candidate.anonymised");
+
+      const status = history.page.find(
+        (event) => event.action === "candidate.status_changed",
+      );
+      expect(status?.changes).toEqual([
+        { field: "status", before: '"active"', after: '"paused"' },
+      ]);
+      const details = history.page.find(
+        (event) => event.action === "candidate.details_changed",
+      );
+      expect(details?.changes).toEqual([
+        { field: "email", before: '"[erased]"', after: '"[erased]"' },
+        // An absent `before` stays absent: it said nothing to begin with.
+        { field: "name", after: '"[erased]"' },
+      ]);
+    }
+  });
+
+  test("is refused without the account's own address typed back", async () => {
+    const w = await person();
+    await expect(
+      w.asAdmin.mutation(api.admin.mutations.eraseAccount, {
+        userId: w.jane,
+        confirmEmail: "jane@example.tes",
+      }),
+    ).rejects.toThrow("Type the account's email address exactly");
+    const user = await w.t.run((ctx) => ctx.db.get("users", w.jane));
+    expect(user?.name).toBe("Jane Doe");
+  });
+
+  test("is refused to anyone who isn't a platform admin, and for a matchmaker", async () => {
+    const w = await person();
+    await expect(
+      w.asMember.mutation(api.admin.mutations.eraseAccount, {
+        userId: w.jane,
+        confirmEmail: "jane@example.test",
+      }),
+    ).rejects.toThrow("This account isn't a platform admin.");
+
+    await expect(
+      w.asAdmin.mutation(api.admin.mutations.eraseAccount, {
+        userId: w.books[0].ownerUserId,
+        confirmEmail: "alpha@example.test",
+      }),
+    ).rejects.toThrow("owns a matchmaker profile");
+  });
+
+  test("says so rather than erasing an already-erased account twice", async () => {
+    const w = await person();
+    await erase(w);
+    const erased = await w.t.run((ctx) => ctx.db.get("users", w.jane));
+    await expect(
+      w.asAdmin.mutation(api.admin.mutations.eraseAccount, {
+        userId: w.jane,
+        confirmEmail: erased?.email ?? "",
+      }),
+    ).rejects.toThrow("already been erased");
+  });
+
+  test("records who did it, at account level and in each matchmaker's trail", async () => {
+    const w = await person();
+    await erase(w);
+    const events = await w.t.run((ctx) =>
+      ctx.db.query("auditEvents").collect(),
+    );
+    const erasure = events.filter((event) => event.action === "account.erased");
+    expect(erasure).toHaveLength(1);
+    expect(erasure[0].matchmakerId).toBeUndefined();
+    expect(erasure[0].actor).toEqual({
+      type: "user",
+      userId: w.ids.admin,
+      role: "platform_admin",
+    });
+    // One per matchmaker, each only in their own trail.
+    const anonymised = events.filter(
+      (event) => event.action === "candidate.anonymised",
+    );
+    expect(anonymised).toHaveLength(2);
+    expect(new Set(anonymised.map((event) => event.matchmakerId)).size).toBe(2);
+  });
+});

@@ -221,7 +221,7 @@ Filters: All · Details · Invitations & membership · Notes.
 ### 5.3 Guarantees
 
 - **Written in the same mutation as the change.** Every function that changes audited state calls one helper, `recordAudit(ctx, event)` in `convex/audit/helpers.ts`, inside its own transaction. A change without its audit event is impossible; nothing audits later via the scheduler.
-- **Append-only.** No function updates or deletes an audit event.
+- **Append-only.** No function updates or deletes an audit event. The single exception is an erasure request (§12), which redacts the personal *values* inside an event — the event, its action, its actor and its time are never touched.
 - **Tenant-scoped.** Every candidate event carries `matchmakerId` and `candidateId`, and only that matchmaker can read it. Candidates never see the audit trail.
 - **Action names are a fixed list** in `convex/audit/rules.ts`, with a renderer that turns each action into the readable sentence.
 - Implemented as a regular domain (`convex/audit/`), not an isolated Convex component: the helper must write in the caller's transaction and be queried alongside candidate data.
@@ -421,6 +421,7 @@ export default defineSchema({
 - **Two fields for candidate state.** `membership` is the person's side; `status` is the matchmaker's workflow. A candidate who left can still be archived; keeping them separate avoids a combined status explosion.
 - **Uniqueness is enforced in mutations**, since Convex has no unique constraints: one `usernameKey` across matchmakers; one candidate per `(matchmakerId, email)`; one candidate per `(matchmakerId, userId)`.
 - **Account deletion and Convex Auth.** Convex Auth links a new sign-in to an existing user with the same email by default. Override `createOrUpdateUser` so a user with `deletedAt` is never reused.
+- **Erasure** is the one thing that writes over existing rows rather than adding to them, and §5.3's append-only guarantee is narrowed to match: an erasure redacts the *values* inside an audit event's `changes` and `reason`, and never removes, reorders or rewrites an event. What happened, when, and who did it all survive an erasure; only the person does not.
 - **Notification delays and VAPID keys** are deployment env vars, declared in `convex.config.ts` (§8.2 and §12): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NOTIFICATION_PUSH_DELAY_SECONDS`, `NOTIFICATION_EMAIL_DELAY_SECONDS`. All optional: without the keys the app offers email only.
 - **The deletion confirmation code** (§3.5) is not in the schema above: the built `users` table also carries an optional `deletionCode` (`{ codeHash, expiresAt, attempts }`), holding only the SHA-256 of the six digits, cleared once spent, replaced, or guessed at too often. It is not a credential — only `users.deleteAccount` accepts it, and only from the account that asked for it — so it can't be used to sign in.
 - **Remove the template's demo `messages` table and `convex/messages.ts`** before this schema lands; they collide with the table above.
@@ -497,7 +498,7 @@ Candidate conversations include sexual orientation, religion, health and family 
 
 - **Roles:** the matchmaker is the data controller for their candidates; the platform is a processor. This needs a data-processing agreement in the terms.
 - **Consent:** the accept screen carries a privacy notice: the matchmaker keeps the conversation on the platform, including after the candidate leaves or deletes their account.
-- **Retention:** nothing is deleted (§6). Formal erasure requests are handled by an admin process outside the UI — see open decisions.
+- **Retention:** nothing is deleted (§6). A formal erasure request is handled by a platform admin at `/admin/erasure`, which **anonymises rather than deletes**: the person's name, address and handles are replaced everywhere they appear — their account, every matchmaker's candidate record, and the values inside the audit trail — while the conversations, notes and events themselves stay. Each matchmaker keeps a complete record of work they did; none of them can tell who it was with. Message and note *text* is deliberately out of scope — see open decisions.
 
 ---
 
@@ -534,5 +535,5 @@ Candidate conversations include sexual orientation, religion, health and family 
 ## 12. Open decisions (phase 1)
 
 - **Hosting on two subdomains** (§10). Deferred: the interim domain uses path-based hosting on one origin. Revisit when the product domain is bought.
-- **Erasure requests.** "Nothing is deleted" conflicts with a GDPR right-to-erasure request. Proposed: an admin-only process that anonymises the person's data on request. Needs legal review before real candidates are onboarded.
+- **Erasure requests.** *Resolved for identifiers.* "Nothing is deleted" conflicted with a right-to-erasure request; the resolution is to erase the **person**, not the record (§9.3, `admin.mutations.eraseAccount`). Still open, and still needing legal review before real candidates are onboarded: **whether an erasure reaches into message and note text.** Those are free text, a matchmaker's notes are their own words, and the matchmaker is the controller — so how far a given request goes is their call, not something the platform should decide for them. Today the tooling leaves that text alone and the admin page says so.
 - **Notification delays.** 30 s push / 5 min email are starting points; tune with the first matchmaker. Now deployment settings (`NOTIFICATION_PUSH_DELAY_SECONDS`, `NOTIFICATION_EMAIL_DELAY_SECONDS`), so tuning needs no deploy; the defaults are still the numbers above.
