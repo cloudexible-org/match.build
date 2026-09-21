@@ -4,6 +4,7 @@ import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Composer } from "../chat/composer";
+import { ConversationSuggestions } from "../chat/conversation-suggestions";
 import { Thread as MessageThread } from "../chat/thread";
 import { useMarkRead } from "../chat/use-mark-read";
 import { PushNudge } from "../notifications/push-nudge";
@@ -165,6 +166,9 @@ function Thread({
         loadingOlder={isLoading}
       />
       {justSent && closed === undefined && <PushNudge />}
+      {/* Above the composer, and above the reason the composer is closed: a
+          proposal about someone who left is still worth answering. */}
+      <ConversationSuggestions candidateId={candidateId} />
       <Composer
         placeholder={`Message ${name}`}
         disabledReason={closed}

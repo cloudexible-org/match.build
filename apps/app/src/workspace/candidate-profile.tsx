@@ -30,6 +30,7 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useState } from "react";
 import { serverErrorMessage } from "../lib/server-error";
+import { ProposalQuote, ProposedChange } from "./profile-proposal";
 import { useWorkspace } from "./workspace-layout";
 
 /**
@@ -64,7 +65,7 @@ type Entry = {
 };
 
 type Entries = Record<string, Entry>;
-type EntryKind = "facts" | "notes";
+export type EntryKind = "facts" | "notes";
 
 export function CandidateProfile({
   candidateId,
@@ -138,30 +139,12 @@ function Suggestions({
               <span className="text-xs text-muted-foreground">
                 {labelFor(kind, key)}
               </span>
-              {proposal.action === "clear" ? (
-                <p className="break-words text-sm">
-                  Remove this —{" "}
-                  <s className="text-muted-foreground">
-                    {renderValue(kind, key, entry.value)}
-                  </s>
-                </p>
-              ) : entry.value ? (
-                <p className="break-words text-sm">
-                  <s className="text-muted-foreground">
-                    {renderValue(kind, key, entry.value)}
-                  </s>{" "}
-                  → {renderValue(kind, key, proposal.value)}
-                </p>
-              ) : (
-                <p className="whitespace-pre-wrap break-words text-sm">
-                  {renderValue(kind, key, proposal.value)}
-                </p>
-              )}
-              {proposal.sourceQuote && (
-                <p className="border-l-2 border-border pl-2 text-xs italic text-muted-foreground">
-                  “{proposal.sourceQuote}”
-                </p>
-              )}
+              <ProposedChange
+                proposal={proposal}
+                current={renderValue(kind, key, entry.value)}
+                proposed={renderValue(kind, key, proposal.value)}
+              />
+              <ProposalQuote quote={proposal.sourceQuote} />
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -793,12 +776,16 @@ function AddNote({
  * ─── Shared rendering ───────────────────────────────────────────────────────
  */
 
-function labelFor(kind: EntryKind, key: string): string {
+export function labelFor(kind: EntryKind, key: string): string {
   if (kind === "notes") return candidateNoteLabel(key);
   return candidateField(key)?.label ?? key;
 }
 
-function renderValue(kind: EntryKind, key: string, value: string): string {
+export function renderValue(
+  kind: EntryKind,
+  key: string,
+  value: string,
+): string {
   if (kind === "notes") return value;
   const field = candidateField(key);
   return field === null ? value : displayValue(field, value);
