@@ -1,5 +1,5 @@
 import { api, type Id } from "@repo/api";
-import { Toggle } from "@repo/ui";
+import { Switch } from "@repo/ui";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { useWorkspace } from "../workspace/workspace-layout";
@@ -38,35 +38,37 @@ export function SuggestionsToggle({
 
   const { enabled } = state;
   return (
-    <Toggle
-      variant="outline"
-      size="sm"
-      pressed={enabled}
-      disabled={busy}
-      data-testid="toggle-suggestions"
-      data-enabled={enabled}
+    // The label wraps the switch, which is how Base UI names it: it finds the
+    // enclosing `<label>` and points the switch's `aria-labelledby` at it.
+    // Two letters in a 14-row header; the whole name for a screen reader,
+    // which announces on or off by itself and so wants the *setting* named,
+    // not the press.
+    <label
+      className="flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground"
       title={
         enabled
           ? "Drafted replies are on for this conversation"
           : "Drafted replies are off for this conversation"
       }
-      onPressedChange={(pressed) => {
-        setBusy(true);
-        Promise.resolve(
-          setEnabled({
-            matchmakerId: workspace.matchmakerId,
-            candidateId,
-            enabled: pressed,
-          }),
-        ).finally(() => setBusy(false));
-      }}
     >
-      {/* Named in full for a screen reader; two letters in the header, where
-          the pressed state carries the rest of the meaning. */}
-      <span className="sr-only">
-        {enabled ? "Turn off drafted replies" : "Turn on drafted replies"}
-      </span>
+      <Switch
+        checked={enabled}
+        disabled={busy}
+        data-testid="toggle-suggestions"
+        data-enabled={enabled}
+        onCheckedChange={(checked) => {
+          setBusy(true);
+          Promise.resolve(
+            setEnabled({
+              matchmakerId: workspace.matchmakerId,
+              candidateId,
+              enabled: checked,
+            }),
+          ).finally(() => setBusy(false));
+        }}
+      />
+      <span className="sr-only">Drafted replies</span>
       <span aria-hidden>AI</span>
-    </Toggle>
+    </label>
   );
 }
