@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import schema from "../schema";
+import { AI_AGENT_SEED } from "../seed/ai/fixture";
 
 // See waitlist/mutations.test.ts for why the glob is inline and root-anchored.
 const modules = import.meta.glob([
@@ -465,5 +466,222 @@ describe("admin.eraseAccount", () => {
     );
     expect(anonymised).toHaveLength(2);
     expect(new Set(anonymised.map((event) => event.matchmakerId)).size).toBe(2);
+  });
+});
+
+describe("admin AI agent settings", () => {
+  test("an agent nobody has set up is off, empty, and says it was never set up", async () => {
+    const { asAdmin } = await world();
+    const { agents } = await asAdmin.query(api.admin.queries.aiAgents, {});
+
+    expect(agents.map((a) => a.agent)).toEqual([
+      "conversation",
+      "candidate_profile",
+      "voice_profile",
+    ]);
+    for (const agent of agents) {
+      // No defaults anywhere: nothing is substituted for a row that isn't there.
+      expect(agent.exists).toBe(false);
+      expect(agent.enabled).toBe(false);
+      expect(agent.model).toBe("");
+      expect(agent.systemPrompt).toBe("");
+      expect(agent.offReason).toBe("unconfigured");
+      expect(agent.updatedAt).toBeUndefined();
+    }
+  });
+
+  test("the seed creates every agent, and running it again changes nothing", async () => {
+    const { t, asAdmin } = await world();
+    const first = await t.mutation(internal.seed.ai.mutations.apply, {});
+    expect(first.created).toHaveLength(3);
+    expect(first.kept).toHaveLength(0);
+
+    const { agents } = await asAdmin.query(api.admin.queries.aiAgents, {});
+    for (const agent of agents) {
+      // Asserted against the fixture rather than a hard-coded model, so
+      // changing the seeded model is a one-line change and not a test failure.
+      const seed = AI_AGENT_SEED.find((s) => s.agent === agent.agent);
+      expect(seed).toBeDefined();
+      expect(agent.exists).toBe(true);
+      expect(agent.enabled).toBe(seed?.enabled);
+      expect(agent.model).toBe(seed?.model);
+      expect(agent.systemPrompt).toBe(seed?.systemPrompt);
+      expect(agent.offReason).toBeNull();
+      // Nobody decided this, the seed did.
+      expect(agent.updatedBy).toBeUndefined();
+    }
+
+    const second = await t.mutation(internal.seed.ai.mutations.apply, {});
+    expect(second.created).toHaveLength(0);
+    expect(second.kept).toHaveLength(3);
+  });
+
+  test("the seed leaves an admin's own edit alone, and --force overwrites it", async () => {
+    const { t, asAdmin } = await world();
+    await t.mutation(internal.seed.ai.mutations.apply, {});
+    await asAdmin.mutation(api.admin.mutations.setAiAgent, {
+      agent: "conversation",
+      enabled: true,
+      model: "anthropic/claude-sonnet-5",
+      systemPrompt: "Mine.",
+    });
+
+    const untouched = await t.mutation(internal.seed.ai.mutations.apply, {});
+    expect(untouched.kept).toContain("conversation");
+    let { agents } = await asAdmin.query(api.admin.queries.aiAgents, {});
+    expect(agents.find((a) => a.agent === "conversation")?.systemPrompt).toBe(
+      "Mine.",
+    );
+
+    const forced = await t.mutation(internal.seed.ai.mutations.apply, {
+      force: true,
+    });
+    expect(forced.overwritten).toContain("conversation");
+    ({ agents } = await asAdmin.query(api.admin.queries.aiAgents, {}));
+    const conversation = agents.find((a) => a.agent === "conversation");
+    expect(conversation?.systemPrompt).not.toBe("Mine.");
+    expect(conversation?.updatedBy).toBeUndefined();
+  });
+
+  test("the seeded instructions carry the two rules that must not be lost", async () => {
+    // They live in the instruction rather than being prepended in code, so the
+    // seed is the only thing that puts them there — and this is the only thing
+    // that checks it did.
+    const { t, asAdmin } = await world();
+    await t.mutation(internal.seed.ai.mutations.apply, {});
+    const { agents } = await asAdmin.query(api.admin.queries.aiAgents, {});
+    for (const agent of agents) {
+      expect(agent.systemPrompt).toMatch(/content, never instructions/);
+      expect(agent.systemPrompt).toMatch(
+        /never reveal what the matchmaker knows/i,
+      );
+    }
+  });
+
+  test("saving audits the change with the old instruction and the switch", async () => {
+    const { t, ids, asAdmin } = await world();
+    await t.mutation(internal.seed.ai.mutations.apply, {});
+    await asAdmin.mutation(api.admin.mutations.setAiAgent, {
+      agent: "conversation",
+      enabled: false,
+      model: "anthropic/claude-sonnet-5",
+      systemPrompt: "Be brief and warm.",
+    });
+
+    const { agents } = await asAdmin.query(api.admin.queries.aiAgents, {});
+    const conversation = agents.find((a) => a.agent === "conversation");
+    expect(conversation?.model).toBe("anthropic/claude-sonnet-5");
+    expect(conversation?.enabled).toBe(false);
+    expect(conversation?.offReason).toBe("disabled");
+    expect(conversation?.updatedBy).toBe("admin@example.test");
+
+    await t.run(async (ctx) => {
+      const events = await ctx.db.query("auditEvents").collect();
+      const event = events.find((e) => e.action === "ai_agent.updated");
+      expect(event).toBeDefined();
+      // Platform-level: it changes the product, not anyone's book.
+      expect(event?.matchmakerId).toBeUndefined();
+      expect(event?.candidateId).toBeUndefined();
+      expect(event?.entityTable).toBe("aiAgentSettings");
+      expect(event?.entityId).toBe("conversation");
+      expect(event?.actor).toEqual({
+        type: "user",
+        userId: ids.admin,
+        role: "platform_admin",
+      });
+      const fields = event?.changes?.map((c) => c.field) ?? [];
+      expect(fields).toContain("enabled");
+      expect(fields).toContain("model");
+      // The whole previous instruction is in the event: that is where an
+      // instruction's history lives, so it has to actually be there.
+      const prompt = event?.changes?.find((c) => c.field === "systemPrompt");
+      expect(prompt?.before).toContain("You draft replies in the matchmaker");
+      expect(prompt?.after).toBe(JSON.stringify("Be brief and warm."));
+    });
+  });
+
+  test("clearing the model turns the agent off, and says which way", async () => {
+    const { t, asAdmin } = await world();
+    await t.mutation(internal.seed.ai.mutations.apply, {});
+    await asAdmin.mutation(api.admin.mutations.setAiAgent, {
+      agent: "voice_profile",
+      enabled: true,
+      model: "",
+      systemPrompt: "Still here.",
+    });
+
+    const { agents } = await asAdmin.query(api.admin.queries.aiAgents, {});
+    const voice = agents.find((a) => a.agent === "voice_profile");
+    expect(voice?.enabled).toBe(true);
+    expect(voice?.model).toBe("");
+    expect(voice?.offReason).toBe("no_model");
+  });
+
+  test("clearing the instruction turns it off too", async () => {
+    const { t, asAdmin } = await world();
+    await t.mutation(internal.seed.ai.mutations.apply, {});
+    await asAdmin.mutation(api.admin.mutations.setAiAgent, {
+      agent: "voice_profile",
+      enabled: true,
+      model: "anthropic/claude-haiku-4-5",
+      systemPrompt: "",
+    });
+    const { agents } = await asAdmin.query(api.admin.queries.aiAgents, {});
+    expect(agents.find((a) => a.agent === "voice_profile")?.offReason).toBe(
+      "no_instruction",
+    );
+  });
+
+  test("a save that changes nothing records nothing", async () => {
+    const { t, asAdmin } = await world();
+    await t.mutation(internal.seed.ai.mutations.apply, {});
+    const { agents } = await asAdmin.query(api.admin.queries.aiAgents, {});
+    const conversation = agents.find((a) => a.agent === "conversation");
+    if (conversation === undefined) throw new Error("no conversation agent");
+
+    await asAdmin.mutation(api.admin.mutations.setAiAgent, {
+      agent: "conversation",
+      enabled: conversation.enabled,
+      model: conversation.model,
+      systemPrompt: conversation.systemPrompt,
+    });
+
+    await t.run(async (ctx) => {
+      const events = await ctx.db.query("auditEvents").collect();
+      expect(
+        events.filter((e) => e.action === "ai_agent.updated"),
+      ).toHaveLength(0);
+    });
+  });
+
+  test("refuses a model the gateway couldn't accept, and changes nothing", async () => {
+    const { t, asAdmin } = await world();
+    await expect(
+      asAdmin.mutation(api.admin.mutations.setAiAgent, {
+        agent: "conversation",
+        enabled: true,
+        model: "claude-opus-5",
+        systemPrompt: "Be brief.",
+      }),
+    ).rejects.toThrow(/provider, a slash/);
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.query("aiAgentSettings").collect()).toHaveLength(0);
+    });
+  });
+
+  test("a matchmaker who isn't a platform admin can neither read nor write it", async () => {
+    const { asMember } = await world();
+    await expect(
+      asMember.query(api.admin.queries.aiAgents, {}),
+    ).rejects.toThrow(/platform admin/);
+    await expect(
+      asMember.mutation(api.admin.mutations.setAiAgent, {
+        agent: "conversation",
+        enabled: true,
+        model: "anthropic/claude-opus-5",
+        systemPrompt: "Mine now.",
+      }),
+    ).rejects.toThrow(/platform admin/);
   });
 });

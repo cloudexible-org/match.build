@@ -8,7 +8,7 @@ export class AdminLayout {
     return this.page.getByTestId("admin-account-email");
   }
 
-  getNavLink(name: "Audit trail" | "Sign-in codes" | "Erasure") {
+  getNavLink(name: "Audit trail" | "Sign-in codes" | "Erasure" | "AI agents") {
     return this.page
       .getByRole("navigation", { name: "Admin" })
       .getByRole("link", { name });

@@ -94,6 +94,12 @@ const SEEDED_TABLES = [
   "notifications",
   "emailOutbox",
   "waitlist",
+  // Global AI agent settings (prd/phase-2.md §4.4). Written by
+  // specs/admin-convex/ai-settings.spec.ts, and there is one row per agent for
+  // the whole deployment rather than one per test — so a run that left them
+  // behind would both leak into the next and, after any schema change to the
+  // table, fail the push outright on rows that no longer validate.
+  "aiAgentSettings",
 ] as const;
 
 /** Bounded so a large table cannot blow the transaction limit in one call. */

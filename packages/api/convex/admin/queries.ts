@@ -7,6 +7,8 @@ import {
 import { ConvexError, v } from "convex/values";
 import type { DataModel, Doc, Id } from "../_generated/dataModel";
 import { type QueryCtx, query } from "../_generated/server";
+import { agentSettings, aiEnabled, storedAgentSettings } from "../ai/helpers";
+import { AI_AGENT_IDS } from "../ai/rules";
 import { auditActor } from "../schema";
 import { accountLabel, getAdminSession, requirePlatformAdmin } from "./helpers";
 import {
@@ -356,3 +358,63 @@ class Labels {
     return this.candidates.get(candidateId) ?? null;
   }
 }
+
+/*
+ * ─── AI agents (prd/phase-2.md §4.4) ────────────────────────────────────────
+ */
+
+/**
+ * The three agents exactly as stored — no substitution, because there is no
+ * default to substitute. An agent nobody has configured comes back empty and
+ * off, with `offReason` saying which of the four ways it is off.
+ *
+ * Whether the deployment can reach a model at all comes back too: an agent can
+ * be configured and switched on and still have nothing to call, and a page that
+ * doesn't say so implies these settings are already doing something.
+ */
+export const aiAgents = query({
+  args: {},
+  returns: v.object({
+    aiEnabled: v.boolean(),
+    agents: v.array(
+      v.object({
+        agent: v.string(),
+        label: v.string(),
+        does: v.string(),
+        enabled: v.boolean(),
+        model: v.string(),
+        systemPrompt: v.string(),
+        exists: v.boolean(),
+        offReason: v.union(v.string(), v.null()),
+        updatedAt: v.optional(v.number()),
+        /** The admin who last saved it, or absent when the seed wrote it. */
+        updatedBy: v.optional(v.string()),
+      }),
+    ),
+  }),
+  handler: async (ctx) => {
+    await requirePlatformAdmin(ctx);
+    const agents = [];
+    for (const agent of AI_AGENT_IDS) {
+      const settings = await agentSettings(ctx, agent);
+      const stored = await storedAgentSettings(ctx, agent);
+      const editor =
+        stored?.updatedByUserId === undefined
+          ? null
+          : await ctx.db.get("users", stored.updatedByUserId);
+      agents.push({
+        agent,
+        label: settings.label,
+        does: settings.does,
+        enabled: settings.enabled,
+        model: settings.model,
+        systemPrompt: settings.systemPrompt,
+        exists: settings.exists,
+        offReason: settings.offReason,
+        updatedAt: stored?.updatedAt,
+        updatedBy: editor?.email ?? undefined,
+      });
+    }
+    return { aiEnabled: aiEnabled(), agents };
+  },
+});

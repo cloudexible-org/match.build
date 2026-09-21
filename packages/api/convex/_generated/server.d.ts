@@ -31,8 +31,6 @@ type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly AI_ENABLED: string | undefined;
-  readonly AI_MODEL_EXTRACTION: string | undefined;
-  readonly AI_MODEL_REPLIES: string | undefined;
   readonly INVITE_LINK_SECRET: string | undefined;
   readonly NOTIFICATION_EMAIL_DELAY_SECONDS: string | undefined;
   readonly NOTIFICATION_PUSH_DELAY_SECONDS: string | undefined;

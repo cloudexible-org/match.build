@@ -66,6 +66,24 @@ auditEvents.actor: add
   })
 auditEvents: add sourceMessageId: v.optional(v.id("messages")), undoOf: v.optional(v.id("auditEvents"))
 
+// One row per agent (§4.4). The ONLY source of an agent's model and standing
+// instruction: nothing in the code supplies a default, so an agent with no row
+// — or an empty string, or enabled false — is simply off. Seeded once from
+// convex/seed/ai/, then owned by a platform admin. Global, not per
+// matchmaker. BUILT.
+aiAgentSettings: defineTable({
+  agent: v.union(
+    v.literal("conversation"),
+    v.literal("candidate_profile"),
+    v.literal("voice_profile"),
+  ),
+  enabled: v.boolean(),
+  model: v.string(),        // "" means off
+  systemPrompt: v.string(), // "" means off
+  updatedAt: v.number(),
+  updatedByUserId: v.optional(v.id("users")), // absent when seeded
+}).index("by_agent", ["agent"]),
+
 // AI reply suggestions. Persisted so they survive reloads and can be marked stale.
 replySuggestions: defineTable({
   matchmakerId: v.id("matchmakers"),
@@ -120,7 +138,7 @@ facts: defineTable({
 - There is no in-place update. Every change produces a new fact plus an audit event, so every change can be undone from the audit trail. That is also why `facts` carries no `updatedAt`: a row that is never edited has nothing to stamp.
 - **Facts are the matchmaker's record, not the candidate's profile.** They are collected and maintained by the matchmaker with the AI's help, exactly like their notes, and the matchmaker is the controller (prd/phase-1.md §9.3). An erasure therefore anonymises them and leaves them standing, like everything else in that matchmaker's book — but `admin.mutations.eraseAccount` walks an **explicit** list of tables with a ceiling per table (`ERASURE_LIMITS`), so a new table is invisible to it until it is added. Adding `facts` to the erasure in the same change that adds the table is not optional; [#3](https://github.com/cloudexible-org/match.build/issues/3) holds the decision and the rest of the sweep.
 - **`sourceQuote` is a verbatim copy of message text**, which prd/phase-1.md §12 deliberately leaves outside an erasure's reach. Whatever [#2](https://github.com/cloudexible-org/match.build/issues/2) concludes has to hold for both places at once, or the product's answer is incoherent.
-- Fact audit actions: `fact.created`, `fact.edited`, `fact.accepted` (suggested → active), `fact.rejected`, `fact.superseded`, `fact.undone`. Voice: `matchmaker.voice_samples_changed`, `matchmaker.voice_profile_regenerated`.
+- Fact audit actions: `fact.created`, `fact.edited`, `fact.accepted` (suggested → active), `fact.rejected`, `fact.superseded`, `fact.undone`. Voice: `matchmaker.voice_samples_changed`, `matchmaker.voice_profile_regenerated`. **`ai_agent.updated` is built** (§4.4) — a platform-level event with no `matchmakerId`.
 
 ### 3.1 Fact key registry
 
@@ -164,47 +182,44 @@ The condition is the one that made the earlier draft nervous, and it is concrete
 
 `@convex-dev/rag` is worth a look in phase 3 for cross-conversation retrieval, not here.
 
-### 4.3 What is installed (built)
+### 4.1 Three agents, and what each one owns
 
-The plumbing is in, with no product feature on top of it yet:
+An earlier draft listed five jobs (A reply suggester, B fact extractor, C fact reconciler, D voice-profile job, E summariser). They collapse into **three agents**, which is the better cut: it separates *reading* a conversation and proposing from *owning the write path* to a record. The five-job split had two agents on the read side and left the write path as a step rather than an owner.
 
-- **`convex/ai/`** — `rules.ts` (which model does which job, and the ceilings), `helpers.ts` (is AI reachable, and which model), `actions.ts` (`"use node"`, actions only, the only place a call leaves Convex).
-- **No API key anywhere.** `convexGateway` from `@convex-dev/ai-sdk-provider` mints a short-lived deployment token per action; the **Convex AI gateway** holds the provider credentials. This changes §7 and §9.1: there is no separate provider contract to sign, and Convex is the sub-processor the DPA names.
-- **Two tiers, both proven against the dev deployment:** `anthropic/claude-opus-5` for drafting a reply a matchmaker sends under their own name, `anthropic/claude-haiku-4-5` for high-volume extraction. Both overridable per deployment (`AI_MODEL_REPLIES`, `AI_MODEL_EXTRACTION`); an unparseable override falls back to the default rather than failing every generation.
-- **`AI_ENABLED`, because off is a supported state.** The gateway needs a paid Convex Cloud deployment, so a local backend and the e2e suite's anonymous one cannot reach it. `pnpm --filter @repo/api ai:setup` sets the flag and then actually calls both models, since a flag reading "on" while the gateway refuses us is the one state worse than off.
-- **`ai/actions.ts:probe`** — one generation with nothing of the product in it: no candidate, no conversation, no thread. It answers the only question a unit test cannot, which is whether this deployment can reach a model at all.
-- **The `agent` component is registered and unused.** No thread is created anywhere yet, by the condition above.
+| Agent | Owns | Absorbed |
+|---|---|---|
+| `conversation` | Reading one thread: drafting a reply, noticing facts, keeping the summary. Proposes; writes nothing to a record. | A + B + E |
+| `candidate_profile` | The write path to a candidate's facts. | C |
+| `voice_profile` | The write path to the matchmaker's voice profile — and to everything the product learns about the matchmaker. | D |
 
-**A. Reply suggester** (foreground, latency-sensitive)
-- Trigger: a candidate message, **debounced** (~5 s after the last one, so a burst of messages produces one generation). Also once when a candidate accepts, for a welcome message.
-- Input: system prompt + voice profile + active facts for this candidate + conversation summary + last N messages (including private imported history).
-- Output: 1–3 replies, streamed through `persistent-text-streaming`; the `replySuggestions` row holds the status and the finished text, so a reload still finds them.
+**The summariser is not its own agent.** It reads the same thread to write another derived artefact, on a different trigger (thread length rather than a new message). One agent, three outputs.
+
+**What the product learns about the *matchmaker* lands in the voice profile.** `facts` stays keyed to a candidate. So the voice profile is wider than its name suggests: not only how they write, but how they work and what they care about in a match. Its §3 comment says "tone/style"; take this paragraph as the definition.
+
+**Each agent has one model and one standing instruction, platform-wide, stored in the database and edited at `/admin/ai`** (§4.4). A matchmaker's own character does not vary the prompt — it is the voice profile, which is *data a prompt reads*.
+
+**A. `conversation`** (foreground for the draft, background for the rest)
+- Trigger: a candidate message, **debounced** (~5 s after the last one, so a burst produces one generation). Also once when a candidate accepts, for a welcome message — triggered from `convex/invites/`, which owns accepting.
+- Input: the standing prompt + voice profile + active facts for this candidate + conversation summary + last N messages (including the private imported history).
+- Output: 1–3 replies streamed through `persistent-text-streaming`; candidate facts, each with a verbatim source quote; and the rolling summary.
+- Live window: last **20** messages verbatim. Older messages roll into `conversations.summary` when the thread crosses a threshold, tracked by `summarisedThroughSeq` so it is incremental. The summary is for conversational continuity — rapport, tone, key events, sensitivities — not fact retention.
 - Earlier `ready` suggestions become `stale` when a new message arrives or the matchmaker replies manually.
-- Never receives other candidates' data.
+- Never receives another candidate's data.
 
-**B. Fact extractor** (background, cheaper model)
-- Separate from the reply suggester, so structured extraction never slows the streamed replies.
-- Trigger: each candidate message, and the imported history at onboarding.
-- Output: candidate facts, each with category, key (if any), value, text, confidence and a verbatim source quote.
-
-**C. Fact reconciler** (background)
-- Runs once per message over all its candidate facts together, serialised per candidate — a `workpool` with a per-candidate key, one job at a time. Parallel per-fact jobs would race: two facts from one message could both add a duplicate or both supersede the same fact.
-- Input: the candidate facts + source message text + the candidate's `active` and `suggested` facts, plus recently `rejected` ones (so dismissed suggestions don't keep coming back).
+**B. `candidate_profile`** (background)
+- Runs once per message over all the facts the conversation agent noticed, serialised per candidate — a `workpool` with a per-candidate key, one job at a time. Parallel per-fact jobs would race: two facts from one message could both add a duplicate or both supersede the same fact.
+- Input: those candidate facts + the source message + the candidate's `active` and `suggested` facts, plus recently `rejected` ones, so dismissed suggestions do not keep coming back.
 - Output per fact: `ADD`, `DISCARD_DUPLICATE`, or `SUPERSEDE(id)`.
-- Auto-applies when confidence ≥ threshold (start at 0.8); otherwise writes `status: "suggested"`.
-- **Never auto-supersedes a `manual` fact: that change is always a suggestion, and a suggestion is allowed.** A matchmaker who typed something themselves has to be the one to change it, but a conversation that contradicts what they typed is exactly the thing worth telling them about. (The first draft of this file listed this as an open question in §9 while answering it here; the answer stands.)
-- Writes through internal mutations that call `recordAudit` with the agent as actor. **Undo** reverses the audit event (restores the superseded fact, marks the new one `rejected`).
+- Auto-applies at or above the confidence threshold (§9.2); otherwise writes `status: "suggested"`.
+- **Never auto-supersedes a `manual` fact: that change is always a suggestion, and a suggestion is allowed.** A matchmaker who typed something themselves has to be the one to change it, but a conversation that contradicts what they typed is exactly the thing worth telling them about.
+- Writes through internal mutations that call `recordAudit` with the agent as actor. **Undo** reverses the audit event: the superseded fact is restored and the new one marked `rejected`.
 
-**D. Voice profile job** (background, batched)
-- Input: the matchmaker's pasted samples, then their own sent messages (≥ 20).
-- Output: a prose voice profile — register, warmth, sentence length, greeting/sign-off habits, characteristic phrases, things they never say.
-- Runs on a schedule or after every N sent messages, not per message.
+**C. `voice_profile`** (background, batched)
+- Input: the matchmaker's pasted samples, then their own sent messages (§9.2 sets how many).
+- Output: a prose voice profile — register, warmth, sentence length, greeting and sign-off habits, characteristic phrases, things they never say — plus what the product has learned about them.
+- Runs on a schedule or after every N sent messages, never per message.
 
-**E. Summariser** (background)
-- Live window: last **20** messages verbatim. Older messages roll into `conversations.summary` when the thread crosses a threshold, tracked by `summarisedThroughSeq` so it's incremental.
-- For conversational continuity, not fact retention: rapport, tone, key events, sensitivities.
-
-### 4.1 Context assembly
+### 4.2 Context assembly
 
 Facts are never appended into message history. They're read live at prompt time:
 
@@ -220,11 +235,37 @@ A newly written fact is reflected in the very next generation.
 
 **Guardrails:** candidate messages are untrusted input — instructions inside them are content, not commands. Suggested replies must not reveal facts the candidate hasn't stated in this conversation, or the matchmaker's notes.
 
-### 4.2 Evaluation
+### 4.3 Evaluation
 
 Semantic deduplication is the hard sub-problem: "likes hiking" and "enjoys the outdoors" should merge; "likes hiking" and "hates the gym" should not. Build 40–60 (existing facts, candidate fact) pairs with known correct actions and run them against the reconciliation prompt on every prompt change. Build the set from **synthetic or consented** conversations, never raw candidate data.
 
 ---
+
+### 4.4 Model and prompt settings
+
+Each agent's **switch, model and standing instruction live in the database** (`aiAgentSettings`) and are edited by a platform admin at **`/admin/ai`**.
+
+- **The database is the only source.** Nothing in the code supplies a model or a prompt — `convex/ai/rules.ts` holds validation and labels and no prose at all, and `ai/helpers.ts` substitutes nothing. An agent nobody has configured is **off**, rather than quietly running on a value a reader would have to go looking for.
+- **Four ways to be off, and the page says which:** never set up, switched off, no model, no instruction. `activeAgent()` is the single question a feature asks — it returns the settings or `null`, so no caller has to remember four conditions. `AI_ENABLED` is a fifth, separate thing: whether this deployment can reach the gateway at all.
+- **Empty means off.** Clearing the model or the instruction turns an agent off, so there is no magic value to remember and no way to have a model without an instruction.
+- **The starting values are seed data** (`convex/seed/ai/fixture.ts`, applied by `seed/ai/mutations:apply` via `ai:setup`), not defaults. Seeding is idempotent and never overwrites an admin's work; `--force` puts an agent back to where it started. Unlike `seed/dev` and `seed/e2e` this seed wipes nothing and is safe against prod — it is how a production deployment gets its agents at all.
+- **The guardrails are part of each seeded instruction, not prepended in code**, so everything an agent is told is visible and editable on one page. The cost is that an admin can edit them away; the page therefore says to carry them over, and a test asserts the seeded instructions contain both. *If that trade turns out wrong, moving them back into code is a small change — but it makes the page no longer the whole truth.*
+- **The stored instruction is the agent's standing instruction, not its task.** The conversation agent drafts, extracts and summarises; one prompt describing all three would serve none of them. The instruction is the persona and the rules that hold on every call; the task for a given call is added by the code that makes it.
+- **Every change is audited as `ai_agent.updated`, with the whole previous instruction in the event.** That is deliberately where an instruction's history lives: the audit trail is already append-only and already refuses to be rewritten, so a separate versions table would be a second, less trustworthy copy. To read an old instruction, read the trail. A platform-level event carries no `matchmakerId`, so it appears in the admin trail and in no matchmaker's candidate history — right, because it is our change to the product, not a change to their book.
+- **A save that changes nothing records nothing.** An event per no-op save makes the trail harder to read, not more complete.
+- **There is no "reset to default" button**, because there is no default to reset to. Re-seeding is a deliberate operation with a flag, run from a terminal.
+
+### 4.5 What is installed (built)
+
+The plumbing is in, with no product feature on top of it yet:
+
+- **`convex/ai/`** — `rules.ts` (agent ids, labels, validation, and *no* defaults or prose), `helpers.ts` (`activeAgent`, the one question a feature asks), `queries.ts` (internal reads), `actions.ts` (the only place a call leaves Convex). Plus `convex/seed/ai/` for the starting values and `/admin/ai` to own them after that.
+- **No API key anywhere.** `convexGateway` from `@convex-dev/ai-sdk-provider` mints a short-lived deployment token per action; the **Convex AI gateway** holds the provider credentials. This changes §7 and §9.1: there is no separate provider contract to sign, and Convex is the sub-processor the DPA names.
+- **Three agents (§4.1), each proven against the dev deployment** with its own model *and its real stored instruction*, so an instruction the gateway would reject is caught by `ai:setup` rather than by a candidate's first message. Seeded model: `openai/gpt-5.6-luna` for all three. (The probe asks for one word and an agent usually answers in its own terms instead — it is following its instruction, which is the thing being checked.)
+- **`AI_ENABLED`, because off is a supported state.** The gateway needs a paid Convex Cloud deployment, so a local backend and the e2e suite's anonymous one cannot reach it. `pnpm --filter @repo/api ai:setup` sets the flag, seeds any agent that has never been set up, and then calls each agent's model — a flag reading "on" while the gateway refuses us is the one state worse than off.
+- **`ai/actions.ts:probe`** — one generation with nothing of the product in it: no candidate, no conversation, no thread. It answers the only question a unit test cannot, which is whether this deployment can reach the model an agent is configured with.
+- **No `"use node"`, anywhere in `convex/`.** The provider's README uses it and it is not needed — the gateway is reached over `fetch`, which Convex's own runtime has. It is also not *allowed*: a local anonymous backend cannot run Node actions, so a single `"use node"` file fails the **whole** push with `DeploymentNotConfiguredForNodeActions` and every e2e spec then runs against stale functions. Recorded in `CLAUDE.md` §8, because it binds the whole backend and not just this domain.
+- **The `agent` component is registered and unused.** No thread is created anywhere yet, by the condition above.
 
 ## 5. UI additions
 
@@ -232,6 +273,7 @@ Semantic deduplication is the hard sub-problem: "likes hiking" and "enjoys the o
 - **Candidate panel:** a **Profile** tab, second after Details: active facts grouped by category, source quote on hover/expand, manual add/edit/remove, a pending section for suggested facts. *The first draft made it the default, which contradicts prd/phase-1.md §4.1 and what shipped.* **Details stays the default:** it holds membership state and the invite controls — what a matchmaker needs on opening a thread they haven't touched in a week — while Profile is a reading surface. Moving the default is a pilot-tuned call, not one to make in a draft.
 - **History tab:** gains fact and agent entries, with a link to the source message and Undo where possible. New filter: Profile.
 - **Matchmaker settings:** voice samples.
+- **`/admin/ai` (built):** the three agents, each with a switch, the model it runs on and its standing instruction, and a line saying which of the four ways it is off when it isn't running. Says plainly when the deployment can't reach a model at all, rather than implying the settings are already doing something.
 
 The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invites/`, which owns accepting an invitation (prd/phase-1.md §7).
 
@@ -240,12 +282,13 @@ The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invit
 - **Suggested-reply latency:** first token under ~2 s, through `persistent-text-streaming` (§4). On failure, fail silently.
 - **Cost control:** keep the reply suggester's context tight; background jobs use a cheaper model; `rate-limiter` caps AI calls per matchmaker.
 - **Audit:** every auto-applied fact is undoable and shows provenance.
-- **Every number in this phase is a deployment setting**, declared in `convex.config.ts` beside phase 1's: the auto-apply threshold, the suggested-reply count, the debounce window, the voice-sample minimum, the live-window size and the per-matchmaker budget. Phase 1 did this for its two notification delays once prd/phase-1.md §12 admitted they were guesses that only a real matchmaker could correct (`NOTIFICATION_PUSH_DELAY_SECONDS`, `NOTIFICATION_EMAIL_DELAY_SECONDS`). Every number in §9.2 is the same kind of guess, and tuning one should not need a deploy.
+- **Switches, models and prompts are database settings** edited at `/admin/ai` (§4.4), with no code-level default behind them. **Every remaining number is a deployment setting**, declared in `convex.config.ts` beside phase 1's: the auto-apply threshold, the suggested-reply count, the debounce window, the voice-sample minimum, the live-window size and the per-matchmaker budget. Phase 1 did this for its two notification delays once prd/phase-1.md §12 admitted they were guesses that only a real matchmaker could correct (`NOTIFICATION_PUSH_DELAY_SECONDS`, `NOTIFICATION_EMAIL_DELAY_SECONDS`). Every number in §9.2 is the same kind of guess, and tuning one should not need a deploy.
 
 ## 7. Privacy
 
 - **Model calls go through the Convex AI gateway** (§4.3), which holds the provider credentials. There is no API key in this deployment and no provider contract of our own, so **Convex is the sub-processor** the DPA in [#1](https://github.com/cloudexible-org/match.build/issues/1) names — the same one it already names for the database. What remains is to confirm the gateway's own training and retention terms, and what it says about the providers behind it, rather than to negotiate with a provider ourselves.
 - **Facts are the matchmaker's records**, collected and maintained by them with the AI's help, like their notes. The matchmaker is the controller (prd/phase-1.md §9.3); an erasure anonymises facts and leaves them standing (§3).
+- **`facts` is keyed to a candidate.** What the product learns about the *matchmaker* lands in their voice profile instead (§4.1), so there is no table of facts about a matchmaker to reason about separately.
 - **Candidates never see their facts.** That is a UI decision and not a legal one: facts are personal data about the candidate, so an access request reaches them whether or not a screen does. Whether *showing* them would improve the data enough to be worth it is still open (§9.3); whether they must be *disclosable* is not, and is part of [#3](https://github.com/cloudexible-org/match.build/issues/3).
 - **Candidate messages are untrusted input** (§4.1). Instructions inside them are content, never commands.
 
@@ -253,7 +296,7 @@ The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invit
 
 **Where it lands.** One new domain, `convex/facts/` (`rules.ts` carrying the key registry, plus mutations, queries and helpers per `CLAUDE.md`). Everything else extends a domain phase 1 already built: reply suggestions and the summariser go in `messages/`, the voice profile in `matchmakers/`, the welcome trigger in `invites/`, the agent actor and the new actions in `audit/`, and the erasure branch for `facts` in `admin/`.
 
-0. *Done.* **AI plumbing** (§4.3): the `agent` component, the gateway, `convex/ai/`, the two model tiers and `ai:setup`. No product feature on it yet.
+0. *Done.* **AI plumbing** (§4.5) and **the settings page** (§4.4): the `agent` component, the gateway, `convex/ai/`, the three agents seeded from `convex/seed/ai/`, `/admin/ai`, and `ai:setup`. No product feature on it yet.
 1. Voice samples in settings + reply suggester (streaming, debounce, stale handling).
 2. Facts schema, key registry, manual facts in the Profile tab, audit integration — **and the `facts` branch of the erasure in the same change** (§3).
 3. Extractor + reconciler + auto-apply/suggest + undo.
@@ -276,7 +319,7 @@ The first draft listed eleven of these flat, which made a number that wants a we
 
 ### 9.2 Ship as a setting, tune with the pilot
 
-None of these blocks a line of code: each ships as a deployment env var with the value below as its default, exactly as phase 1's notification delays did (§6).
+None of these blocks a line of code: each ships as a deployment env var with the value below as its default, exactly as phase 1's notification delays did (§6). (Models and prompts are *not* in this table — they are database settings on a page, §4.4.)
 
 | Setting | Starting value | Why it's a guess |
 |---|---|---|

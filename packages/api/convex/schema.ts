@@ -239,6 +239,34 @@ export default defineSchema({
     pushEnabled: v.boolean(),
   }).index("by_userId", ["userId"]),
 
+  // One row per AI agent (prd/phase-2.md §4.4). **The only source of an agent's
+  // model and standing instruction** — nothing in the code supplies a default,
+  // so an agent nobody has configured is simply off rather than quietly running
+  // on something. Seeded once (`convex/seed/ai/`), then owned by a platform
+  // admin at /admin/ai.
+  //
+  // An agent runs only when its row exists, `enabled` is true, and neither
+  // string is empty. Any of the four being false is a way of being off, and
+  // `offReasonFor` in ai/rules.ts says which.
+  //
+  // Deliberately global rather than per matchmaker: one model and one standing
+  // instruction for the whole platform. Per-matchmaker variation happens
+  // through the voice profile, which is data a prompt reads, not a prompt of
+  // its own. Every edit is audited with the old text in the event, which is
+  // what keeps the prompt's history.
+  aiAgentSettings: defineTable({
+    agent: v.union(
+      v.literal("conversation"),
+      v.literal("candidate_profile"),
+      v.literal("voice_profile"),
+    ),
+    enabled: v.boolean(),
+    model: v.string(), // "" means off
+    systemPrompt: v.string(), // "" means off
+    updatedAt: v.number(),
+    updatedByUserId: v.optional(v.id("users")), // absent when seeded
+  }).index("by_agent", ["agent"]),
+
   // One row per (conversation, recipient, channel) notification attempt.
   notifications: defineTable({
     userId: v.id("users"),

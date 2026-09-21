@@ -56,7 +56,8 @@ This document defines the core standards and automated workflows that any AI age
     * `mutations.ts` — `mutation` / `internalMutation` definitions only.
     * `queries.ts` — `query` / `internalQuery` definitions only.
     * `helpers.ts` — plain functions that take a `ctx` (lookups, shared writes) and are called from that domain's queries and mutations. Never registered as functions.
-    * `actions.ts` — only where a domain calls out of Convex (email, later LLMs): `action` / `internalAction` definitions, usually scheduled from a mutation. Never `"use node"` in a file that also defines queries or mutations.
+    * `actions.ts` — only where a domain calls out of Convex (email, later LLMs): `action` / `internalAction` definitions, usually scheduled from a mutation.
+* **Never `"use node"`, anywhere under `convex/`.** Not merely "not in a file that also defines queries or mutations" — not at all. The e2e suite drives a local **anonymous** Convex backend, which cannot run Node actions, so one `"use node"` file fails the *whole* push with `DeploymentNotConfiguredForNodeActions` and every Convex-backed spec then silently runs against stale functions. Reach an external service over `fetch`, which Convex's own runtime has; if something genuinely needs Node, it needs a plan for the e2e backend first.
 * **Tests sit beside the file they cover:** `rules.test.ts`, `mutations.test.ts` (convex-test), etc.
 * Function references follow the path: `api.<domain>.mutations.<name>`, `internal.<domain>.queries.<name>`.
 

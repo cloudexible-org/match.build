@@ -1,67 +1,107 @@
-"use node";
-
 /*
- * Every call that leaves Convex for a model (prd/phase-2.md §4). Node runtime,
- * because that is what `@convex-dev/ai-sdk-provider` documents; and actions
- * only, so nothing here shares a file with a query or mutation (`CLAUDE.md` §8).
+ * Every call that leaves Convex for a model (prd/phase-2.md §4).
  *
- * There is no API key in this file or in this deployment. `convexGateway` mints
- * a short-lived deployment token per action and calls the Convex AI gateway,
- * which holds the provider credentials (prd/phase-2.md §7).
+ * **Deliberately not `"use node"`**, though the provider's README uses it. The
+ * gateway is reached over `fetch`, which Convex's own runtime has, and the cost
+ * of a Node action here is not a cold start — it is the e2e suite: a local
+ * anonymous backend cannot run Node actions at all, so one `"use node"` file
+ * fails the *whole* push with `DeploymentNotConfiguredForNodeActions` and every
+ * spec then runs against stale functions (`AGENTS.md` §8). Actions only all the
+ * same, so nothing here shares a file with a query or mutation.
  */
 
 import { convexGateway } from "@convex-dev/ai-sdk-provider";
 import { generateText } from "ai";
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
-import { aiEnabled, modelForJob } from "./helpers";
-import { MAX_OUTPUT_TOKENS } from "./rules";
+import type { AgentSettings } from "./helpers";
+import { type AiAgentId, OFF_REASON_TEXT } from "./rules";
+
+const agentId = v.union(
+  v.literal("conversation"),
+  v.literal("candidate_profile"),
+  v.literal("voice_profile"),
+);
+
+/**
+ * Annotated rather than inferred: the handler calls a query through `internal`,
+ * which includes this action, and TypeScript cannot unwind that circle on its
+ * own (TS7022).
+ */
+type ProbeResult = {
+  ok: boolean;
+  agent: AiAgentId;
+  model: string;
+  text?: string;
+  error?: string;
+};
 
 /**
  * One generation, with nothing of the product in it: no candidate, no
- * conversation, no thread. It exists to answer "can this deployment reach a
- * model, and which one does it get?" — the question every feature in phase 2
- * assumes a yes to, and the only one that can't be answered from a unit test.
+ * conversation, no thread. It answers "will this agent actually run, and can
+ * this deployment reach the model it is set to?" — the question every feature in
+ * phase 2 assumes a yes to, and the only one that can't be answered from a unit
+ * test.
  *
- * Internal, so it is reachable from the dashboard and from a test and from
+ * It runs the agent's real stored instruction, so an instruction saved on the
+ * settings page that the gateway rejects is caught here rather than on a
+ * candidate's first message.
+ *
+ * Internal, so it is reachable from the dashboard and from a script and from
  * nowhere a candidate's browser can go.
  */
 export const probe = internalAction({
-  args: {
-    prompt: v.optional(v.string()),
-    job: v.optional(v.union(v.literal("replies"), v.literal("extraction"))),
-  },
+  args: { agent: agentId, prompt: v.optional(v.string()) },
   returns: v.object({
     ok: v.boolean(),
+    agent: agentId,
     model: v.string(),
     text: v.optional(v.string()),
     error: v.optional(v.string()),
   }),
-  handler: async (_ctx, { prompt, job }) => {
-    const which = job ?? "replies";
-    const model = modelForJob(which);
+  handler: async (ctx, { agent, prompt }): Promise<ProbeResult> => {
+    const settings: AgentSettings | null = await ctx.runQuery(
+      internal.ai.queries.active,
+      { agent },
+    );
 
-    // Off is a state, not a failure: a local or e2e backend has no gateway.
-    if (!aiEnabled()) {
-      return { ok: false, model, error: 'AI_ENABLED is not "true".' };
+    // Off is a state, not a failure — and the reason matters, because "off"
+    // without a reason is the thing that wastes an afternoon.
+    if (settings === null) {
+      const stored: AgentSettings = await ctx.runQuery(
+        internal.ai.queries.settings,
+        { agent },
+      );
+      return {
+        ok: false,
+        agent,
+        model: stored.model,
+        error:
+          stored.offReason === null
+            ? 'AI_ENABLED is not "true" on this deployment.'
+            : OFF_REASON_TEXT[stored.offReason],
+      };
     }
 
     try {
       const { text } = await generateText({
-        model: convexGateway(model),
-        maxOutputTokens: MAX_OUTPUT_TOKENS[which],
+        model: convexGateway(settings.model),
+        maxOutputTokens: settings.maxOutputTokens,
+        system: settings.systemPrompt,
         prompt:
           prompt ??
-          "Reply with the single word READY and no punctuation or explanation.",
+          "Ignore your usual work for one message and reply with the single word READY, with no punctuation or explanation.",
       });
-      return { ok: true, model, text };
+      return { ok: true, agent, model: settings.model, text };
     } catch (error) {
       // Returned rather than thrown: the caller wants to know *which* model was
       // asked and what the gateway said, and a thrown error in an action is a
       // stack trace in the logs instead of an answer.
       return {
         ok: false,
-        model,
+        agent,
+        model: settings.model,
         error: error instanceof Error ? error.message : String(error),
       };
     }

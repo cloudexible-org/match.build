@@ -1,6 +1,9 @@
 import { ConvexError, v } from "convex/values";
 import { mutation } from "../_generated/server";
+import { agentSettings, storedAgentSettings } from "../ai/helpers";
+import { modelError, systemPromptError } from "../ai/rules";
 import { recordAudit } from "../audit/helpers";
+import { diffFields } from "../audit/rules";
 import {
   anonymiseAccount,
   anonymiseCandidate,
@@ -175,3 +178,100 @@ function assertWithin(rows: unknown[], limit: number, what: string): void {
     );
   }
 }
+
+/*
+ * ─── AI agents (prd/phase-2.md §4.4) ────────────────────────────────────────
+ */
+
+const agentId = v.union(
+  v.literal("conversation"),
+  v.literal("candidate_profile"),
+  v.literal("voice_profile"),
+);
+
+/**
+ * Sets one agent's switch, model and standing instruction, platform-wide. These
+ * three fields are the only source of any of it: nothing in the code supplies a
+ * model or a prompt, so an agent saved with an empty field is off, and that is
+ * the intended way to turn one off.
+ *
+ * Audited as `ai_agent.updated` in the same mutation, with the whole previous
+ * instruction in the event's `changes`. That is deliberately where a prompt's
+ * history lives: the audit trail is already append-only and already refuses to
+ * let anything rewrite it, so a separate versions table would be a second, less
+ * trustworthy copy of the same thing. To read an old prompt, read the trail.
+ *
+ * A platform-level event has no `matchmakerId`, so it appears in the admin trail
+ * and in no matchmaker's candidate history — which is right: it is our change to
+ * how the product behaves, not a change to their book.
+ */
+export const setAiAgent = mutation({
+  args: {
+    agent: agentId,
+    enabled: v.boolean(),
+    model: v.string(),
+    systemPrompt: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { agent, enabled, model, systemPrompt }) => {
+    const admin = await requirePlatformAdmin(ctx);
+
+    // Empty is allowed for both — it means off. A non-empty value still has to
+    // be usable.
+    const modelProblem = modelError(model);
+    if (modelProblem) throw new ConvexError(modelProblem);
+    const promptProblem = systemPromptError(systemPrompt);
+    if (promptProblem) throw new ConvexError(promptProblem);
+
+    const nextModel = model.trim();
+    const nextPrompt = systemPrompt.trim();
+    const existing = await storedAgentSettings(ctx, agent);
+    const before = await agentSettings(ctx, agent);
+
+    if (
+      before.exists &&
+      before.enabled === enabled &&
+      before.model === nextModel &&
+      before.systemPrompt === nextPrompt
+    ) {
+      // Nothing changed. Recording an event for a save that changed nothing
+      // would make the trail harder to read, not more complete.
+      return null;
+    }
+
+    if (existing === null) {
+      await ctx.db.insert("aiAgentSettings", {
+        agent,
+        enabled,
+        model: nextModel,
+        systemPrompt: nextPrompt,
+        updatedAt: Date.now(),
+        updatedByUserId: admin._id,
+      });
+    } else {
+      await ctx.db.patch("aiAgentSettings", existing._id, {
+        enabled,
+        model: nextModel,
+        systemPrompt: nextPrompt,
+        updatedAt: Date.now(),
+        updatedByUserId: admin._id,
+      });
+    }
+
+    await recordAudit(ctx, {
+      actor: { type: "user", userId: admin._id, role: "platform_admin" },
+      action: "ai_agent.updated",
+      entity: { table: "aiAgentSettings", id: agent },
+      changes: diffFields(
+        {
+          enabled: before.enabled,
+          model: before.model,
+          systemPrompt: before.systemPrompt,
+        },
+        { enabled, model: nextModel, systemPrompt: nextPrompt },
+        ["enabled", "model", "systemPrompt"],
+      ),
+    });
+    return null;
+  },
+});

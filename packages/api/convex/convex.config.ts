@@ -49,12 +49,11 @@ const app = defineApp({
     // The gateway needs a paid Convex Cloud deployment, so it is unset — and AI
     // is off — on a local backend and on the e2e suite's anonymous one. There
     // is no provider API key here: the gateway holds the credentials.
+    // Which model each agent uses, and its standing instruction, are NOT here:
+    // they live in `aiAgentSettings` and are edited at /admin/ai, because a
+    // prompt is long, is versioned by the audit trail, and is changed far more
+    // often than a deployment setting (prd/phase-2.md §4.4).
     AI_ENABLED: v.optional(v.string()),
-    // Which model does which job (prd/phase-2.md §6, ai/rules.ts). Unset means
-    // the defaults in that file; an unparseable value is ignored rather than
-    // failing every generation.
-    AI_MODEL_REPLIES: v.optional(v.string()),
-    AI_MODEL_EXTRACTION: v.optional(v.string()),
   },
 });
 app.use(staticHosting, { name: "www" });

@@ -52,6 +52,12 @@ export const AUDIT_ACTIONS = [
   // request. Recorded in their trail because their records visibly change.
   "candidate.anonymised",
 
+  // An AI agent's model or standing instruction, changed by a platform admin
+  // (prd/phase-2.md §4.4). Platform-level: no matchmakerId, so it appears in
+  // the admin trail and in nobody's candidate history — but it changes how the
+  // product behaves for every tenant, which is exactly why it is recorded.
+  "ai_agent.updated",
+
   // Notes.
   "note.created",
   "note.edited",
@@ -65,6 +71,7 @@ export const AUDIT_ENTITY_TABLES = [
   "matchmakers",
   "candidates", // includes invitations, which live on the candidate row
   "notes",
+  "aiAgentSettings",
 ] as const;
 
 export type AuditEntityTable = (typeof AUDIT_ENTITY_TABLES)[number];
@@ -192,6 +199,7 @@ const PLAIN_SENTENCES: Partial<Record<AuditAction, string>> = {
   "account.erased": "Erased their personal data at their request",
   "candidate.anonymised":
     "Anonymised them at their request — the conversation, notes and history are unchanged",
+  "ai_agent.updated": "Changed an AI agent's settings",
 };
 
 /*
