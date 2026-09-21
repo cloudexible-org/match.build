@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5.6-luna, through the Convex AI Gateway (`convexGateway(settings.model)`; the id is seeded into `aiAgentSettings` and editable at /admin/ai)
 - **Started:** 2026-09-19T15:37:25Z
-- **Last updated:** 2026-09-21T17:05:55Z
+- **Last updated:** 2026-09-21T18:34:41Z
 
 ## Log
 
@@ -356,3 +356,49 @@ cron fans out one transaction per book and only ever revises its own untouched
 suggestions. Convex features: crons, scheduled functions, mutations, queries,
 indexes (`packages/api/convex/crons.ts`, `packages/api/convex/matches/`,
 `apps/app/src/matches/`).
+
+### 2026-09-21 - 74ef310
+An AI switch per conversation, in the header: drafted replies can be turned off
+for one candidate and back on. Absent means on, so only the exception is stored.
+Off cancels the pending job, stales the drafts on offer, and deletes the agent
+thread through the component's own API; on again therefore starts from nothing
+rather than carrying on a sentence from a fortnight ago. The summariser is cut
+from v1 — the live window goes 20 → 50 messages and is now the whole of what the
+agent ever sees. Convex features: mutations, queries, scheduled functions,
+schema, typed env vars, agent component
+(`packages/api/convex/replySuggestions/`, `packages/api/convex/convex.config.ts`).
+
+### 2026-09-21 - c1abe5a
+Matches moved into the candidate panel as its first section, drawing the same
+card the board draws, with the stage as a badge since a panel has no columns to
+say it with. `matches.queries.forCandidate` reads `by_candidateAId` and
+`by_candidateBId` both, because a pair is keyed by id order and one read would
+miss whichever match puts this person second. The carousel is now one control
+used twice, shared with the suggestion cards. Convex features: queries, indexes
+(`packages/api/convex/matches/queries.ts`, `apps/app/src/workspace/candidate-matches.tsx`,
+`apps/app/src/lib/carousel.ts`).
+
+### 2026-09-21 - 33a5abc
+The board drops to three columns, and **the five-column shape logged above is
+superseded**: `Reviewing` and `Mutual interest` described the matchmaker rather
+than the match, so unseen-ness became a dot on the card instead of a lane, and
+`Suggested` became `Proposed` because a matchmaker's own pairing lands there too.
+A rejection and a wedding are the same event — somebody saying this is over and
+saying what happened — so the Rejected lane is gone and there is one `closed`
+state carrying an outcome, who ended it (including **both of them**, the
+commonest way an introduction quietly ends), and a note. Nothing ages out any
+more, because nothing needs hiding. The board also became the page: it fills the
+workspace frame and scrolls inside itself. Convex features: schema, mutations,
+queries, indexes (`packages/api/convex/matches/`, `apps/app/src/matches/board.tsx`).
+
+### 2026-09-21 - f0ee80a
+Tooling, not product: demo clips of the working app for the pitch deck.
+`pnpm capture:demo` drives the app through a real feature and writes timed
+frames plus a manifest; `pnpm render:demo` turns those into an mp4, a GIF and a
+poster. Frames and a timeline rather than a recording, because a recording's
+pacing is the run's pacing — every Convex round trip lands in the clip as dead
+air and the length changes run to run. To share the test world without sharing
+the suite, `apps/e2e` split into `tooling/harness` (local Convex backend, seed,
+sign-in, every page object), `tooling/e2e` (the specs) and `tooling/marketing`
+(the captures). No Convex features added; all 166 e2e specs pass unchanged
+(`tooling/`, `docs/demo-videos.md`).
