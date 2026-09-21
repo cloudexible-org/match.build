@@ -7,11 +7,12 @@ import { Link } from "react-router";
  * matchmaker's candidate panel (prd/phase-1.md §4.1) and the candidate's
  * panel about their matchmaker (§4.2).
  *
- * The panel sits alongside from `lg` up and can be collapsed; on anything
- * narrower it takes the whole column while it's open, which is what makes
- * either side usable on a phone. That, the header and the state behind the
- * toggle are the same both ways round, so they live here; what goes in the
- * header and the panel does not.
+ * The panel sits alongside from `lg` up, where it needs no control at all;
+ * on anything narrower it is collapsed behind a Details button and takes the
+ * whole column while it's open, which is what makes either side usable on a
+ * phone. That, the header and the state behind the toggle are the same both
+ * ways round, so they live here; what goes in the header and the panel does
+ * not.
  */
 export function ConversationPanes({
   testId,
@@ -77,11 +78,15 @@ export function ConversationPanes({
             {subtitle}
           </div>
           {headerAction}
+          {/* Below `lg` only: from `lg` up the panel is always alongside, and
+              a button that opens what is already open is just a dead control
+              taking a header slot. */}
           <Button
             variant="outline"
             size="sm"
             aria-expanded={panelOpen}
             data-testid={panelToggleTestId}
+            className="lg:hidden"
             onClick={() => setPanelOpen((open) => !open)}
           >
             Details

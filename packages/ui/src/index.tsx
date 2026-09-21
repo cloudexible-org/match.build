@@ -29,4 +29,5 @@ export {
 export { NativeSelect } from "./components/native-select";
 export { Popover, PopoverTitle } from "./components/popover";
 export { Textarea } from "./components/textarea";
+export { Toggle, type ToggleProps, toggleVariants } from "./components/toggle";
 export { cn } from "./lib/cn";

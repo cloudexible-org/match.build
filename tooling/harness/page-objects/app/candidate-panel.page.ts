@@ -12,6 +12,7 @@ export class CandidatePanelPage {
     return this.page.getByTestId("candidate-panel");
   }
 
+  /** The header's Details button — below `lg` only, where the panel hides. */
   getToggle() {
     return this.page.getByTestId("toggle-candidate-panel");
   }

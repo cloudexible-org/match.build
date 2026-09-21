@@ -104,6 +104,7 @@ export class CandidateChatPage {
     await expect(this.getMessageInput()).toHaveValue("");
   }
 
+  /** The header's Details button — below `lg` only, where the panel hides. */
   getPanelToggle() {
     return this.page.getByTestId("toggle-matchmaker-panel");
   }
@@ -132,10 +133,19 @@ export class CandidateChatPage {
   /**
    * Opens the panel where it's collapsed (below `lg`) and returns its
    * "Leave <matchmaker>" button.
+   *
+   * The chat has to be on screen before the panel's state can be read at
+   * all: on a page that is still loading, *nothing* is visible, and
+   * "the Leave button isn't there yet" is not the same answer as "the panel
+   * is closed".
    */
   async openLeave() {
-    if (!(await this.getLeaveButton().isVisible())) {
-      await this.getPanelToggle().click();
+    await expect(this.getRoot()).toBeVisible();
+    // From `lg` up there is no Details button: the panel is already beside
+    // the thread, so there is nothing to press.
+    const toggle = this.getPanelToggle();
+    if ((await toggle.isVisible()) && !(await this.getPanel().isVisible())) {
+      await toggle.click();
     }
     const button = this.getLeaveButton();
     await expect(button).toBeVisible();

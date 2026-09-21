@@ -1,5 +1,5 @@
 import { api, type Id } from "@repo/api";
-import { Button, cn } from "@repo/ui";
+import { Toggle } from "@repo/ui";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { useWorkspace } from "../workspace/workspace-layout";
@@ -38,11 +38,10 @@ export function SuggestionsToggle({
 
   const { enabled } = state;
   return (
-    <Button
-      variant="ghost"
+    <Toggle
+      variant="outline"
       size="sm"
-      role="switch"
-      aria-checked={enabled}
+      pressed={enabled}
       disabled={busy}
       data-testid="toggle-suggestions"
       data-enabled={enabled}
@@ -51,31 +50,23 @@ export function SuggestionsToggle({
           ? "Drafted replies are on for this conversation"
           : "Drafted replies are off for this conversation"
       }
-      onClick={() => {
+      onPressedChange={(pressed) => {
         setBusy(true);
         Promise.resolve(
           setEnabled({
             matchmakerId: workspace.matchmakerId,
             candidateId,
-            enabled: !enabled,
+            enabled: pressed,
           }),
         ).finally(() => setBusy(false));
       }}
     >
-      <span
-        aria-hidden
-        className={cn(
-          "size-2 rounded-full",
-          enabled ? "bg-primary" : "bg-muted-foreground/40",
-        )}
-      />
-      {/* Named in full for a screen reader; shortened for a phone's header. */}
+      {/* Named in full for a screen reader; two letters in the header, where
+          the pressed state carries the rest of the meaning. */}
       <span className="sr-only">
         {enabled ? "Turn off drafted replies" : "Turn on drafted replies"}
       </span>
-      <span aria-hidden className="hidden sm:inline">
-        Suggestions
-      </span>
-    </Button>
+      <span aria-hidden>AI</span>
+    </Toggle>
   );
 }
