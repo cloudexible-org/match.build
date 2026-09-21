@@ -30,6 +30,14 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useState } from "react";
 import { serverErrorMessage } from "../lib/server-error";
+import {
+  AssistantMark,
+  PencilIcon,
+  RecordEditRow,
+  RecordGroup,
+  RecordRow,
+  TrashIcon,
+} from "./panel-record";
 import { useWorkspace } from "./workspace-layout";
 
 /**
@@ -119,25 +127,17 @@ function Facts({
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map(({ group, fields }) => (
-            <section key={group} className="flex flex-col gap-1">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {CANDIDATE_GROUP_LABELS[group]}
-              </h4>
-              {/* `-mx-2` so a row's hover background bleeds into the panel's
-                  own padding and reads as a full-width row, the way a list
-                  row should. */}
-              <ul className="-mx-2 flex flex-col">
-                {fields.map((field) => (
-                  <FactRow
-                    key={field.key}
-                    candidateId={candidateId}
-                    field={field}
-                    // biome-ignore lint/style/noNonNullAssertion: `filled` proves it
-                    entry={entries[field.key]!}
-                  />
-                ))}
-              </ul>
-            </section>
+            <RecordGroup key={group} title={CANDIDATE_GROUP_LABELS[group]}>
+              {fields.map((field) => (
+                <FactRow
+                  key={field.key}
+                  candidateId={candidateId}
+                  field={field}
+                  // biome-ignore lint/style/noNonNullAssertion: `filled` proves it
+                  entry={entries[field.key]!}
+                />
+              ))}
+            </RecordGroup>
           ))}
         </div>
       )}
@@ -185,11 +185,7 @@ function FactRow({
 
   if (editing) {
     return (
-      <li
-        className="px-2 py-2"
-        data-testid="profile-field"
-        data-field={field.key}
-      >
+      <RecordEditRow testId="profile-field" field={field.key}>
         <form noValidate onSubmit={submit} className="flex flex-col gap-2">
           <Field invalid={error !== null}>
             <FieldLabel>{field.label}</FieldLabel>
@@ -238,49 +234,36 @@ function FactRow({
             </Button>
           </div>
         </form>
-      </li>
+      </RecordEditRow>
     );
   }
 
   return (
-    // `relative`: the `sr-only` line below is absolutely positioned, and an
-    // absolute box with no positioned ancestor is not clipped by the panel's
-    // scroller — it would sit at its static offset in the *document* and give
-    // the window a thousand pixels to scroll (`specs/app-convex/layout.spec`).
-    <li className="relative" data-testid="profile-field" data-field={field.key}>
-      {/* The whole row is the edit control. A narrow column cannot afford a
-          permanent pair of buttons per fact, and a row you click to change is
-          the thing every records panel already taught people. */}
-      <button
-        type="button"
-        title={source}
-        className="group/row flex w-full items-baseline gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-        onClick={() => {
-          setDraft(entry.value);
-          setEditing(true);
-        }}
-      >
-        <span className="w-32 shrink-0 text-sm text-muted-foreground">
-          {field.label}
-        </span>
-        <span className="min-w-0 flex-1 break-words text-sm">
+    <RecordRow
+      testId="profile-field"
+      field={field.key}
+      label={field.label}
+      title={source}
+      srOnly={source}
+      onEdit={() => {
+        setDraft(entry.value);
+        setEditing(true);
+      }}
+      value={
+        <>
           {entry.source !== "matchmaker" && <AssistantMark />}
           {displayValue(field, entry.value)}
           {field.key === "dateOfBirth" && ageOf(entry.value)}
-        </span>
-        <PencilIcon className="size-3.5 shrink-0 self-center text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-visible/row:opacity-100" />
-        {/* The button's name is its content — label, value, then this — so a
-            screen reader hears the fact before it hears what the button does.
-            An `aria-label` here would replace all of it with "Edit …". */}
-        <span className="sr-only">Edit</span>
-      </button>
-      <span className="sr-only">{source}</span>
-      {entry.sourceQuote && (
-        <p className="ml-2 border-l-2 border-border pl-2 text-xs italic text-muted-foreground">
-          “{entry.sourceQuote}”
-        </p>
-      )}
-    </li>
+        </>
+      }
+      footer={
+        entry.sourceQuote && (
+          <p className="ml-2 border-l-2 border-border pl-2 text-xs italic text-muted-foreground">
+            “{entry.sourceQuote}”
+          </p>
+        )
+      }
+    />
   );
 }
 
@@ -787,54 +770,6 @@ function AddNote({
         </Button>
       </div>
     </form>
-  );
-}
-
-/*
- * ─── Marks ──────────────────────────────────────────────────────────────────
- */
-
-/**
- * The one piece of provenance worth a pixel in read mode. Whose record it is
- * is the default; that a model touched a value is the exception, and the
- * exception is what a mark is for. The full wording is on the row's `title`,
- * in its `sr-only` line and in the edit form.
- */
-function AssistantMark() {
-  return (
-    <span
-      aria-hidden
-      className="mr-1 inline-block align-baseline text-xs text-primary"
-    >
-      ✦
-    </span>
-  );
-}
-
-function PencilIcon({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 16 16" fill="none" className={className}>
-      <path
-        d="M11.3 2.7a1.7 1.7 0 0 1 2.4 2.4L5.6 13.2 2 14l.8-3.6 8.5-7.7Z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function TrashIcon({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 16 16" fill="none" className={className}>
-      <path
-        d="M2.5 4h11M6 4V2.5h4V4m-6 0 .6 9a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9L12 4"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 
