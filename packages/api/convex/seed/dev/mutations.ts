@@ -20,6 +20,7 @@ import {
   internalMutation,
   type MutationCtx,
 } from "../../_generated/server";
+import { runMatchPass } from "../../matches/helpers";
 import { findLiveUserByEmail } from "../../users/helpers";
 import {
   DEV_INVITED_SLUGS,
@@ -426,6 +427,62 @@ export const apply = internalMutation({
         },
       });
       created.push(`invite ${user.email}`);
+    }
+
+    // The match board (prd/phase-3.md §2). It runs the real algorithm rather
+    // than writing cards by hand: a seeded board the nightly run could never
+    // have produced is one you can't learn anything from.
+    //
+    // Only when the board is empty, so a re-run doesn't undo an afternoon of
+    // moving cards around.
+    const anyMatch = await ctx.db
+      .query("matches")
+      .withIndex("by_matchmakerId", (q) => q.eq("matchmakerId", matchmakerId))
+      .first();
+    if (anyMatch === null) {
+      const report = await runMatchPass(ctx, matchmakerId, {
+        type: "system",
+        job: "seed",
+      });
+      created.push(`${report.created} suggested matches`);
+
+      // Three of them moved along, so the board is a board rather than one
+      // full column beside four empty ones.
+      const suggested = await ctx.db
+        .query("matches")
+        .withIndex("by_matchmakerId_and_stage", (q) =>
+          q.eq("matchmakerId", matchmakerId).eq("stage", "suggested"),
+        )
+        .order("desc")
+        .take(3);
+      const [reviewing, introduced, turnedDown] = suggested;
+      if (reviewing !== undefined) {
+        await ctx.db.patch("matches", reviewing._id, {
+          stage: "reviewing",
+          stageChangedAt: now,
+          updatedAt: now,
+        });
+      }
+      if (introduced !== undefined) {
+        await ctx.db.patch("matches", introduced._id, {
+          stage: "introduced",
+          stageChangedAt: now,
+          // One yes and one answer still missing: the sub-state neither of the
+          // columns either side of it can show.
+          candidateAResponse: "yes",
+          candidateBResponse: "pending",
+          updatedAt: now,
+        });
+      }
+      if (turnedDown !== undefined) {
+        await ctx.db.patch("matches", turnedDown._id, {
+          stage: "rejected",
+          stageChangedAt: now,
+          rejectedBy: "candidateB",
+          rejectionReason: "Not ready to meet anyone until the spring.",
+          updatedAt: now,
+        });
+      }
     }
 
     const accounts = DEV_USERS.map(({ email, role }) => ({ email, role }));

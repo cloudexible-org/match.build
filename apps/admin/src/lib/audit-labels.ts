@@ -37,6 +37,12 @@ export const ACTION_LABELS: Record<AuditAction, string> = {
   "matchmaker_profile.suggested": "Matchmaker profile change suggested",
   "matchmaker_profile.suggestion_accepted": "Suggestion accepted",
   "matchmaker_profile.suggestion_rejected": "Suggestion dismissed",
+  "match.suggested": "Match suggested by the nightly run",
+  "match.created": "Match made by hand",
+  "match.stage_changed": "Match moved",
+  "match.rejected": "Match turned down",
+  "match.response_recorded": "Answer to an introduction recorded",
+  "match.outcome_recorded": "Match outcome recorded",
   // Historical: the notes table `candidateProfiles` replaced. The trail is
   // append-only, so events recorded before the change still have to read.
   "note.created": "Note added",

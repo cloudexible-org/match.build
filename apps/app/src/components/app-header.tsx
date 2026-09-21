@@ -24,9 +24,17 @@ export function AppHeader({ name, nav }: { name: string; nav?: ReactNode }) {
     <header className="shrink-0 border-b border-border bg-card">
       <div className="flex h-14 items-center justify-between gap-4 px-4">
         {/* The brand and workspace name give way; the controls on the right
-            can't shrink, and at 380px something has to. */}
+            can't shrink, and at 380px something has to. Inside a workspace the
+            brand goes first: its nav is where you are and where you can go,
+            and the name of the product is neither. */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Link to="/" className="truncate font-display text-xl">
+          <Link
+            to="/"
+            className={cn(
+              "truncate font-display text-xl",
+              nav !== undefined && "hidden sm:inline",
+            )}
+          >
             match.build
           </Link>
           {nav}

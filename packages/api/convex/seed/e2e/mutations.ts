@@ -25,7 +25,15 @@ import { v } from "convex/values";
 import type { Id } from "../../_generated/dataModel";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { inviteTokenFor, newInvite } from "../../invites/helpers";
+import { orderedIds } from "../../matches/helpers";
+import { MATCH_ALGORITHM_VERSION, pairKey } from "../../matches/rules";
 import type { ProfileEntries } from "../../profiles/helpers";
+import {
+  matchRejectedBy,
+  matchResponse,
+  matchSignal,
+  matchStage,
+} from "../../schema";
 import {
   SEED_ADMINS,
   SEED_CODE_TARGET,
@@ -167,6 +175,7 @@ const SEEDED_TABLES = [
   "candidateProfiles",
   "matchmakerProfiles",
   "replySuggestions",
+  "matches",
   "auditEvents",
   "pushSubscriptions",
   "notificationSettings",
@@ -416,6 +425,30 @@ export const scenario = internalMutation({
         }),
       ),
     ),
+    matches: v.optional(
+      v.array(
+        v.object({
+          key: v.string(),
+          matchmakerKey: v.string(),
+          aKey: v.string(),
+          bKey: v.string(),
+          stage: v.optional(matchStage),
+          origin: v.optional(
+            v.union(v.literal("algorithm"), v.literal("manual")),
+          ),
+          score: v.optional(v.number()),
+          coverage: v.optional(v.number()),
+          signals: v.optional(v.array(matchSignal)),
+          checkDealbreakers: v.optional(v.boolean()),
+          candidateAResponse: v.optional(matchResponse),
+          candidateBResponse: v.optional(matchResponse),
+          rejectedBy: v.optional(matchRejectedBy),
+          rejectionReason: v.optional(v.string()),
+          outcome: v.optional(v.string()),
+          stageChangedDaysAgo: v.optional(v.number()),
+        }),
+      ),
+    ),
   },
   returns: v.object({
     ns: v.string(),
@@ -440,6 +473,7 @@ export const scenario = internalMutation({
         inviteToken: v.union(v.null(), v.string()),
       }),
     ),
+    matches: v.record(v.string(), v.object({ id: v.string() })),
   }),
   handler: async (ctx, args) => {
     const ns = args.ns;
@@ -747,6 +781,53 @@ export const scenario = internalMutation({
       };
     }
 
-    return { ns, users, matchmakers, candidates };
+    // The match board (prd/phase-3.md §2). Written straight into the stage the
+    // spec asked for: the nightly run can only ever produce `suggested`, so a
+    // card halfway along the board is a state no amount of seeding candidates
+    // reaches.
+    const matches: ScenarioManifest["matches"] = {};
+    for (const spec of args.matches ?? []) {
+      const matchmakerId = matchmakerIds[spec.matchmakerKey];
+      if (matchmakerId === undefined) {
+        throw new Error(
+          `Scenario ${ns}: no matchmaker "${spec.matchmakerKey}".`,
+        );
+      }
+      const first = candidates[spec.aKey]?.id as Id<"candidates"> | undefined;
+      const second = candidates[spec.bKey]?.id as Id<"candidates"> | undefined;
+      if (first === undefined || second === undefined) {
+        throw new Error(
+          `Scenario ${ns}: match "${spec.key}" needs two seeded candidates.`,
+        );
+      }
+      const [candidateAId, candidateBId] = orderedIds(first, second);
+      const stageChangedAt =
+        now - (spec.stageChangedDaysAgo ?? 0) * 24 * 60 * 60 * 1000;
+      const id = await ctx.db.insert("matches", {
+        matchmakerId,
+        candidateAId,
+        candidateBId,
+        pairKey: pairKey(candidateAId, candidateBId),
+        origin: spec.origin ?? "algorithm",
+        stage: spec.stage ?? "suggested",
+        stageChangedAt,
+        score: spec.score,
+        coverage: spec.coverage,
+        signals: spec.signals,
+        checkDealbreakers: spec.checkDealbreakers,
+        algorithmVersion:
+          spec.score === undefined ? undefined : MATCH_ALGORITHM_VERSION,
+        lastScoredAt: spec.score === undefined ? undefined : now,
+        candidateAResponse: spec.candidateAResponse,
+        candidateBResponse: spec.candidateBResponse,
+        rejectedBy: spec.rejectedBy,
+        rejectionReason: spec.rejectionReason,
+        outcome: spec.outcome,
+        updatedAt: stageChangedAt,
+      });
+      matches[spec.key] = { id };
+    }
+
+    return { ns, users, matchmakers, candidates, matches };
   },
 });

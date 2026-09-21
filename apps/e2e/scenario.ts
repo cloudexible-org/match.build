@@ -39,6 +39,8 @@ export type Scenario = ScenarioManifest & {
   conversationId(key: string): string;
   /** A seeded candidate's invite link path, by key. Throws without one. */
   invitePath(key: string): string;
+  /** A seeded match card's id, by key. */
+  matchId(key: string): string;
 };
 
 /** A namespace unique to this run: 4–12 lowercase letters/digits, letter first. */
@@ -82,5 +84,6 @@ export async function seedScenario(
       }
       return `/app/invite/${token}`;
     },
+    matchId: (key) => lookup("match", manifest.matches, key).id,
   };
 }

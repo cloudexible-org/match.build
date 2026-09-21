@@ -116,6 +116,33 @@ export const DEV_USERS: DevUser[] = [
     name: "Lee Left",
     role: "candidate (left Maya's book)",
   },
+  // Four more joined members with filled-in profiles, so the match board has
+  // a book to work on (prd/phase-3.md §2). Between them they produce a strong
+  // pair, a thin one, and pairs the hard filters refuse outright.
+  {
+    slug: "priya",
+    email: `priya.member@${DEV_DOMAIN}`,
+    name: "Priya Member",
+    role: "candidate (joined, full profile)",
+  },
+  {
+    slug: "daniel",
+    email: `daniel.member@${DEV_DOMAIN}`,
+    name: "Daniel Member",
+    role: "candidate (joined, full profile)",
+  },
+  {
+    slug: "nadia",
+    email: `nadia.member@${DEV_DOMAIN}`,
+    name: "Nadia Member",
+    role: "candidate (joined, full profile)",
+  },
+  {
+    slug: "theo",
+    email: `theo.member@${DEV_DOMAIN}`,
+    name: "Theo Member",
+    role: "candidate (joined, full profile)",
+  },
   // Verified account with nothing attached, for onboarding.
   {
     slug: "blank",
@@ -169,7 +196,26 @@ export const DEV_MEMBERS: DevMember[] = [
     // asks for an entry to go, and a free-text note. Every quote is something
     // Sam actually says in the thread above.
     profile: {
-      facts: { lookingFor: "unsure", pets: "A cat, Miso", wantsKids: "maybe" },
+      facts: {
+        lookingFor: "unsure",
+        pets: "A cat, Miso",
+        wantsKids: "maybe",
+        age: "34",
+        gender: "man",
+        locationCity: "Toronto",
+        locationCountry: "Canada",
+        seekingGender: "women",
+        partnerAgeRange: "28-40",
+        smoking: "never",
+        drinking: "socially",
+        languages: "English, French",
+        exercise: "often",
+        diet: "omnivore",
+        education: "postgraduate",
+        religion: "none",
+        religionImportance: "low",
+        familyImportance: "high",
+      },
       notes: {
         matchmakerNotes: "Easy to talk to. Would introduce to Jordan first.",
       },
@@ -212,7 +258,25 @@ export const DEV_MEMBERS: DevMember[] = [
     // One proposal, so the same row appears without arrows or a counter —
     // worth seeing beside Sam's, because it is a different card.
     profile: {
-      facts: { wantsKids: "yes" },
+      facts: {
+        wantsKids: "yes",
+        age: "31",
+        gender: "woman",
+        locationCity: "Toronto",
+        locationCountry: "Canada",
+        seekingGender: "men",
+        partnerAgeRange: "30-42",
+        lookingFor: "long-term",
+        smoking: "never",
+        drinking: "socially",
+        languages: "English, Spanish",
+        exercise: "sometimes",
+        diet: "omnivore",
+        education: "undergraduate",
+        religion: "none",
+        religionImportance: "low",
+        familyImportance: "high",
+      },
       suggestions: [
         {
           kind: "notes",
@@ -224,7 +288,136 @@ export const DEV_MEMBERS: DevMember[] = [
   },
   // Nothing pending: the matchmaker's own voice draft is the only row here,
   // and once that is answered the stack disappears entirely.
-  { userSlug: "alex", messages: [] },
+  {
+    userSlug: "alex",
+    messages: [],
+    profile: {
+      facts: {
+        age: "38",
+        gender: "man",
+        locationCity: "Toronto",
+        locationCountry: "Canada",
+        seekingGender: "men",
+        partnerAgeRange: "32-46",
+        lookingFor: "long-term",
+        wantsKids: "no",
+        smoking: "never",
+        drinking: "socially",
+        languages: "English",
+        exercise: "often",
+        diet: "omnivore",
+        education: "undergraduate",
+        religionImportance: "low",
+        familyImportance: "medium",
+      },
+    },
+  },
+  // Priya and Daniel are the pair the algorithm should be most sure of: same
+  // city, same religion and both of them say it matters, both want marriage
+  // and children.
+  {
+    userSlug: "priya",
+    messages: [],
+    profile: {
+      facts: {
+        age: "33",
+        gender: "woman",
+        locationCity: "Toronto",
+        locationCountry: "Canada",
+        seekingGender: "men",
+        partnerAgeRange: "32-42",
+        lookingFor: "marriage",
+        wantsKids: "yes",
+        religion: "Hindu",
+        religionImportance: "high",
+        partnerReligionRequired: "yes",
+        smoking: "never",
+        drinking: "never",
+        diet: "vegetarian",
+        languages: "English, Hindi",
+        exercise: "often",
+        education: "postgraduate",
+        familyImportance: "high",
+      },
+      notes: { hobbies: "Running, and a book club she has run for years." },
+    },
+  },
+  {
+    userSlug: "daniel",
+    messages: [],
+    profile: {
+      facts: {
+        age: "36",
+        gender: "man",
+        locationCity: "Toronto",
+        locationCountry: "Canada",
+        seekingGender: "women",
+        partnerAgeRange: "30-38",
+        lookingFor: "marriage",
+        wantsKids: "yes",
+        religion: "Hindu",
+        religionImportance: "high",
+        smoking: "never",
+        drinking: "never",
+        diet: "vegetarian",
+        languages: "English, Hindi",
+        exercise: "sometimes",
+        education: "postgraduate",
+        familyImportance: "high",
+      },
+    },
+  },
+  // Nadia is the thin end: another city, a different idea of what she wants,
+  // and habits that don't line up. A card, but not a confident one.
+  {
+    userSlug: "nadia",
+    messages: [],
+    profile: {
+      facts: {
+        age: "29",
+        gender: "woman",
+        locationCity: "Montreal",
+        locationCountry: "Canada",
+        seekingGender: "men",
+        partnerAgeRange: "28-40",
+        lookingFor: "companionship",
+        wantsKids: "maybe",
+        smoking: "regularly",
+        drinking: "regularly",
+        languages: "French",
+        exercise: "rarely",
+        diet: "omnivore",
+        education: "undergraduate",
+        religionImportance: "low",
+        familyImportance: "low",
+      },
+    },
+  },
+  // Theo is who the hard filters are for: nobody in this book is looking for
+  // him, and he is looking for nobody in it either.
+  {
+    userSlug: "theo",
+    messages: [],
+    profile: {
+      facts: {
+        age: "44",
+        gender: "man",
+        locationCity: "Toronto",
+        locationCountry: "Canada",
+        seekingGender: "women",
+        partnerAgeRange: "20-26",
+        lookingFor: "unsure",
+        smoking: "regularly",
+        drinking: "regularly",
+        languages: "English",
+        exercise: "rarely",
+        diet: "omnivore",
+        education: "school",
+        religionImportance: "low",
+        familyImportance: "low",
+      },
+    },
+  },
   {
     userSlug: "left",
     messages: [

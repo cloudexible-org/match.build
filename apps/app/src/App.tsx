@@ -7,6 +7,7 @@ import { CreateMatchmakerPage } from "./pages/create-matchmaker";
 import { DiscoverPage } from "./pages/discover";
 import { HomePage } from "./pages/home";
 import { InvitePage } from "./pages/invite";
+import { MatchesPage } from "./pages/matches";
 import { MatchmakerSettingsPage } from "./pages/matchmaker-settings";
 import { NotFoundPage } from "./pages/not-found";
 import { OnboardPage } from "./pages/onboard";
@@ -43,6 +44,7 @@ export default function App() {
             <Route index element={<NoConversation />} />
             <Route path="c/:candidateId" element={<ConversationPage />} />
           </Route>
+          <Route path="matches" element={<MatchesPage />} />
           <Route path="onboard" element={<OnboardPage />} />
           <Route path="settings" element={<MatchmakerSettingsPage />} />
         </Route>
