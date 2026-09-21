@@ -4,7 +4,7 @@
 - **Event:** Convex All Gas Hackathon
 - **What it does:** An operating system for independent human matchmakers: invite candidates from Instagram/WhatsApp into an in-app chat, with AI-drafted replies and an AI-enriched candidate profile planned for later phases.
 - **Live app:** https://www.match.build (app at /app/)
-- **Repo:** https://github.com/cloudexible-org/matchmaker
+- **Repo:** https://github.com/cloudexible-org/match.build
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://api.match.build (CONVEX_CLOUD_URL custom domain)
 - **Components:** @convex-dev/static-hosting (three instances: `www`, `app`, `admin`)
