@@ -84,6 +84,39 @@ test("Details shows who they are and saves an edit", async ({ page }) => {
   await expect(panel.getNameRow()).toContainText("Dana Renamed");
 });
 
+test("an editable row says so without being hovered", async ({ page }) => {
+  const panel = await openPanel(page, "details");
+
+  // Hover is not something a touch screen has, so an affordance that only
+  // appears under a pointer is an affordance a phone never sees.
+  const hint = panel.getNameRow().getByTestId("row-edit-hint");
+  await expect(hint).toBeVisible();
+  expect(
+    Number(await hint.evaluate((node) => getComputedStyle(node).opacity)),
+  ).toBeGreaterThan(0.2);
+
+  // And a row nothing can change here does not offer one.
+  await expect(
+    panel.getDetail("membership").getByTestId("row-edit-hint"),
+  ).toHaveCount(0);
+});
+
+test("the status control sits in the value column like a value", async ({
+  page,
+}) => {
+  const panel = await openPanel(page, "details");
+
+  // It is a bare <select>, which insets its own text by an amount that is the
+  // browser's rather than ours — so its value used to start a few pixels left
+  // of every other value in the column.
+  const status = await panel.getStatusSelect().boundingBox();
+  const membership = await panel.getMembership().boundingBox();
+  if (status === null || membership === null) {
+    throw new Error("No details on screen");
+  }
+  expect(Math.abs(Math.round(status.x - membership.x))).toBeLessThanOrEqual(1);
+});
+
 test("Details refuses a handle the server would refuse", async ({ page }) => {
   const panel = await openPanel(page, "details");
   await panel.addHandle("WhatsApp", "07700 900123");
