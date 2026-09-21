@@ -25,7 +25,8 @@ const NOW = Date.parse("2026-09-21T12:00:00Z");
  * each inside the other's stated ranges.
  */
 const SAM: ProfileFacts = {
-  age: "34",
+  // 34 at NOW. An age is never stored: it is read off the birth date.
+  dateOfBirth: "1992-03-14",
   gender: "man",
   heightCm: "180",
   languages: "English, French",
@@ -46,7 +47,8 @@ const SAM: ProfileFacts = {
 };
 
 const JORDAN: ProfileFacts = {
-  age: "31",
+  // 31 at NOW.
+  dateOfBirth: "1995-01-09",
   gender: "woman",
   heightCm: "168",
   languages: "English, Spanish",
@@ -136,14 +138,17 @@ describe("pairKey", () => {
 });
 
 describe("reading facts", () => {
-  test("a birth date beats a stated age", () => {
-    expect(ageOf({ dateOfBirth: "1990-01-01", age: "12" }, NOW)).toBe(36);
-    expect(ageOf({ age: "34" }, NOW)).toBe(34);
+  test("an age comes off the birth date and nowhere else", () => {
+    expect(ageOf({ dateOfBirth: "1990-01-01" }, NOW)).toBe(36);
     expect(ageOf({}, NOW)).toBeNull();
+    // The `age` fact the registry used to carry. A stored number that ages
+    // without anyone touching it is the thing this file stopped reading: a
+    // profile written two years ago would match on a 34 that is now 36.
+    expect(ageOf({ age: "34" }, NOW)).toBeNull();
   });
 
   test("an empty value is not a value", () => {
-    expect(ageOf({ age: "" }, NOW)).toBeNull();
+    expect(ageOf({ dateOfBirth: "" }, NOW)).toBeNull();
   });
 
   test("seeking comes from the fact, or from orientation where there isn't one", () => {
@@ -198,17 +203,23 @@ describe("the hard filters", () => {
   });
 
   test("block an age outside the stated range", () => {
-    const tooYoung = { ...JORDAN, age: "24", partnerAgeRange: "30-42" };
+    // 24 at NOW, and Sam is after 28-38.
+    const tooYoung = {
+      ...JORDAN,
+      dateOfBirth: "2002-01-09",
+      partnerAgeRange: "30-42",
+    };
     const blockers = hardBlockers(SAM, tooYoung, NOW);
     expect(blockers.map((b) => b.key)).toEqual(["partnerAgeRange"]);
     expect(blockers[0].detail).toContain("28–38");
   });
 
-  test("read the age off a birth date, as the registry says", () => {
-    const born = { ...without(JORDAN, "age"), dateOfBirth: "2005-01-01" };
-    expect(hardBlockers(SAM, born, NOW).map((b) => b.key)).toEqual([
-      "partnerAgeRange",
-    ]);
+  test("nobody is blocked on an age no birth date gives", () => {
+    // The cost of dropping the `age` fact, stated plainly: a candidate whose
+    // age is only prose in `notes.age` passes the age filter rather than
+    // being filtered on a number nothing keeps current.
+    const undated = without(JORDAN, "dateOfBirth");
+    expect(hardBlockers(SAM, undated, NOW).map((b) => b.key)).toEqual([]);
   });
 
   test("block a height outside the stated range", () => {

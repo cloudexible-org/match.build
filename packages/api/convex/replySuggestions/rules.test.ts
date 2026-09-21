@@ -198,23 +198,33 @@ describe("voiceUpdate", () => {
 });
 
 describe("draftInstruction", () => {
+  /** 2026-09-21, so the date the instruction states is a fixed one. */
+  const NOW = Date.parse("2026-09-21T12:00:00Z");
+
+  it("tells the model what day it is", () => {
+    // Without it, "see you tomorrow" is a date the model cannot resolve. It
+    // goes here, in the per-turn instruction, rather than in the opening
+    // brief: a thread outlives the day it was opened.
+    expect(draftInstruction(3, "Sam", NOW)).toContain("Monday, 2026-09-21");
+  });
+
   it("asks for as many as it was told to", () => {
-    expect(draftInstruction(3, "Sam")).toContain("3 replies");
-    expect(draftInstruction(1, "Sam")).toContain("one reply");
+    expect(draftInstruction(3, "Sam", NOW)).toContain("3 replies");
+    expect(draftInstruction(1, "Sam", NOW)).toContain("one reply");
   });
 
   it("repeats the rule that matters most, where the model will act on it", () => {
-    expect(draftInstruction(3, "Sam")).toContain(
+    expect(draftInstruction(3, "Sam", NOW)).toContain(
       "Never repeat the matchmaker's private notes",
     );
   });
 
   it("gives it a way to decline", () => {
-    expect(draftInstruction(3, "Sam")).toContain("NOTHING");
+    expect(draftInstruction(3, "Sam", NOW)).toContain("NOTHING");
   });
 
   it("asks for both halves, replies first", () => {
-    const instruction = draftInstruction(3, "Sam");
+    const instruction = draftInstruction(3, "Sam", NOW);
     expect(instruction).toContain("REPLIES");
     expect(instruction).toContain("NOTICED");
     // The half a matchmaker sees is the half described first (prd §4.4).
@@ -224,7 +234,9 @@ describe("draftInstruction", () => {
   });
 
   it("insists the quote is the candidate's own words", () => {
-    expect(draftInstruction(3, "Sam")).toContain("character for character");
+    expect(draftInstruction(3, "Sam", NOW)).toContain(
+      "character for character",
+    );
   });
 });
 

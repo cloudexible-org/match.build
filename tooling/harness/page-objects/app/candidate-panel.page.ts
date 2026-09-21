@@ -213,6 +213,30 @@ export class CandidatePanelPage {
     await this.page.getByRole("button", { name: "Add note" }).click();
   }
 
+  /**
+   * A note under a name of the matchmaker's own, typed rather than picked.
+   *
+   * The name goes in as free text and leaves the field as a key — "Ideal
+   * Weekend" becomes `ideal_weekend` — so this blurs the field the way a
+   * person would before reading the result back.
+   */
+  async addCustomNote(name: string, body: string) {
+    await this.openAddNote();
+    await this.page
+      .getByTestId("profile-add-note-key")
+      .selectOption("__custom");
+    const key = this.page.getByTestId("profile-add-note-custom-key");
+    await key.fill(name);
+    await key.blur();
+    await this.page.getByTestId("profile-add-note-body").fill(body);
+    await this.page.getByRole("button", { name: "Add note" }).click();
+  }
+
+  /** The name field on the add-a-note form, for asserting what it shows back. */
+  getCustomNoteKey() {
+    return this.page.getByTestId("profile-add-note-custom-key");
+  }
+
   async editNote(key: string, body: string) {
     const row = this.getNote(key);
     await row.getByRole("button", { name: "Edit" }).click();

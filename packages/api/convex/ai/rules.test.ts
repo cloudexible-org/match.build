@@ -8,6 +8,7 @@ import {
   offReasonFor,
   SYSTEM_PROMPT_MAX,
   systemPromptError,
+  todayLine,
 } from "./rules";
 
 describe("the agent list", () => {
@@ -116,5 +117,26 @@ describe("offReasonFor", () => {
         systemPrompt: "",
       }),
     ).toBe("unconfigured");
+  });
+});
+
+describe("todayLine", () => {
+  test("names the day, so a relative date is one the model can resolve", () => {
+    const line = todayLine(Date.parse("2026-09-21T12:00:00Z"));
+    expect(line).toContain("Monday, 2026-09-21");
+    expect(line).toContain("tomorrow");
+  });
+
+  test("is the UTC day, and says so", () => {
+    // Late evening in Auckland is already the next day there. The line does
+    // not pretend to know that; it says which day it is stating and that the
+    // reader may be either side of it.
+    expect(todayLine(Date.parse("2026-09-21T23:30:00Z"))).toContain(
+      "2026-09-21",
+    );
+    expect(todayLine(Date.parse("2026-09-22T00:30:00Z"))).toContain(
+      "2026-09-22",
+    );
+    expect(todayLine(Date.now())).toContain("UTC");
   });
 });

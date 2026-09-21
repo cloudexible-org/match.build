@@ -91,6 +91,7 @@ export const reconcile = internalAction({
       reconcileInstruction(
         context.candidateName,
         noticed.slice(0, MAX_NOTICED) satisfies NoticedFact[],
+        Date.now(),
       ),
     );
 

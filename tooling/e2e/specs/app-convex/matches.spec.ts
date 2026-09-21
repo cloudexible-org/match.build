@@ -15,9 +15,19 @@ import { signInAs } from "@repo/harness/session";
  * rather than asserting a number.
  */
 
+/**
+ * A birth date that reads as `age` today. An age is never stored — it is read
+ * off the birth date — so a hard-coded date would drift a year at a time until
+ * a fixture fell outside the range a test depends on. Born on the 1st of
+ * January, so the birthday has always already passed when the suite runs.
+ */
+function bornAged(age: number): string {
+  return `${new Date().getUTCFullYear() - age}-01-01`;
+}
+
 /** Enough of a profile for a pair to clear the coverage bar. */
 const MAN = {
-  age: "34",
+  dateOfBirth: bornAged(34),
   gender: "man",
   seekingGender: "women",
   partnerAgeRange: "28-40",
@@ -37,14 +47,14 @@ const MAN = {
 
 const WOMAN = {
   ...MAN,
-  age: "31",
+  dateOfBirth: bornAged(31),
   gender: "woman",
   seekingGender: "men",
   partnerAgeRange: "30-42",
 };
 
 /** Nobody in this book is looking for him, so no filter lets him through. */
-const UNMATCHABLE = { ...MAN, age: "60", seekingGender: "men" };
+const UNMATCHABLE = { ...MAN, dateOfBirth: bornAged(60), seekingGender: "men" };
 
 /** More than a card shows at once, so it has an "All N reasons" to open. */
 const MANY_SIGNALS = [

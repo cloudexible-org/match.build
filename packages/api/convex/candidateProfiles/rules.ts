@@ -25,6 +25,7 @@
  * Plain code with no Convex imports, exported through `@repo/api`.
  */
 
+import { todayLine } from "../ai/rules";
 import {
   humaniseKey,
   type ProfileFieldDef,
@@ -87,16 +88,7 @@ export const CANDIDATE_PROFILE_FIELDS: readonly CandidateFieldDef[] = [
     // months of it. It may propose; a person confirms.
     policy: "suggest",
     personal: true,
-    hint: "Authoritative when known; otherwise use Age.",
-  },
-  {
-    key: "age",
-    label: "Age",
-    group: "identity",
-    value: { kind: "integer", min: 18, max: 110 },
-    policy: "agent",
-    personal: false,
-    hint: "What's known when there's no birth date. Date of birth wins.",
+    hint: "The only age the record keeps. A stated age goes in the notes.",
   },
   {
     key: "gender",
@@ -567,6 +559,17 @@ export type CandidateNoteDef = {
 
 export const CANDIDATE_PROFILE_NOTES: readonly CandidateNoteDef[] = [
   {
+    key: "age",
+    label: "Age they gave",
+    // Where an age lands when there is no birth date. It is prose rather than
+    // a field on purpose: "34" stops being true and nothing in the record
+    // knows when it stopped, whereas a birth date is true for good. Matching
+    // reads the birth date and only the birth date (`matches/rules.ts`), so
+    // this note is for the matchmaker to read and to act on — by asking.
+    policy: "agent",
+    hint: "Only when no date of birth is on the record. Say when they said it.",
+  },
+  {
     key: "howTheyDescribeThemselves",
     label: "How they describe themselves",
     policy: "agent",
@@ -728,7 +731,10 @@ export function registryCatalogue(): string {
 
   const notes = CANDIDATE_PROFILE_NOTES.filter(
     (note) => note.policy !== "matchmaker",
-  ).map((note) => `- ${note.key} (${note.label}): free text`);
+  ).map((note) => {
+    const hint = note.hint === undefined ? "" : ` — ${note.hint}`;
+    return `- ${note.key} (${note.label}): free text${hint}`;
+  });
 
   return [
     `FIELDS — a value must be exactly the shape given\n${groups.join("\n\n")}`,
@@ -801,8 +807,11 @@ export function profileUpdateBrief(
 export function reconcileInstruction(
   candidateName: string,
   noticed: NoticedInput[],
+  now: number,
 ): string {
   return [
+    todayLine(now),
+    "",
     `JUST NOTICED IN THE CONVERSATION WITH ${candidateName.toUpperCase()}`,
     noticed
       .map((item) => `- ${item.observation} | their words: "${item.quote}"`)
@@ -818,6 +827,8 @@ export function reconcileInstruction(
     "Rules:",
     "- Only keys from the lists above. A key that is not there is not a key.",
     "- A field's value must be exactly the shape its line gives. A number means digits, a choice means one of the words offered.",
+    '- A date they gave relative to today — "my birthday\'s tomorrow", "I turned 40 last March" — is resolved against the date above and written out in full.',
+    "- An age is not a date of birth. If they tell you how old they are, write it to notes.age and say when they said it; only write facts.dateOfBirth when they have given you an actual birth date, and never work one back from an age.",
     `- Say nothing about what is already on the profile and has not changed. Repeating it is the one thing that wastes ${candidateName}'s matchmaker's attention.`,
     "- CLEAR only when they have said something that makes the stored value untrue, never because they stopped mentioning it.",
     "- The exact words must be copied character for character from something they said. If you cannot quote it, do not write the line.",
