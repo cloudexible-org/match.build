@@ -43,7 +43,7 @@
       //
       // E2E_CONVEX=0 drops the Convex backend and its specs (CI). CONVEX_URL
       // and SKIP_SEED_IMPORT are escape hatches documented in
-      // apps/e2e/local-backend.ts and fixtures/global-setup.ts.
+      // tooling/harness/local-backend.ts and fixtures/global-setup.ts.
       "env": [
         "NEXT_PUBLIC_CONVEX_URL",
         "E2E_CONVEX",

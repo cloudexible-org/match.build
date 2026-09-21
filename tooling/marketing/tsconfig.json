@@ -1,0 +1,15 @@
+{
+  "extends": "@repo/config/base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    // DOM because `lib/cursor.ts` is injected into the page and the callbacks
+    // passed to `page.evaluate` run in the browser, not in Node.
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "types": ["node"],
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["playwright.config.ts", "lib", "captures"]
+}

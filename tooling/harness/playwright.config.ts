@@ -1,0 +1,223 @@
+import * as path from "node:path";
+import type { PlaywrightTestConfig } from "@playwright/test";
+import { convexEnabled } from "./convex-enabled";
+import { withDoppler } from "./doppler";
+import { stablePorts } from "./free-port";
+import { ensureLocalDeployment, localBackendUrl } from "./local-backend";
+import { appDir, HARNESS_DIR, REPO_ROOT } from "./paths";
+
+/**
+ * The world every run shares: a local Convex backend, three app servers, the
+ * seed, and the timeouts. What it deliberately does **not** define is
+ * `testDir` or `projects` — those are the only thing that distinguishes an
+ * E2E run from a marketing capture, so each consumer declares its own:
+ *
+ *   `tooling/e2e/playwright.config.ts`        five suites, three apps
+ *   `tooling/marketing/playwright.config.ts`  one capture project
+ *
+ * **Every path this file hands out is absolute.** Playwright resolves a
+ * config's relative paths against *that config's own directory*, so a relative
+ * `globalSetup` or `webServer.cwd` inherited by a consumer in another folder
+ * resolves somewhere that does not exist — the run then starts with no backend
+ * and no seed, and every spec fails at a different place. See `paths.ts`.
+ */
+
+/** Whether this run has a Convex backend at all. `E2E_CONVEX=0` drops it. */
+export const WITH_CONVEX = convexEnabled();
+
+/**
+ * Watching a run: `pnpm test:e2e:observe` sets this (and `--headed`), so the
+ * browser pauses between actions and you can follow what a spec does.
+ * Override the pause with `E2E_SLOW_MO=1000 pnpm test:e2e:observe`.
+ *
+ * It also forces one worker and stretches the timeouts, since every click now
+ * costs half a second and the defaults would expire mid-test.
+ */
+const SLOW_MO = Number(process.env.E2E_SLOW_MO ?? 0);
+
+/**
+ * Every server this run starts listens on a port the OS hands us, never a
+ * fixed or recorded one. That is what lets any number of runs — one per git
+ * worktree, alongside each worktree's `pnpm dev` — share a machine: nothing is
+ * contended, so nothing collides. See §1c of `docs/e2e-architecture.md`.
+ *
+ * The Convex pair included: the port recorded in the local deployment's
+ * `config.json` is only free until another worktree's backend claims it, and
+ * every worktree's anonymous deployment is named `anonymous-agent`, so the
+ * Convex CLI cannot tell theirs from ours and refuses to start. The
+ * `convex-local.mjs` webServer is handed these ports instead.
+ *
+ * Memoised through the environment because Playwright re-evaluates this file in
+ * every worker process; see `free-port.ts` for why allocating directly here
+ * makes every spec fail with `ERR_CONNECTION_REFUSED` at a different port.
+ */
+const [APP_PORT, ADMIN_PORT, WWW_PORT, CONVEX_PORT, CONVEX_SITE_PORT] =
+  stablePorts([
+    "E2E_APP_PORT",
+    "E2E_ADMIN_PORT",
+    "E2E_WWW_PORT",
+    "E2E_CONVEX_PORT",
+    "E2E_CONVEX_SITE_PORT",
+  ]);
+
+/** Where each app is served for this run. A consumer's project pins one. */
+export const APP_URL = `http://127.0.0.1:${APP_PORT}`;
+export const ADMIN_URL = `http://127.0.0.1:${ADMIN_PORT}`;
+export const WWW_URL = `http://127.0.0.1:${WWW_PORT}`;
+
+// Provision this worktree's local deployment up front (a no-op once it
+// exists), so global setup has an admin key to seed with.
+if (WITH_CONVEX) ensureLocalDeployment();
+
+const CONVEX_URL = WITH_CONVEX ? localBackendUrl() : undefined;
+
+/**
+ * What `apps/app` validates at startup. Without Convex it is a well-formed
+ * placeholder that is never connected to — the app mounts, renders its chrome,
+ * and its `useQuery` simply never resolves.
+ */
+const VITE_CONVEX_URL = CONVEX_URL ?? "https://ci-e2e-placeholder.convex.cloud";
+
+/**
+ * A distDir of the suite's own, so its `next dev` does not contend with a
+ * developer's for the lock at `<distDir>/lock`. See `apps/www/next.config.ts`.
+ */
+const WWW_DIST_DIR = ".next-e2e";
+
+/**
+ * What the harness sets on each app server. These win over Doppler (see
+ * `doppler.ts`) and over any `.env.local`, so the apps always talk to the
+ * backend this run chose — the local one, or a placeholder that never
+ * connects — and never to a cloud deployment.
+ */
+const APP_ENV = { VITE_CONVEX_URL };
+const WWW_ENV = {
+  NEXT_DIST_DIR: WWW_DIST_DIR,
+  NEXT_PUBLIC_CONVEX_URL: VITE_CONVEX_URL,
+};
+
+/**
+ * Everything but `testDir` and `projects`. Spread it, add those two.
+ *
+ * Typed as `PlaywrightTestConfig` rather than passed through `defineConfig`
+ * here: `defineConfig` is the consumer's call, and running it twice over the
+ * same object buys nothing.
+ */
+const base: PlaywrightTestConfig = {
+  // Proves the backend is ours, then reseeds. No-ops when E2E_CONVEX=0.
+  globalSetup: path.join(HARNESS_DIR, "fixtures", "global-setup.ts"),
+  /**
+   * Tests within a file run one at a time, in order; different files run in
+   * parallel across workers. That is what lets a file's tests share the world
+   * it seeded in `beforeAll` (see `scenario.ts`) without racing each other,
+   * while files stay independent because each seeds its own namespace.
+   *
+   * Keep a spec file under ~10 tests: it is the unit of parallelism, so one
+   * long file sets the suite's wall-clock floor.
+   */
+  fullyParallel: false,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI || SLOW_MO ? 1 : undefined,
+  timeout: SLOW_MO ? 300_000 : 30_000,
+  expect: { timeout: SLOW_MO ? 15_000 : 5_000 },
+  // `open: "never"` — the default ("on-failure") serves the report and blocks
+  // the process, which hangs any non-interactive run (CI, agents, `&&` chains).
+  reporter: [["html", { open: "never" }], ["list"]],
+  use: {
+    trace: "on-first-retry",
+    launchOptions: { slowMo: SLOW_MO },
+  },
+  webServer: [
+    ...(WITH_CONVEX
+      ? [
+          {
+            // Never reused. The port is fresh for this run, so anything already
+            // answering on it is not ours. `convex-local.mjs` also holds a
+            // per-worktree lock, so a second run in the *same* worktree fails
+            // loudly instead of starting a second backend on the same database
+            // file — or reseeding it under the first run's feet.
+            command: `node ${JSON.stringify(path.join(HARNESS_DIR, "scripts", "convex-local.mjs"))}`,
+            url: `${CONVEX_URL}/version`,
+            cwd: REPO_ROOT,
+            reuseExistingServer: false,
+            env: {
+              E2E_CONVEX_PORT: String(CONVEX_PORT),
+              E2E_CONVEX_SITE_PORT: String(CONVEX_SITE_PORT),
+            },
+            timeout: 180_000,
+            stdout: "ignore" as const,
+            stderr: "pipe" as const,
+          },
+        ]
+      : []),
+    {
+      // Run Vite as a DIRECT child. The previous `pnpm --filter app dev` went
+      // pnpm → portless → vite, so Playwright killed the wrapper, vite survived
+      // reparented to PID 1 still holding 5173, and teardown timed out after
+      // every test had already passed. See `docs/e2e-architecture.md` §3.
+      command: withDoppler(
+        "app",
+        `pnpm exec vite --port ${APP_PORT} --strictPort`,
+        APP_ENV,
+      ),
+      cwd: appDir("app"),
+      // The app is mounted at /app/ (vite `base`); `/` is a Vite 404.
+      url: `${APP_URL}/app/`,
+      // Never adopt a server we did not start: a developer's `pnpm dev` carries
+      // the VITE_CONVEX_URL from apps/app/.env.local — your *cloud* deployment —
+      // so the suite would assert against cloud data while global setup seeded
+      // the local backend, and every assertion would measure the wrong
+      // database. The port is ours alone, so this should never trigger; with
+      // `--strictPort` a lost race is a loud failure rather than a silent
+      // attachment to something else.
+      reuseExistingServer: false,
+      // Overrides whatever apps/app/.env.local says. This is the whole reason
+      // running the suite cannot disturb your dev setup, and vice versa.
+      env: APP_ENV,
+      timeout: 120_000,
+      stdout: "ignore" as const,
+      stderr: "pipe" as const,
+    },
+    {
+      // The admin app, a direct child for the same teardown reason, with the
+      // same env as apps/app: it talks to the same backend.
+      command: withDoppler(
+        "admin",
+        `pnpm exec vite --port ${ADMIN_PORT} --strictPort`,
+        APP_ENV,
+      ),
+      cwd: appDir("admin"),
+      // Mounted at /admin/ (vite `base`).
+      url: `${ADMIN_URL}/admin/`,
+      reuseExistingServer: false,
+      env: APP_ENV,
+      timeout: 120_000,
+      stdout: "ignore" as const,
+      stderr: "pipe" as const,
+    },
+    {
+      // Next as a direct child too, for the same teardown reason.
+      //
+      // `NEXT_DIST_DIR` is what lets this coexist with a running `pnpm dev`:
+      // Next 16's dev lock lives at `<distDir>/lock`, so two `next dev`
+      // processes sharing `.next` refuse to start and a different port does not
+      // help. Giving the suite its own distDir gives it its own lock.
+      command: withDoppler(
+        "www",
+        `pnpm exec next dev --port ${WWW_PORT} --hostname 127.0.0.1`,
+        WWW_ENV,
+      ),
+      cwd: appDir("www"),
+      url: WWW_URL,
+      reuseExistingServer: false,
+      env: WWW_ENV,
+      // A cold `.next-e2e` compiles from scratch on the first request.
+      timeout: 180_000,
+      stdout: "ignore" as const,
+      stderr: "pipe" as const,
+    },
+  ],
+};
+
+export default base;
