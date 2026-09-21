@@ -81,8 +81,9 @@ you have not, is a property of a card and is now a dot on it.
   things the matchmaker did and then recorded; the app sends nobody anything
   (§6).
 - **A match that has ended leaves the board.** One `closed` state, carrying an
-  outcome — `together` or `didnt_work` — plus who ended it where somebody did,
-  and a note. A rejection and a wedding are the same event, so there is no
+  outcome — `together` or `didnt_work` — plus who ended it where somebody did
+  (the matchmaker, either candidate, or `both` — neither of them wanting it is
+  a different fact from one of them not wanting it), and a note. A rejection and a wedding are the same event, so there is no
   Rejected lane at one end of the board and no "married" column at the other;
   there is a line under the board that counts what is closed, and opens it.
   Nothing ages out, because nothing needs hiding.

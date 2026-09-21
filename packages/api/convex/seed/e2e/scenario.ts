@@ -171,7 +171,7 @@ export type ScenarioMatch = {
   checkDealbreakers?: boolean;
   /** What closing recorded. Only meaningful on a `closed` card. */
   closedAs?: "together" | "didnt_work";
-  closedBy?: "matchmaker" | "candidateA" | "candidateB" | "system";
+  closedBy?: "matchmaker" | "candidateA" | "candidateB" | "both" | "system";
   closingNote?: string;
   /**
    * Whether the matchmaker has looked at it. Default: true at every stage but

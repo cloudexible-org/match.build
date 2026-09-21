@@ -127,20 +127,25 @@ export type MatchClosedBy =
   | "matchmaker"
   | "candidateA"
   | "candidateB"
+  // Neither of them wanted it, which is a different fact from either of them
+  // not wanting it — and the commonest way an introduction quietly ends.
+  | "both"
   | "system";
 
 export const MATCH_CLOSED_BY_LABELS: Record<MatchClosedBy, string> = {
   matchmaker: "You",
   candidateA: "First candidate",
   candidateB: "Second candidate",
+  both: "Both of them",
   system: "The nightly run",
 };
 
-/** The three a person can pick. `system` is the run's own word. */
+/** The four a person can pick. `system` is the run's own word. */
 export const MATCH_CLOSED_BY_CHOICES: readonly MatchClosedBy[] = [
   "matchmaker",
   "candidateA",
   "candidateB",
+  "both",
 ];
 
 export const MATCH_LIMITS = {

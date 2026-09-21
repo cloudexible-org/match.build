@@ -574,6 +574,22 @@ describe("moving a card", () => {
     ]);
   });
 
+  test("and neither of them wanting it is its own answer", async () => {
+    const { w, matchId } = await carded();
+    await w.asOwner.mutation(api.matches.mutations.close, {
+      matchmakerId: w.matchmakerId,
+      matchId,
+      outcome: "didnt_work",
+      closedBy: "both",
+      note: "Polite on both sides, and nothing after.",
+    });
+    expect((await w.cards())[0]).toMatchObject({
+      stage: "closed",
+      closedAs: "didnt_work",
+      closedBy: "both",
+    });
+  });
+
   test("a match that worked needs no reason, and nobody ended it", async () => {
     const { w, matchId } = await carded();
     await w.asOwner.mutation(api.matches.mutations.close, {
