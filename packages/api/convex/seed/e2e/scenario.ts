@@ -189,6 +189,35 @@ export type ScenarioMatchStage =
   | "connected"
   | "closed";
 
+/**
+ * A generation that was already paid for, and what it cost — a state the suite
+ * cannot otherwise reach at all: the Convex AI gateway needs a paid Cloud
+ * deployment and the e2e backend is a local anonymous one, so no spec can make
+ * a real model call.
+ *
+ * `model` should carry the namespace (`aiModel(ns)`), because `aiGenerations`
+ * and `aiModelRates` are global — the usage page adds up the whole deployment —
+ * and a model id nobody else uses is what makes an assertion about a row exact
+ * while other spec files run beside it.
+ */
+export type ScenarioGeneration = {
+  agent: "conversation" | "candidate_profile" | "voice_profile";
+  model: string;
+  /** Whose book it is on. Omit for a call with no tenant, like a probe. */
+  matchmakerKey?: string;
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens?: number;
+  /** How many UTC days back it happened. Default: 0, today. */
+  daysAgo?: number;
+  /**
+   * What the model costs while this generation is written, in dollars per
+   * million tokens. Given on any generation for a model, it prices every one of
+   * them and leaves the rate behind for the page's rate editor to show.
+   */
+  rate?: { inputUsdPerMillion: number; outputUsdPerMillion: number };
+};
+
 export type ScenarioSpec = {
   /** 4–12 lowercase letters and digits, starting with a letter. */
   ns: string;
@@ -196,6 +225,7 @@ export type ScenarioSpec = {
   matchmakers?: ScenarioMatchmaker[];
   candidates?: ScenarioCandidate[];
   matches?: ScenarioMatch[];
+  generations?: ScenarioGeneration[];
 };
 
 export type ScenarioManifest = {
@@ -233,4 +263,13 @@ export function scenarioUsername(key: string, ns: string): string {
 
 export function scenarioName(key: string): string {
   return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+/**
+ * A model id private to one scenario, in the shape the gateway names models.
+ * `aiGenerations` and `aiModelRates` are global, so this is what lets a spec
+ * assert on its own rows while another file's are in the same totals.
+ */
+export function scenarioAiModel(ns: string): string {
+  return `e2e/${ns}-model`;
 }

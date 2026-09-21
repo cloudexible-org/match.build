@@ -33,6 +33,7 @@ import { convexGateway } from "@convex-dev/ai-sdk-provider";
 import { v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
+import { recordUsage } from "../aiUsage/helpers";
 import { MAX_NOTICED, type NoticedFact } from "../replySuggestions/rules";
 import {
   parseReconciled,
@@ -117,7 +118,7 @@ export const reconcile = internalAction({
         { conversationId, threadId, briefedAt: context.profileAt },
       );
 
-      const { text } = await agent.generateText(
+      const { text, usage } = await agent.generateText(
         ctx,
         { threadId },
         {
@@ -125,6 +126,17 @@ export const reconcile = internalAction({
           maxOutputTokens: settings.maxOutputTokens,
         },
       );
+
+      // Before the parse, and before the early return below it: a run that
+      // reconciled nothing still cost what it cost, and a reconciler quietly
+      // burning tokens for no entries is the thing the usage page exists to
+      // show. `recordUsage` never throws.
+      await recordUsage(ctx, {
+        agent: "candidate_profile",
+        model: settings.model,
+        usage,
+        conversationId,
+      });
 
       const entries = parseReconciled(text);
       if (entries.length === 0) return null;

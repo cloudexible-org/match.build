@@ -24,11 +24,17 @@
 import { v } from "convex/values";
 import type { Id } from "../../_generated/dataModel";
 import { internalMutation, internalQuery } from "../../_generated/server";
+import {
+  dayKey,
+  generationCostMicroUsd,
+  storedTokens,
+} from "../../aiUsage/rules";
 import { inviteTokenFor, newInvite } from "../../invites/helpers";
 import { orderedIds } from "../../matches/helpers";
 import { MATCH_ALGORITHM_VERSION, pairKey } from "../../matches/rules";
 import type { ProfileEntries } from "../../profiles/helpers";
 import {
+  aiAgentId,
   matchClosedBy,
   matchOutcome,
   matchSignal,
@@ -188,6 +194,11 @@ const SEEDED_TABLES = [
   // behind would both leak into the next and, after any schema change to the
   // table, fail the push outright on rows that no longer validate.
   "aiAgentSettings",
+  // What the AI has cost, and what a model costs. Global like the settings
+  // above — the usage page adds up the whole deployment — so a run that left
+  // them behind would report the last run's spend as this one's.
+  "aiGenerations",
+  "aiModelRates",
 ] as const;
 
 /** Bounded so a large table cannot blow the transaction limit in one call. */
@@ -422,6 +433,25 @@ export const scenario = internalMutation({
           unreadForMatchmaker: v.optional(v.boolean()),
           profile: v.optional(scenarioProfile),
           replyDrafts: v.optional(v.array(v.string())),
+        }),
+      ),
+    ),
+    generations: v.optional(
+      v.array(
+        v.object({
+          agent: aiAgentId,
+          model: v.string(),
+          matchmakerKey: v.optional(v.string()),
+          inputTokens: v.number(),
+          outputTokens: v.number(),
+          cachedInputTokens: v.optional(v.number()),
+          daysAgo: v.optional(v.number()),
+          rate: v.optional(
+            v.object({
+              inputUsdPerMillion: v.number(),
+              outputUsdPerMillion: v.number(),
+            }),
+          ),
         }),
       ),
     ),
@@ -830,6 +860,57 @@ export const scenario = internalMutation({
         updatedAt: stageChangedAt,
       });
       matches[spec.key] = { id };
+    }
+
+    // What the AI has already cost. A state no spec can otherwise reach: the
+    // gateway needs a paid Convex Cloud deployment and this backend is a local
+    // anonymous one, so there is no run that could have produced a token count.
+    //
+    // `aiGenerations` and `aiModelRates` are global — the usage page adds up the
+    // whole deployment — so a scenario keeps to model ids of its own
+    // (`scenarioAiModel`) and asserts on those rows rather than on the totals.
+    for (const spec of args.generations ?? []) {
+      const model = spec.model.trim();
+      if (spec.rate !== undefined) {
+        const existing = await ctx.db
+          .query("aiModelRates")
+          .withIndex("by_model", (q) => q.eq("model", model))
+          .unique();
+        if (existing === null) {
+          await ctx.db.insert("aiModelRates", {
+            model,
+            inputUsdPerMillion: spec.rate.inputUsdPerMillion,
+            outputUsdPerMillion: spec.rate.outputUsdPerMillion,
+            updatedAt: now,
+          });
+        }
+      }
+      const matchmakerId =
+        spec.matchmakerKey === undefined
+          ? undefined
+          : matchmakerIds[spec.matchmakerKey];
+      if (spec.matchmakerKey !== undefined && matchmakerId === undefined) {
+        throw new Error(
+          `Scenario ${ns}: no matchmaker "${spec.matchmakerKey}".`,
+        );
+      }
+      const tokens = storedTokens({
+        inputTokens: spec.inputTokens,
+        outputTokens: spec.outputTokens,
+        inputTokenDetails: { cacheReadTokens: spec.cachedInputTokens },
+      });
+      await ctx.db.insert("aiGenerations", {
+        agent: spec.agent,
+        model,
+        day: dayKey(now - (spec.daysAgo ?? 0) * DAY_MS),
+        ...tokens,
+        // Priced exactly as `aiUsage/mutations:record` would have, so a spec's
+        // expected figure is the product's arithmetic and not a second copy of
+        // it.
+        costMicroUsd:
+          generationCostMicroUsd(tokens, spec.rate ?? null) ?? undefined,
+        matchmakerId,
+      });
     }
 
     return { ns, users, matchmakers, candidates, matches };

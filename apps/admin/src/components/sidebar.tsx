@@ -23,6 +23,7 @@ const NAV = [
   { to: "/sign-in-codes", label: "Sign-in codes", icon: KeyIcon },
   { to: "/erasure", label: "Erasure", icon: EraseIcon },
   { to: "/ai", label: "AI agents", icon: AgentIcon },
+  { to: "/usage", label: "AI usage", icon: UsageIcon },
 ] as const;
 
 /**
@@ -102,7 +103,7 @@ export function Sidebar() {
 }
 
 /*
- * Icons are inline: three of them and a chevron don't pay for a dependency.
+ * Icons are inline: four of them and a chevron don't pay for a dependency.
  * Each is `aria-hidden` — the link beside it carries the name — and says so
  * on the element rather than through this spread, which the a11y lint rule
  * can't see into.
@@ -153,6 +154,16 @@ function AgentIcon() {
     <svg aria-hidden="true" {...iconProps}>
       <path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z" />
       <path d="M18 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />
+    </svg>
+  );
+}
+
+/** Bars rising: what the agents are spending. */
+function UsageIcon() {
+  return (
+    <svg aria-hidden="true" {...iconProps}>
+      <path d="M4 20h16" />
+      <path d="M7 20v-5M12 20V9M17 20v-8" />
     </svg>
   );
 }

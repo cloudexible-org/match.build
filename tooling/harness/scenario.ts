@@ -6,6 +6,13 @@ import type {
 import { adminClient } from "./admin-client";
 
 /**
+ * A model id private to one scenario. `aiGenerations` and `aiModelRates` are
+ * global — /admin/usage adds up the whole deployment — so a spec that asserts on
+ * its own spend keeps to a model nobody else is using.
+ */
+export { scenarioAiModel } from "../../packages/api/convex/seed/e2e/scenario";
+
+/**
  * Per-spec-file test data (see `packages/api/convex/seed/e2e/scenario.ts`).
  *
  * A spec file seeds its own world once, in `beforeAll`, and works only with

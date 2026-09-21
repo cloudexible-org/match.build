@@ -9,6 +9,11 @@ import type { DataModel, Doc, Id } from "../_generated/dataModel";
 import { type QueryCtx, query } from "../_generated/server";
 import { agentSettings, aiEnabled, storedAgentSettings } from "../ai/helpers";
 import { AI_AGENT_IDS } from "../ai/rules";
+import { usageSummary } from "../aiUsage/helpers";
+import {
+  DEFAULT_USAGE_WINDOW_DAYS,
+  MAX_USAGE_WINDOW_DAYS,
+} from "../aiUsage/rules";
 import { auditActor } from "../schema";
 import { accountLabel, getAdminSession, requirePlatformAdmin } from "./helpers";
 import {
@@ -416,5 +421,72 @@ export const aiAgents = query({
       });
     }
     return { aiEnabled: aiEnabled(), agents };
+  },
+});
+
+/*
+ * ─── What the AI is costing (prd/phase-2.md §6, "cost control") ─────────────
+ */
+
+/** The running totals of a group of generations, as `aiUsage/helpers.ts` adds them. */
+const usageTotals = {
+  generations: v.number(),
+  inputTokens: v.number(),
+  outputTokens: v.number(),
+  cachedInputTokens: v.number(),
+  totalTokens: v.number(),
+  costMicroUsd: v.number(),
+  /** How many of them had no rate, and so are missing from `costMicroUsd`. */
+  unpriced: v.number(),
+};
+
+const modelRate = v.object({
+  inputUsdPerMillion: v.number(),
+  outputUsdPerMillion: v.number(),
+  cachedInputUsdPerMillion: v.optional(v.number()),
+});
+
+/**
+ * Tokens spent over a window of UTC days, grouped every way /admin/usage shows
+ * them, plus the rate each model is priced at.
+ *
+ * **Tokens are measured and money is computed.** The gateway reports no price
+ * (`aiUsage/rules.ts`), so every dollar here is arithmetic over a rate an admin
+ * typed, and `unpriced` is how many generations no rate covered — without it a
+ * total would read as the whole bill when it is only the part of it we can
+ * price.
+ */
+export const aiUsage = query({
+  args: { days: v.optional(v.number()) },
+  returns: v.object({
+    days: v.number(),
+    total: v.object(usageTotals),
+    byDay: v.array(v.object({ key: v.string(), ...usageTotals })),
+    byAgent: v.array(
+      v.object({ key: v.string(), label: v.string(), ...usageTotals }),
+    ),
+    byModel: v.array(
+      v.object({
+        key: v.string(),
+        rate: v.union(modelRate, v.null()),
+        configured: v.boolean(),
+        ...usageTotals,
+      }),
+    ),
+    byMatchmaker: v.array(
+      v.object({ key: v.string(), label: v.string(), ...usageTotals }),
+    ),
+    platform: v.object(usageTotals),
+    truncated: v.boolean(),
+  }),
+  handler: async (ctx, { days }) => {
+    await requirePlatformAdmin(ctx);
+    // Clamped rather than refused: a window is a view, and a page that throws
+    // over a stray URL is worse than one that shows a month.
+    const window = Math.min(
+      Math.max(Math.trunc(days ?? DEFAULT_USAGE_WINDOW_DAYS), 1),
+      MAX_USAGE_WINDOW_DAYS,
+    );
+    return await usageSummary(ctx, window);
   },
 });
