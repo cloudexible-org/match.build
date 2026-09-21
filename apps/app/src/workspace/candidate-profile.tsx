@@ -559,7 +559,9 @@ function NoteRow({
         {!editing && (
           // Present but quiet: the note body is what you came to read, and a
           // pair of buttons per note is what made this column a wall of them.
-          <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/note:opacity-100">
+          // Faint rather than hidden — hover is not something a touch screen
+          // has, and a control nobody can find is not quiet, it is missing.
+          <span className="flex shrink-0 items-center gap-0.5 opacity-40 transition-opacity focus-within:opacity-100 group-hover/note:opacity-100">
             <Button
               size="sm"
               variant="ghost"
