@@ -305,6 +305,21 @@ export async function notificationSettingsFor(
   };
 }
 
+/**
+ * When this account last opened the notifications panel, or `undefined` if it
+ * never has. Everything the panel means by "read" (see rules.ts).
+ */
+export async function feedSeenAtFor(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+): Promise<number | undefined> {
+  const stored = await ctx.db
+    .query("notificationSettings")
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .unique();
+  return stored?.feedSeenAt;
+}
+
 /** Which side of a conversation a user is on, for reading their marker. */
 export type Side = "matchmaker" | "candidate";
 

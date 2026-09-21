@@ -1,73 +1,30 @@
-import { useCallback, useMemo, useState } from "react";
+import { api } from "@repo/api";
+import { useMutation, useQuery } from "convex/react";
+import { useCallback } from "react";
 import type { Notification } from "./notifications";
 
 /**
- * The seam between the notifications overlay and where notifications will
- * come from.
+ * What the bell shows, from the backend that derives it
+ * (`convex/notifications/queries.ts`).
  *
- * TEMPORARY: this returns a fixed sample so the UI can be looked at and
- * judged before there is anything to read. Wiring it up means replacing the
- * body — a `useQuery(api.notifications.queries.recent)` for the list, and a
- * mutation behind `markAllRead` — and deleting `SAMPLE`. The component above
- * it takes a list and one callback and doesn't care which of those two
- * worlds it is in.
+ * The server decides everything — which conversations are waiting, what each
+ * item says, and which are new since the panel was last opened — so the view
+ * takes the list as it comes. `read` is one watermark per account, which is
+ * why marking is one mutation with no arguments rather than one per item.
+ *
+ * While the query is loading there is nothing to show: an empty bell for a
+ * moment is better than a count that lands and then changes.
  */
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-const SAMPLE = (now: number): Notification[] => [
-  {
-    id: "1",
-    kind: "message",
-    title: "Amara Osei",
-    body: "That sounds good — Thursday evening works for me. Should I book somewhere?",
-    at: now - 2 * MINUTE,
-    read: false,
-    href: "/",
-  },
-  {
-    id: "2",
-    kind: "message",
-    title: "Daniel Whitfield",
-    body: "Thanks for the intro! I had a look at her profile and I'd be up for meeting.",
-    at: now - 3 * HOUR,
-    read: false,
-    href: "/",
-  },
-  {
-    id: "3",
-    kind: "invite",
-    title: "Priya Raman",
-    body: "Accepted your invite and finished her profile.",
-    at: now - 2 * DAY,
-    read: false,
-    href: "/",
-  },
-  {
-    id: "4",
-    kind: "system",
-    title: "match.build",
-    body: "Your workspace is live. Invite a candidate to get started.",
-    at: now - 9 * DAY,
-    read: true,
-  },
-];
-
 export function useNotifications(): {
   items: Notification[];
   markAllRead: () => void;
 } {
-  const [seen, setSeen] = useState(false);
-  const base = useMemo(() => SAMPLE(Date.now()), []);
+  const feed = useQuery(api.notifications.queries.feed);
+  const markFeedSeen = useMutation(api.notifications.mutations.markFeedSeen);
 
-  const items = useMemo(
-    () => (seen ? base.map((item) => ({ ...item, read: true })) : base),
-    [base, seen],
-  );
+  const markAllRead = useCallback(() => {
+    void markFeedSeen({});
+  }, [markFeedSeen]);
 
-  const markAllRead = useCallback(() => setSeen(true), []);
-
-  return { items, markAllRead };
+  return { items: feed ?? [], markAllRead };
 }

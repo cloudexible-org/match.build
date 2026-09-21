@@ -227,3 +227,107 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+/*
+ * ─── The in-app panel ───────────────────────────────────────────────────────
+ *
+ * The bell in the app's header (§8.1's third channel, alongside push and
+ * email). Its list is **derived**, not stored: a conversation with messages
+ * past the reader's marker, a membership that changed, an invitation waiting.
+ * Nothing writes a feed row, so nothing can disagree with the conversation it
+ * describes.
+ *
+ * "Read" is one watermark per account — `notificationSettings.feedSeenAt`,
+ * set when the panel opens. An item is new when it happened after it. That is
+ * deliberately not the same as having read the *message*: the conversation's
+ * own marker still only moves when the thread is open (§8.1), so glancing at
+ * the bell clears the bell and nothing else.
+ *
+ * Like every other notification here, an item says who and never what
+ * (§9.3) — "3 new messages", not the messages.
+ */
+
+/** What the panel shows at most. Older than this belongs in the workspace. */
+export const MAX_FEED_ITEMS = 20;
+
+/**
+ * How many profiles of one kind an account is read for. Well past anything
+ * real; it stops one account's feed from being unbounded work.
+ */
+export const MAX_FEED_PROFILES = 10;
+
+export type FeedKind = "message" | "invite" | "system";
+
+export type FeedItem = {
+  id: string;
+  kind: FeedKind;
+  /** Who it is about: the other person's name. */
+  title: string;
+  body: string;
+  at: number;
+  /** Path within the app, leading slash included. */
+  href: string;
+};
+
+/** Never the message, only how much of it there is. */
+export function unreadMessageBody(unread: number): string {
+  return unread === 1 ? "Sent you a message" : `${unread} new messages`;
+}
+
+/**
+ * What a membership change says to the matchmaker whose candidate it is, or
+ * `null` for one they aren't told about (§8.1 names three).
+ *
+ * "Accepted" is an `invite`, the other two are `system`: one is a person
+ * arriving, the others are the record closing. It is the only difference the
+ * panel draws between them.
+ */
+export function membershipFeedEntry(
+  membership: "invited" | "declined" | "joined" | "left" | "account_deleted",
+): { kind: FeedKind; body: string } | null {
+  switch (membership) {
+    case "joined":
+      return { kind: "invite", body: "Accepted your invitation" };
+    case "left":
+      return { kind: "system", body: "Left your workspace" };
+    case "account_deleted":
+      return { kind: "system", body: "Deleted their account" };
+    default:
+      return null;
+  }
+}
+
+/**
+ * How far back a membership change is still news. A message item disappears
+ * when the message is read, but nothing ever "reads" an acceptance — without
+ * a window, a quiet workspace's panel would be a list of who joined it last
+ * year. An invitation has no window: it is waiting on an answer for as long
+ * as it is open, and it expires on its own.
+ */
+export const MEMBERSHIP_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function withinMembershipWindow(at: number, now: number): boolean {
+  return now - at < MEMBERSHIP_WINDOW_MS;
+}
+
+/** What an open invitation says to the person it is waiting for. */
+export function invitationBody(): string {
+  return "Invited you to connect";
+}
+
+/**
+ * Newest first, capped. The cap is applied after sorting, so a busy
+ * matchmaker's twenty-first conversation drops off rather than an arbitrary
+ * one from whichever source was read first.
+ */
+export function newestFirst(items: FeedItem[]): FeedItem[] {
+  return [...items].sort((a, b) => b.at - a.at).slice(0, MAX_FEED_ITEMS);
+}
+
+/**
+ * Whether the panel shows this as new. `undefined` is an account that has
+ * never opened it, for which everything is.
+ */
+export function isNew(at: number, seenAt: number | undefined): boolean {
+  return seenAt === undefined || at > seenAt;
+}
