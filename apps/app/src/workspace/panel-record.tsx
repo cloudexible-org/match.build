@@ -28,11 +28,7 @@ export function RecordGroup({
 }) {
   return (
     <section className="flex flex-col gap-1">
-      {title && (
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </h4>
-      )}
+      {title && <RecordHeading>{title}</RecordHeading>}
       {/* `-mx-2` so a row's hover background bleeds into the panel's own
           padding and reads as a full-width row, the way a list row should. */}
       <ul className="-mx-2 flex flex-col">{children}</ul>
@@ -118,6 +114,15 @@ export function RecordEditRow({
     <li className="relative px-2 py-2" data-testid={testId} data-field={field}>
       {children}
     </li>
+  );
+}
+
+/** A group's name. Exported for History, which groups an `<ol>` by day. */
+export function RecordHeading({ children }: { children: ReactNode }) {
+  return (
+    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </h4>
   );
 }
 
