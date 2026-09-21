@@ -453,9 +453,28 @@ export default defineSchema({
 
 ## 7. Backend layout
 
-Domains under `packages/api/convex/`, each split into `rules.ts` / `mutations.ts` / `queries.ts` / `helpers.ts` per `CLAUDE.md`:
+Domains under `packages/api/convex/`, each split into `rules.ts` / `mutations.ts` / `queries.ts` / `helpers.ts` (plus `actions.ts` where a domain calls out of Convex) per `CLAUDE.md`:
 
-`users/`, `matchmakers/`, `candidates/` (including invitations), `conversations/` (conversations + messages), `notes/`, `audit/`, `notifications/`.
+| Domain | What it owns |
+|---|---|
+| `users/` | Accounts: the account name, the deletion code and the deletion fan-out across every matchmaker who holds a record of the person (§3.5). |
+| `matchmakers/` | Matchmaker profiles, the username rules and the reserved list (§1.1, §1.2). |
+| `candidates/` | The candidate row: onboarding it (§3.1, which also creates its `conversations` row and the imported private message), editing its details, the matchmaker's `status` label, and leaving (§3.4). |
+| `invites/` | The open invitation on that row (§3.2): issuing, resending, revoking, changing the email, accepting, declining, and the expiry job. |
+| `messages/` | The thread: reading and writing `messages`, and the `conversations` counters and read markers they move (§3.3, §8.1). |
+| `notes/` | The matchmaker's private notes on a candidate (§4.1). |
+| `audit/` | `recordAudit`, the fixed action list and the renderer behind the History tab (§5). Queries only — nothing writes an event except through the helper, inside the caller's own transaction. |
+| `notifications/` | Both channels: the per-account `notificationSettings`, push subscriptions, the coalescing table, the delay and throttle rules, and the sending action (§8.1, §8.2). |
+| `email/` | Outgoing mail: the message bodies, the `emailOutbox` record of what was sent, and the Resend hand-off. Sign-in codes included, so `auth.ts` and the admin app share one sender. |
+| `admin/` | The platform admin app's cross-tenant functions (audit trail, sign-in codes, erasure), each behind `requirePlatformAdmin`. See §9.3 and §12. |
+| `waitlist/` | The marketing site's sign-up form. No tenant, no auth: the one domain `apps/www` talks to. |
+
+Two departures from the earlier plan, which had `candidates/` carry invitations and a single `conversations/` domain carry conversations and messages:
+
+- **Invitations are their own domain.** They have a lifecycle (issue → resend → change email → revoke/expire → accept/decline), an email, a token, a rate limit and a scheduled job — more surface than the candidate row they live on.
+- **`conversations/` is `messages/`.** The `conversations` row is created by `candidates.onboard` and never exists without a candidate, so it has no mutations of its own; what the domain actually owns is the messages and the counters they move. Naming it after the table with the functions keeps the `api.<domain>.<file>.<name>` path honest.
+
+`seed/dev/` and `seed/e2e/` are not domains: they are internal fixture mutations, and only the e2e one is safe to point at a database you care about (`docs/e2e-architecture.md` §1a).
 
 ---
 
