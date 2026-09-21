@@ -1,5 +1,5 @@
 import { type Browser, expect, type Page, test } from "@playwright/test";
-import { CandidateChatPage } from "../../page-objects/app/invite.page";
+import { CandidateChatPage } from "../../page-objects/app/candidate.page";
 import {
   ConversationPage,
   WorkspacePage,
@@ -122,7 +122,7 @@ async function asCandidate(
   const context = await browser.newContext({ baseURL });
   const page = await context.newPage();
   await signInAs(page, world.email(userKey));
-  await page.goto(`/app/c/${world.username("book")}`);
+  await page.goto(`/app/c#${world.username("book")}`);
   const chat = new CandidateChatPage(page);
   await expect(chat.getRoot()).toBeVisible();
   return { page, chat };

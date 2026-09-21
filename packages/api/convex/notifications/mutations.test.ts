@@ -235,7 +235,7 @@ describe("when the job fires", () => {
     // Never the message itself (prd §8, §9.3).
     expect(sent[0].text).not.toContain("Hello Jane");
     expect(sent[0].text).toContain(
-      "https://app.example.test/app/c/maya.matches",
+      "https://app.example.test/app/c#maya.matches",
     );
     expect(
       (await rows(w.t)).filter((row) => row.channel === "email")[0].status,

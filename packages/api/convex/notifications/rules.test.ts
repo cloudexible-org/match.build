@@ -87,12 +87,12 @@ describe("what a notification says", () => {
   test("email names who wrote and never what they wrote", () => {
     const message = newMessageEmail({
       fromName: "Maya Maker",
-      link: "https://example.test/app/c/maya",
+      link: "https://example.test/app/c#maya",
     });
     expect(message.subject).toBe("You have a new message from Maya Maker");
     for (const part of [message.text, message.html]) {
       expect(part).toContain("Maya Maker");
-      expect(part).toContain("https://example.test/app/c/maya");
+      expect(part).toContain("https://example.test/app/c#maya");
       // The way out has to be in the email itself (prd §8.1).
       expect(part).toContain("turn these emails off");
     }
@@ -101,12 +101,12 @@ describe("what a notification says", () => {
   test("push says the same, in the shape the service worker reads", () => {
     const payload = newMessagePush({
       fromName: "Maya Maker",
-      url: "https://example.test/app/c/maya",
+      url: "https://example.test/app/c#maya",
     });
     expect(payload).toEqual({
       title: "Maya Maker",
       body: "Sent you a message",
-      url: "https://example.test/app/c/maya",
+      url: "https://example.test/app/c#maya",
     });
   });
 

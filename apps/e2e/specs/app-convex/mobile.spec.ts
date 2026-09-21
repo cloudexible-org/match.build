@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { uniqueEmail } from "../../accounts";
-import { HomePage } from "../../page-objects/app/home.page";
 import {
   CandidateChatPage,
-  InvitePage,
-} from "../../page-objects/app/invite.page";
+  CandidateShellPage,
+} from "../../page-objects/app/candidate.page";
+import { InvitePage } from "../../page-objects/app/invite.page";
 import {
   ConversationPage,
   OnboardPage,
@@ -118,7 +118,7 @@ test("the accept screen and a candidate's chat fit the screen", async ({
   page,
 }) => {
   await signInAs(page, world.email("jane"));
-  await page.goto(`/app/c/${world.username("book")}`);
+  await page.goto(`/app/c#${world.username("book")}`);
   await expect(new CandidateChatPage(page).getMatchmakerName()).toBeVisible();
   await expectNoSidewaysScroll(page);
 
@@ -130,13 +130,28 @@ test("the accept screen and a candidate's chat fit the screen", async ({
   await expectNoSidewaysScroll(page);
 });
 
-test("the home page fits the screen", async ({ page }) => {
+test("the candidate shell fits the screen, one column at a time", async ({
+  page,
+}) => {
+  // A candidate lands on the shell rather than home, and on a phone sees
+  // the list until they open a conversation.
   await signInAs(page, world.email("jane"));
-  const home = new HomePage(page);
-  await home.goto();
-  await expect(home.getWelcomeHeading()).toBeVisible();
-  await expect(
-    home.getRow("candidateProfiles", world.displayName("book")),
-  ).toBeVisible();
+  const shell = new CandidateShellPage(page);
+  await shell.goto();
+  await expect(shell.getMatchmakerRow(world.displayName("book"))).toBeVisible();
   await expectNoSidewaysScroll(page);
+
+  await shell.getMatchmakerRow(world.displayName("book")).click();
+  const chat = new CandidateChatPage(page);
+  await expect(chat.getMatchmakerName()).toBeVisible();
+  await expect(shell.getMatchmakerList()).toBeHidden();
+  await expectNoSidewaysScroll(page);
+
+  // The third column takes the whole width while it's open, and closes.
+  await chat.getPanelToggle().click();
+  await expect(chat.getPanel()).toBeVisible();
+  await expect(chat.getMatchmakerName()).toBeHidden();
+  await expectNoSidewaysScroll(page);
+  await page.getByTestId("close-matchmaker-panel").click();
+  await expect(chat.getMatchmakerName()).toBeVisible();
 });

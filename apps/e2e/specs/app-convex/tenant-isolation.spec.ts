@@ -1,8 +1,6 @@
 import { expect, test } from "@playwright/test";
-import {
-  CandidateChatPage,
-  InvitePage,
-} from "../../page-objects/app/invite.page";
+import { CandidateChatPage } from "../../page-objects/app/candidate.page";
+import { InvitePage } from "../../page-objects/app/invite.page";
 import {
   ConversationPage,
   MatchmakerSettingsPage,
@@ -118,7 +116,7 @@ test("a candidate's own chat shows the matchmaker, not the matchmaker's notes", 
   page,
 }) => {
   await signInAs(page, world.email("jane"));
-  await page.goto(`/app/c/${world.username("book")}`);
+  await page.goto(`/app/c#${world.username("book")}`);
 
   await expect(new CandidateChatPage(page).getMatchmakerName()).toHaveText(
     world.displayName("book"),
@@ -134,7 +132,7 @@ test("an account with nothing can't reach any of it", async ({ page }) => {
   await workspace.goto(world.username("book"));
   await expect(workspace.getNotFound()).toBeVisible();
 
-  await page.goto(`/app/c/${world.username("book")}`);
+  await page.goto(`/app/c#${world.username("book")}`);
   await expect(workspace.getNotFound()).toBeVisible();
 
   // An invitation addressed to someone else, by candidate id, is invisible.
@@ -155,6 +153,6 @@ test("signed out, every page asks for sign-in and remembers where you were", asy
     `/app/sign-in?next=${encodeURIComponent(route)}`,
   );
 
-  await page.goto(`/app/c/${world.username("book")}`);
+  await page.goto(`/app/c#${world.username("book")}`);
   await expect(new SignInPage(page).getEmailForm()).toBeVisible();
 });

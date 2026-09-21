@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { HomePage } from "../../page-objects/app/home.page";
+import { CandidateShellPage } from "../../page-objects/app/candidate.page";
 import {
   CompleteProfilePage,
   SignInPage,
@@ -8,7 +8,8 @@ import { latestSignInEmail, waitForSignInCode } from "../../sign-in-codes";
 
 /**
  * A brand-new account against the seeded local backend: email → code → name
- * → an empty home page.
+ * → their own empty candidate shell (an account with no matchmaker profile
+ * never sees the home picker).
  *
  * Parallel-safe: every spec signs up with an address unique to this run and
  * test, so no two specs share an account or a pending code.
@@ -37,21 +38,22 @@ test("a new account signs up with an emailed code and names itself", async ({
   await expect(profile.getForm()).toBeVisible();
   await profile.submitName("  Nova   Tester ");
 
-  const home = new HomePage(page);
-  await expect(home.getWelcomeHeading()).toHaveText("Welcome, Nova");
-  await expect(home.getAccountName()).toHaveText("Nova Tester");
-  await expect(home.getInvitationsSection()).toBeHidden();
-  await expect(home.getMatchmakerProfilesSection()).toContainText(
-    "You don't have a matchmaker profile yet.",
+  // Straight to their own shell, with nothing in it and both ways out.
+  const shell = new CandidateShellPage(page);
+  await expect(page).toHaveURL(/\/app\/c$/);
+  await expect(shell.getAccountName()).toHaveText("Nova Tester");
+  await expect(shell.getMatchmakerList()).toContainText(
+    "You haven't joined a matchmaker yet.",
   );
-  await expect(home.getCandidateProfilesSection()).toContainText(
-    "Ask your matchmaker for your invite link.",
-  );
+  await expect(shell.getWaitingSection()).toBeHidden();
+  await expect(shell.getNoConversations()).toBeVisible();
+  await expect(shell.getJoinAnotherLink()).toBeVisible();
+  await expect(shell.getCreateMatchmakerLink()).toBeVisible();
 
   // The session survives a reload: this re-reads from the backend rather than
   // trusting local state.
   await page.reload();
-  await expect(home.getAccountName()).toHaveText("Nova Tester");
+  await expect(shell.getAccountName()).toHaveText("Nova Tester");
 });
 
 test("a wrong code is refused, and a new one can be requested", async ({
@@ -82,8 +84,9 @@ test("a wrong code is refused, and a new one can be requested", async ({
 
 test("signing in returns to the page that required it", async ({ page }) => {
   const email = freshEmail("next");
-  // A route that doesn't exist yet still proves the redirect honours `next`.
-  await page.goto("/app/c/somebody.matches");
+  // A matchmaker this account will never have still proves the redirect
+  // honours `next`, hash and all.
+  await page.goto("/app/c#somebody.matches");
 
   const signIn = new SignInPage(page);
   const before = await latestSignInEmail(email);
@@ -91,5 +94,5 @@ test("signing in returns to the page that required it", async ({ page }) => {
   await signIn.enterCode(await waitForSignInCode(email, before));
   await new CompleteProfilePage(page).submitName("Redirect Tester");
 
-  await expect(page).toHaveURL(/\/app\/c\/somebody\.matches$/);
+  await expect(page).toHaveURL(/\/app\/c#somebody\.matches$/);
 });

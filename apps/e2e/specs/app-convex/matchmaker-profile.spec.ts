@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { uniqueUsername } from "../../accounts";
+import { CandidateShellPage } from "../../page-objects/app/candidate.page";
 import { HomePage } from "../../page-objects/app/home.page";
 import {
   CreateMatchmakerPage,
@@ -37,10 +38,12 @@ test.beforeAll(async () => {
 test("a new account creates a profile, with the server's username rules", async ({
   page,
 }) => {
+  // An account with no profile lands on the candidate shell, which is where
+  // "Become a matchmaker" lives.
   await signInAs(page, world.email("creator"));
   const home = new HomePage(page);
   await home.goto();
-  await home.getCreateMatchmakerLink().click();
+  await new CandidateShellPage(page).getCreateMatchmakerLink().click();
 
   const create = new CreateMatchmakerPage(page);
   await expect(create.getForm()).toBeVisible();
@@ -74,10 +77,10 @@ test("a new account creates a profile, with the server's username rules", async 
   await expect(workspace.getName()).toHaveText("Maya Matches");
   await expect(workspace.getCandidates()).toContainText("No candidates yet");
 
-  // The UI allows one profile per account: the button goes, and the create
-  // page sends them to the workspace they already have.
+  // The UI allows one profile per account: owning one turns home back into
+  // the picker, and the create page sends them to the workspace they have.
   await home.goto();
-  await expect(home.getCreateMatchmakerLink()).toBeHidden();
+  await expect(home.getWelcomeHeading()).toBeVisible();
   await expect(home.getRow("matchmakerProfiles", "Maya Matches")).toContainText(
     `@${username}`,
   );

@@ -17,8 +17,8 @@
 
 | Profile | What it is | Created by | URL |
 |---|---|---|---|
-| **Matchmaker profile** | A tenant: one matchmaker's business and book of candidates. | The account holder, from the home page. Asks for a **username** (§1.1) and display name. | `app.match.build/mm/<username>` |
-| **Candidate profile** | A person's membership in *one* matchmaker's book. | The matchmaker, when they onboard someone (§3.1). Linked to an account when the invitation is accepted. | `app.match.build/c/<matchmakerUsername>` |
+| **Matchmaker profile** | A tenant: one matchmaker's business and book of candidates. | The account holder, from the home page. Asks for a **username** (§1.1) and display name. | `www.match.build/app/mm/<username>` |
+| **Candidate profile** | A person's membership in *one* matchmaker's book. | The matchmaker, when they onboard someone (§3.1). Linked to an account when the invitation is accepted. | `www.match.build/app/c/<matchmakerUsername>` |
 
 - The same account can be a candidate of several matchmakers, and a matchmaker at the same time.
 - An account is a candidate of a given matchmaker **at most once**. That is why the candidate URL is keyed by the matchmaker's username, and candidates never need a username of their own.
@@ -54,7 +54,7 @@ Extend the list rather than blocking substrings: a substring rule would reject l
 
 ## 2. Home page
 
-Shown after sign-in at `app.match.build/`. Sections:
+Shown after sign-in at the app's root (`www.match.build/app/`). Sections:
 
 1. **Invitations** — pending invites for this account's verified email. Hidden when empty.
 2. **Your matchmaker profiles** — with a **Create matchmaker profile** button, hidden once one exists.
@@ -94,7 +94,7 @@ Empty state for a new account: a prompt to create a matchmaker profile, plus a l
 Two ways in, both ending at the same accept screen:
 
 - **From the home page.** When a signed-in account's verified email matches a pending invite, it appears under **Invitations**.
-- **From the invite link** `app.match.build/invite/<token>`. Signed-out visitors go through sign-up/sign-in and return to the link. **The token works for any signed-in account**, even if its email differs from the one the matchmaker typed — this rescues typos and second email addresses. The token is single-use.
+- **From the invite link** `www.match.build/app/invite/<token>`. Signed-out visitors go through sign-up/sign-in and return to the link. **The token works for any signed-in account**, even if its email differs from the one the matchmaker typed — this rescues typos and second email addresses. The token is single-use.
 
 The accept screen shows the matchmaker's display name, a short privacy notice (§9.3), and **Accept** / **Decline**. On accept:
 
@@ -147,7 +147,7 @@ In `/settings`: **Delete account**, confirmed with a fresh one-time code. The co
 
 ## 4. UI
 
-`app.match.build` routes:
+Routes within the app (`apps/app`), which is mounted at `/app/` (§10) — the paths below are relative to that base:
 
 | Route | View |
 |---|---|
@@ -182,9 +182,19 @@ Three-column, mobile-first. On narrow viewports **only the centre column is visi
 
 `paused` and `archived` are the matchmaker's own labels. In phase 1 they only affect list filtering; they don't restrict messaging.
 
-### 4.2 Candidate chat
+### 4.2 Candidate shell
 
-A single chat window headed by the matchmaker's display name. Only `visibility: "everyone"` messages. Composer. Menu with **Leave**. A link back to the home page when the account has more than one profile.
+Three columns, the mirror of §4.1 from the candidate's side, at `/c`. The matchmaker is named by the hash (`/c#maya.matches`), so moving between them never reloads the shell around the conversation. On narrow viewports one column shows at a time: the list until a matchmaker is picked, then the conversation, with a way back.
+
+An account that owns no matchmaker profile lands here from `/` — including one with no matchmakers at all, which gets the empty state rather than a chooser. An account that owns a profile still gets the home page in §2 and chooses a side.
+
+**Left — matchmakers.** Everyone this account has joined, then **Waiting on you**: open invitations, and the pending applications Discover adds in phase 3. **Join another matchmaker** leads to `/c/mm/discover`; an account without a profile of its own is also offered one here.
+
+**Centre — conversation.** One thread with the selected matchmaker, headed by their display name. Only `visibility: "everyone"` messages: the query can't return the matchmaker's private ones. Composer.
+
+**Right — about this matchmaker (collapsible).** Display name, business name and username; when this account joined; a way to the account's notification settings (§8.1, an account-wide preference rather than one per matchmaker); and **Leave** (§3.4).
+
+A candidate keeps no record of their matchmaker, so this panel is much thinner than §4.1's.
 
 ---
 
@@ -504,16 +514,10 @@ Candidate conversations include sexual orientation, religion, health and family 
 
 ## 10. Platform & hosting
 
-- **Domain: `match.build`** (bought 2026-09-21, replacing the interim `aileenlancif.com`). Production is served at `https://www.match.build` with path-based hosting (option 3 below): the marketing site at `/`, the app at `/app/`, HTTP actions at `/api/`. The apex redirects to `www`. The brand is the domain itself, written lowercase — **match.build** — while *matchmaker* stays the word for the role and the tenant, in the product's copy and in the code.
-- **Frontends (target):** `app.match.build` (Vite app) and `www.match.build` (Next.js static export), if the subdomain split below is chosen. The marketing site's CTAs link to the app.
+- **Domain: `match.build`** (bought 2026-09-21, replacing the interim `aileenlancif.com`). Production is served from one origin, `https://www.match.build`, routed by path: the marketing site at `/`, the app at `/app/`, the platform admin app at `/admin/`, HTTP actions at `/api/`. The apex redirects to `www`. The brand is the domain itself, written lowercase — **match.build** — while *matchmaker* stays the word for the role and the tenant, in the product's copy and in the code.
+- **One origin, routed by path — decided.** Convex's static hosting routes by path only, so serving `app.` and `www.` as separate subdomains would have meant either host-aware dispatch in `convex/http.ts` or hosting the marketing site somewhere else. Neither buys anything the paths don't already give: one origin means one certificate, one auth issuer, one `CONVEX_SITE_URL`, and no cross-origin hop between the marketing site's CTA and the app. The app therefore keeps its Vite `base` of `/app/`, and `BrowserRouter` takes its `basename` from `import.meta.env.BASE_URL` (`apps/app/src/main.tsx`), so the base is set in one place and the routes below are written without it. The marketing site's CTAs link to `/app/`.
 - **Auth:** Convex Auth (`@convex-dev/auth`) with an email one-time-code provider. Replaces turbostack's Clerk wiring. Convex validates session tokens through the OpenID discovery document at `<site>/.well-known/openid-configuration`, which has to sit at the site root. So `convex/http.ts` owns the whole URL space: `/.well-known/…` for auth, `/api/…` for HTTP actions, then the static sites as catch-alls (`/app/…`, then `/`).
 - Nothing in `apps/www` may need a Node server at request time. All server logic lives in Convex.
-- **Hosting on two subdomains is an open decision.** Static sites are routed by path only (today: `www` at `/`, `app` at `/app/`), so pointing `app.` and `www.` at one deployment would serve the same paths on both. Options:
-  1. Host-aware routing in `convex/http.ts` dispatching on the `Host` header. `http.ts` already registers the static sites itself (`registerStaticRoutes`), so this is a wrapper around those handlers.
-  2. Host `www` separately (it only calls the waitlist mutation) and mount `app` at `/` on the main deployment.
-  3. Keep path-based hosting on one domain.
-
-  This doesn't block local development. Whichever is chosen, the app's Vite `base` becomes `/`.
 
 ---
 
@@ -530,10 +534,12 @@ Candidate conversations include sexual orientation, religion, health and family 
 
 **Done when:** a friendly matchmaker can onboard real candidates and run conversations in the app for a week without falling back to DMs.
 
+**All eight steps are built and deployed; the pilot is what's left, and it is gated on the terms.** Real candidates means real special-category data (§9.3) under terms that don't exist yet — the data-processing agreement §9.3 calls for, and the privacy policy the accept screen's notice should link to. Tracked in [#1](https://github.com/cloudexible-org/match.build/issues/1), along with the notification-delay tuning that only a first matchmaker can supply.
+
 ---
 
 ## 12. Open decisions (phase 1)
 
-- **Hosting on two subdomains** (§10). Deferred: the interim domain uses path-based hosting on one origin. Revisit when the product domain is bought.
-- **Erasure requests.** *Resolved for identifiers.* "Nothing is deleted" conflicted with a right-to-erasure request; the resolution is to erase the **person**, not the record (§9.3, `admin.mutations.eraseAccount`). Still open, and still needing legal review before real candidates are onboarded: **whether an erasure reaches into message and note text.** Those are free text, a matchmaker's notes are their own words, and the matchmaker is the controller — so how far a given request goes is their call, not something the platform should decide for them. Today the tooling leaves that text alone and the admin page says so.
-- **Notification delays.** 30 s push / 5 min email are starting points; tune with the first matchmaker. Now deployment settings (`NOTIFICATION_PUSH_DELAY_SECONDS`, `NOTIFICATION_EMAIL_DELAY_SECONDS`), so tuning needs no deploy; the defaults are still the numbers above.
+- ~~**Hosting on two subdomains** (§10).~~ *Resolved:* one origin, routed by path. `www.match.build` serves the marketing site at `/`, the app at `/app/`, the admin app at `/admin/` and HTTP actions at `/api/`; the apex redirects to `www`. See §10 for why the subdomain split was dropped rather than deferred again.
+- **Erasure requests.** *Resolved for identifiers.* "Nothing is deleted" conflicted with a right-to-erasure request; the resolution is to erase the **person**, not the record (§9.3, `admin.mutations.eraseAccount`). Still open, and still needing legal review before real candidates are onboarded: **whether an erasure reaches into message and note text.** Those are free text, a matchmaker's notes are their own words, and the matchmaker is the controller — so how far a given request goes is their call, not something the platform should decide for them. Today the tooling leaves that text alone and the admin page says so. Tracked in [#2](https://github.com/cloudexible-org/match.build/issues/2).
+- **Notification delays.** 30 s push / 5 min email are starting points; tune with the first matchmaker. Now deployment settings (`NOTIFICATION_PUSH_DELAY_SECONDS`, `NOTIFICATION_EMAIL_DELAY_SECONDS`), so tuning needs no deploy; the defaults are still the numbers above. Waits on the pilot ([#1](https://github.com/cloudexible-org/match.build/issues/1)).

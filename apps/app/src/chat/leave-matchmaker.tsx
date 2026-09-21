@@ -6,7 +6,8 @@ import { useNavigate } from "react-router";
 import { serverErrorMessage } from "../lib/server-error";
 
 /**
- * Leaving a matchmaker (prd/phase-1.md §3.4), from the candidate chat's menu.
+ * Leaving a matchmaker (prd/phase-1.md §3.4), from the third column of the
+ * candidate shell.
  *
  * The confirmation says plainly what leaving does and does not do: the
  * conversation goes from this account, and the matchmaker keeps their copy of
@@ -37,7 +38,9 @@ export function LeaveMatchmaker({
     try {
       await leave({ candidateId, reason: reason.trim() || undefined });
       // The conversation is no longer theirs to open, so don't go back to it.
-      void navigate("/", { replace: true });
+      // `/c` without a hash opens whichever matchmaker is left, or the empty
+      // state when none is.
+      void navigate("/c", { replace: true });
     } catch (caught) {
       setError(serverErrorMessage(caught, "That didn't work. Try again."));
       setLeaving(false);
@@ -48,15 +51,16 @@ export function LeaveMatchmaker({
     <form
       noValidate
       onSubmit={handleSubmit}
-      className="flex shrink-0 flex-col gap-3 border-b border-border bg-accent/40 px-4 py-3"
+      className="flex shrink-0 flex-col gap-3 rounded-lg border border-border bg-accent/40 p-3"
       data-testid="leave-confirmation"
     >
       <div className="flex flex-col gap-1">
         <h2 className="text-sm font-medium">Leave {matchmakerName}?</h2>
         <p className="text-sm text-muted-foreground">
-          This conversation will go from your home page and you won't be able to
-          send or read messages here. {matchmakerName} keeps their copy of it.
-          They can invite you back, and the thread carries on where it left off.
+          This conversation will go from your matchmakers and you won't be able
+          to send or read messages here. {matchmakerName} keeps their copy of
+          it. They can invite you back, and the thread carries on where it left
+          off.
         </p>
       </div>
       <Field invalid={error !== null}>

@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 import { expectNoA11yViolations } from "../../a11y";
 import { AccountSettingsPage } from "../../page-objects/app/account-settings.page";
-import { HomePage } from "../../page-objects/app/home.page";
 import {
   CandidateChatPage,
-  InvitePage,
-} from "../../page-objects/app/invite.page";
+  DiscoverPage,
+} from "../../page-objects/app/candidate.page";
+import { HomePage } from "../../page-objects/app/home.page";
+import { InvitePage } from "../../page-objects/app/invite.page";
 import {
   ConversationPage,
   CreateMatchmakerPage,
@@ -71,7 +72,9 @@ test("the sign-in screens", async ({ page }) => {
 });
 
 test("the home page", async ({ page }) => {
-  await signInAs(page, world.email("jane"));
+  // Home is only for an account that owns a matchmaker profile; a candidate
+  // is redirected to the shell, which the chat test below scans.
+  await signInAs(page, world.email("maya"));
   const home = new HomePage(page);
   await home.goto();
   await expect(home.getWelcomeHeading()).toBeVisible();
@@ -154,9 +157,14 @@ test("the accept screen and a candidate's chat", async ({ page }) => {
   await expectNoA11yViolations(page);
 
   await signInAs(page, world.email("jane"));
-  await page.goto(`/app/c/${world.username("book")}`);
+  await page.goto(`/app/c#${world.username("book")}`);
   // Wait for the thread: scanning an empty chat misses everything in it.
   await expect(new CandidateChatPage(page).getMessages().first()).toBeVisible();
+  await expectNoA11yViolations(page);
+
+  // Discover, where "Join another matchmaker" leads.
+  await new DiscoverPage(page).goto();
+  await expect(new DiscoverPage(page).getEmptyState()).toBeVisible();
   await expectNoA11yViolations(page);
 });
 
@@ -175,7 +183,7 @@ test("account settings, and the screens for leaving or deleting", async ({
   await expectNoA11yViolations(page);
 
   // And the leave confirmation, left unconfirmed.
-  await page.goto(`/app/c/${world.username("book")}`);
+  await page.goto(`/app/c#${world.username("book")}`);
   const chat = new CandidateChatPage(page);
   await (await chat.openLeave()).click();
   await expect(chat.getLeaveConfirmation()).toBeVisible();

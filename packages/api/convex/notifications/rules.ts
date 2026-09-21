@@ -120,9 +120,13 @@ export function workspaceConversationPath(
   return `mm/${matchmakerUsername}/c/${candidateId}`;
 }
 
-/** The candidate's own chat with one matchmaker. */
+/**
+ * The candidate's own chat with one matchmaker. The shell is one route
+ * (`c`) and the hash picks the matchmaker, so the whole list and the
+ * conversation arrive together.
+ */
 export function candidateChatPath(matchmakerUsername: string): string {
-  return `c/${matchmakerUsername}`;
+  return `c#${matchmakerUsername}`;
 }
 
 /*

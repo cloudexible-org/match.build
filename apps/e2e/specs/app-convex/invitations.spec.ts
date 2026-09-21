@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { signUp } from "../../accounts";
-import { HomePage } from "../../page-objects/app/home.page";
 import {
   CandidateChatPage,
-  InvitePage,
-} from "../../page-objects/app/invite.page";
+  CandidateShellPage,
+} from "../../page-objects/app/candidate.page";
+import { InvitePage } from "../../page-objects/app/invite.page";
 import { SignInPage } from "../../page-objects/app/sign-in.page";
 import { type Scenario, seedScenario } from "../../scenario";
 import { signInAs } from "../../session";
@@ -52,13 +52,13 @@ test.beforeAll(async () => {
   });
 });
 
-test("an invited person accepts from their home page and joins", async ({
+test("an invited person accepts from their own shell and joins", async ({
   page,
 }) => {
   await signInAs(page, world.email("jane"));
-  const home = new HomePage(page);
-  await home.goto();
-  await home.getRow("invitations", world.displayName("book")).click();
+  const shell = new CandidateShellPage(page);
+  await shell.goto();
+  await shell.getWaitingRow(world.displayName("book")).click();
 
   const invite = new InvitePage(page);
   await expect(invite.getTitle()).toHaveText(
@@ -69,17 +69,15 @@ test("an invited person accepts from their home page and joins", async ({
   );
   await invite.getAcceptButton().click();
 
-  await expect(page).toHaveURL(`/app/c/${world.username("book")}`);
+  await expect(page).toHaveURL(`/app/c#${world.username("book")}`);
   await expect(new CandidateChatPage(page).getMatchmakerName()).toHaveText(
     world.displayName("book"),
   );
 
-  // The invitation is gone from home, and the matchmaker is listed instead.
-  await home.goto();
-  await expect(home.getInvitationsSection()).toBeHidden();
-  await expect(
-    home.getRow("candidateProfiles", world.displayName("book")),
-  ).toBeVisible();
+  // The invitation is gone from the first column, and the matchmaker is
+  // listed there instead.
+  await expect(shell.getWaitingSection()).toBeHidden();
+  await expect(shell.getMatchmakerRow(world.displayName("book"))).toBeVisible();
 });
 
 test("the link works for an account it wasn't addressed to, and is single use", async ({
@@ -106,9 +104,9 @@ test("declining keeps the record and says so", async ({ page }) => {
   await expect(invite.getInvalid()).toBeVisible();
 
   // Declining doesn't join them to anything.
-  const home = new HomePage(page);
-  await home.goto();
-  await expect(home.getCandidateProfilesSection()).not.toContainText(
+  const shell = new CandidateShellPage(page);
+  await shell.goto();
+  await expect(shell.getMatchmakerList()).not.toContainText(
     world.displayName("book"),
   );
 });
@@ -163,7 +161,7 @@ test("a candidate URL for a matchmaker you haven't joined is not found", async (
   page,
 }) => {
   await signInAs(page, world.email("outsider"));
-  await page.goto(`/app/c/${world.username("book")}`);
+  await page.goto(`/app/c#${world.username("book")}`);
   await expect(
     page.getByRole("heading", { name: "Page not found" }),
   ).toBeVisible();

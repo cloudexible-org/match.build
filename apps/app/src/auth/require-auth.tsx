@@ -23,7 +23,10 @@ export function RequireAuth() {
   if (isLoading) return <FullPageStatus>Loading…</FullPageStatus>;
   if (!isAuthenticated) {
     return (
-      <Navigate to={signInPath(location.pathname + location.search)} replace />
+      <Navigate
+        to={signInPath(location.pathname + location.search + location.hash)}
+        replace
+      />
     );
   }
   if (me === undefined) return <FullPageStatus>Loading…</FullPageStatus>;

@@ -1,8 +1,8 @@
 import { api } from "@repo/api";
-import { buttonVariants, cn } from "@repo/ui";
+import { cn } from "@repo/ui";
 import { useQuery } from "convex/react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, Navigate } from "react-router";
 import { AppHeader } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
 
@@ -10,9 +10,14 @@ import { FullPageStatus } from "../components/full-page-status";
  * Home (prd/phase-1.md §2): everything this account can open — invitations,
  * its own matchmaker profiles, and the matchmakers it has joined.
  *
- * The UI allows one matchmaker profile per account (prd/phase-1.md §1), so
- * "Create matchmaker profile" disappears once the account owns one. An
- * invitation opens the same accept screen as its link.
+ * Only an account that owns a matchmaker profile has two sides to choose
+ * between, so only it sees this. Everyone else goes straight to their own
+ * chat at `/c`, which lists their matchmakers and invitations itself — a
+ * candidate has nothing to pick from here.
+ *
+ * Creating a profile is offered on the candidate shell instead, which is
+ * where an account without one now lands. An invitation opens the same
+ * accept screen as its link.
  */
 export function HomePage() {
   const me = useQuery(api.users.queries.me);
@@ -22,11 +27,7 @@ export function HomePage() {
     return <FullPageStatus>Loading…</FullPageStatus>;
   }
   if (me === null || home === null) return null; // RequireAuth handles this
-
-  const isEmpty =
-    home.invitations.length === 0 &&
-    home.matchmakerProfiles.length === 0 &&
-    home.candidateProfiles.length === 0;
+  if (home.matchmakerProfiles.length === 0) return <Navigate to="/c" replace />;
 
   return (
     <div className="min-h-dvh">
@@ -58,47 +59,25 @@ export function HomePage() {
         <Section
           title="Your matchmaker profiles"
           testId="home-matchmaker-profiles"
-          action={
-            home.matchmakerProfiles.length === 0 ? (
-              <Link
-                to="/mm/new"
-                className={buttonVariants({ size: "sm" })}
-                data-testid="home-create-matchmaker"
-              >
-                Create matchmaker profile
-              </Link>
-            ) : undefined
-          }
         >
-          {home.matchmakerProfiles.length === 0 ? (
-            <Empty>You don't have a matchmaker profile yet.</Empty>
-          ) : (
-            home.matchmakerProfiles.map((profile) => (
-              <RowLink
-                key={profile.matchmakerId}
-                to={`/mm/${profile.username}`}
-              >
-                <span className="font-medium">{profile.displayName}</span>
-                <span className="text-sm text-muted-foreground">
-                  @{profile.username}
-                </span>
-              </RowLink>
-            ))
-          )}
+          {home.matchmakerProfiles.map((profile) => (
+            <RowLink key={profile.matchmakerId} to={`/mm/${profile.username}`}>
+              <span className="font-medium">{profile.displayName}</span>
+              <span className="text-sm text-muted-foreground">
+                @{profile.username}
+              </span>
+            </RowLink>
+          ))}
         </Section>
 
         <Section title="Your matchmakers" testId="home-candidate-profiles">
           {home.candidateProfiles.length === 0 ? (
-            <Empty>
-              {isEmpty
-                ? "Waiting for an invitation? Ask your matchmaker for your invite link."
-                : "You haven't joined a matchmaker yet."}
-            </Empty>
+            <Empty>You haven't joined a matchmaker yet.</Empty>
           ) : (
             home.candidateProfiles.map((profile) => (
               <RowLink
                 key={profile.candidateId}
-                to={`/c/${profile.matchmakerUsername}`}
+                to={`/c#${profile.matchmakerUsername}`}
               >
                 <span className="font-medium">
                   {profile.matchmakerDisplayName}
@@ -115,12 +94,10 @@ export function HomePage() {
 function Section({
   title,
   testId,
-  action,
   children,
 }: {
   title: string;
   testId: string;
-  action?: ReactNode;
   children: ReactNode;
 }) {
   const headingId = `${testId}-heading`;
@@ -137,7 +114,6 @@ function Section({
         >
           {title}
         </h2>
-        {action}
       </div>
       <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
         {children}

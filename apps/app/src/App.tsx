@@ -1,9 +1,10 @@
 import { Route, Routes } from "react-router";
 import { RequireAuth } from "./auth/require-auth";
 import { AccountSettingsPage } from "./pages/account-settings";
-import { CandidateChatPage } from "./pages/candidate-chat";
+import { CandidateChatRedirect, CandidatePage } from "./pages/candidate";
 import { ConversationPage } from "./pages/conversation";
 import { CreateMatchmakerPage } from "./pages/create-matchmaker";
+import { DiscoverPage } from "./pages/discover";
 import { HomePage } from "./pages/home";
 import { InvitePage } from "./pages/invite";
 import { MatchmakerSettingsPage } from "./pages/matchmaker-settings";
@@ -26,7 +27,14 @@ export default function App() {
         <Route path="/settings" element={<AccountSettingsPage />} />
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/invitations/:candidateId" element={<InvitePage />} />
-        <Route path="/c/:matchmakerUsername" element={<CandidateChatPage />} />
+        <Route path="/c" element={<CandidatePage />} />
+        <Route path="/c/mm/discover" element={<DiscoverPage />} />
+        {/* Links already out in the world — notification emails, bookmarks —
+            still name the matchmaker in the path. */}
+        <Route
+          path="/c/:matchmakerUsername"
+          element={<CandidateChatRedirect />}
+        />
         <Route path="/mm/new" element={<CreateMatchmakerPage />} />
         <Route path="/mm/:username" element={<WorkspaceLayout />}>
           <Route element={<WorkspacePage />}>

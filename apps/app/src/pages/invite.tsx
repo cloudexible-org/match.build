@@ -82,7 +82,7 @@ export function InvitePage() {
     try {
       if (kind === "accept") {
         const { matchmakerUsername } = await accept(ref);
-        navigate(`/c/${matchmakerUsername}`, { replace: true });
+        navigate(`/c#${matchmakerUsername}`, { replace: true });
       } else {
         await decline(ref);
         setDeclinedFrom(name);

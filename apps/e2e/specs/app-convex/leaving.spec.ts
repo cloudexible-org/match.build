@@ -1,9 +1,11 @@
 import { type Browser, expect, type Page, test } from "@playwright/test";
 import { waitForDeletionCode, wrongCode } from "../../deletion-codes";
 import { AccountSettingsPage } from "../../page-objects/app/account-settings.page";
+import {
+  CandidateChatPage,
+  CandidateShellPage,
+} from "../../page-objects/app/candidate.page";
 import { CandidatePanelPage } from "../../page-objects/app/candidate-panel.page";
-import { HomePage } from "../../page-objects/app/home.page";
-import { CandidateChatPage } from "../../page-objects/app/invite.page";
 import { ConversationPage } from "../../page-objects/app/matchmaker.page";
 import { SignInPage } from "../../page-objects/app/sign-in.page";
 import { type Scenario, seedScenario } from "../../scenario";
@@ -92,7 +94,7 @@ test.beforeAll(async () => {
 /** Opens a candidate's own chat with Maya, signed in as them. */
 async function asCandidate(page: Page, userKey: string) {
   await signInAs(page, world.email(userKey));
-  await page.goto(`/app/c/${world.username("book")}`);
+  await page.goto(`/app/c#${world.username("book")}`);
   const chat = new CandidateChatPage(page);
   await expect(chat.getRoot()).toBeVisible();
   return chat;
@@ -125,18 +127,15 @@ test("leaving takes the conversation away from the candidate", async ({
 
   await chat.leave("Met someone, thank you!");
 
-  // Straight back to the home page, with that matchmaker gone from it.
-  const home = new HomePage(page);
-  await expect(home.getWelcomeHeading()).toBeVisible();
-  await expect(
-    home.getRow("candidateProfiles", world.displayName("book")),
-  ).toBeHidden();
+  // Straight back to the shell, with that matchmaker gone from the column
+  // and no conversation left to open.
+  const shell = new CandidateShellPage(page);
+  await expect(shell.getNoConversations()).toBeVisible();
+  await expect(shell.getMatchmakerRow(world.displayName("book"))).toBeHidden();
 
   // And the URL no longer resolves — the same answer a stranger gets.
-  await page.goto(`/app/c/${world.username("book")}`);
-  await expect(
-    page.getByRole("heading", { name: "Page not found" }),
-  ).toBeVisible();
+  await page.goto(`/app/c#${world.username("book")}`);
+  await expect(chat.getNotFound()).toBeVisible();
 });
 
 test("the matchmaker keeps the thread, sees why, and can re-invite", async ({

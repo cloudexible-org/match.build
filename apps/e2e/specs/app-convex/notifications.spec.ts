@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { waitForNotificationEmail } from "../../notification-emails";
 import { waitForDelivery } from "../../notification-state";
 import { AccountSettingsPage } from "../../page-objects/app/account-settings.page";
-import { CandidateChatPage } from "../../page-objects/app/invite.page";
+import { CandidateChatPage } from "../../page-objects/app/candidate.page";
 import { ConversationPage } from "../../page-objects/app/matchmaker.page";
 import {
   clearPushKeys,
@@ -106,7 +106,7 @@ test("someone who never opens the message gets an email that doesn't quote it", 
   expect(email.subject).toBe("You have a new message from Maya's Book");
   // The whole point of §8: the message itself is never in the notification.
   expect(email.text).not.toContain("someone in mind");
-  expect(email.text).toContain(`/app/c/${world.username("book")}`);
+  expect(email.text).toContain(`/app/c#${world.username("book")}`);
   expect(email.text).toContain("turn these emails off");
 
   const delivery = await waitForDelivery(world.conversationId("away"), "email");
@@ -122,7 +122,7 @@ test("someone reading the conversation is not emailed about it", async ({
   const theirs = await browser.newContext({ baseURL });
   const theirPage = await theirs.newPage();
   await signInAs(theirPage, world.email("reader"));
-  await theirPage.goto(`/app/c/${world.username("book")}`);
+  await theirPage.goto(`/app/c#${world.username("book")}`);
   const chat = new CandidateChatPage(theirPage);
   await expect(chat.getRoot()).toBeVisible();
 

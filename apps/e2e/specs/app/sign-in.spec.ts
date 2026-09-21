@@ -12,11 +12,12 @@ import { SignInPage } from "../../page-objects/app/sign-in.page";
 test("a signed-out visitor is sent to sign-in, remembering where they were headed", async ({
   page,
 }) => {
-  await page.goto("/app/c/some.matchmaker");
+  // The hash picks the matchmaker, so `next` has to carry it too.
+  await page.goto("/app/c#some.matchmaker");
 
   const signIn = new SignInPage(page);
   await expect(signIn.getEmailForm()).toBeVisible();
-  await expect(page).toHaveURL(/\/app\/sign-in\?next=%2Fc%2Fsome\.matchmaker$/);
+  await expect(page).toHaveURL(/\/app\/sign-in\?next=%2Fc%23some\.matchmaker$/);
 });
 
 test("home redirects to a plain sign-in URL", async ({ page }) => {
