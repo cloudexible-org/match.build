@@ -32,6 +32,12 @@ test.beforeAll(async () => {
       },
       { key: "status", matchmakerKey: "book", name: "Stan Status" },
       {
+        key: "handles",
+        matchmakerKey: "book",
+        name: "Holly Handles",
+        socialHandles: [{ platform: "instagram", handle: "holly.handles" }],
+      },
+      {
         key: "history",
         matchmakerKey: "book",
         name: "Hugo History",
@@ -58,34 +64,61 @@ async function openPanel(page: Page, key: string) {
 test("Details shows who they are and saves an edit", async ({ page }) => {
   const panel = await openPanel(page, "details");
 
-  await expect(panel.getNameInput()).toHaveValue("Dana Details");
+  // It reads as a record: a line each, and the editable ones are a row you
+  // click rather than a box that is always open.
+  await expect(panel.getNameRow()).toContainText("Dana Details");
   await expect(panel.getEmail()).toHaveText(world.candidates.details.email);
   await expect(panel.getMembership()).toHaveText("Invited");
+  await expect(panel.getHandle("instagram")).toContainText("dana.details");
 
-  await panel.getNameInput().fill("Dana Renamed");
-  await panel.getSaveDetailsButton().click();
-  await expect(panel.getDetailsStatus()).toHaveText("Saved.");
+  await panel.setName("Dana Renamed");
 
-  // The rest of the workspace follows.
+  // The row closes on the new value — that is the confirmation — and the
+  // rest of the workspace follows.
+  await expect(panel.getNameRow()).toContainText("Dana Renamed");
+  await expect(panel.getNameInput()).toBeHidden();
   await expect(new ConversationPage(page).getCandidateName()).toHaveText(
     "Dana Renamed",
   );
   await page.reload();
-  await expect(panel.getNameInput()).toHaveValue("Dana Renamed");
+  await expect(panel.getNameRow()).toContainText("Dana Renamed");
 });
 
 test("Details refuses a handle the server would refuse", async ({ page }) => {
   const panel = await openPanel(page, "details");
-  await page.getByRole("button", { name: "Add a handle" }).click();
-  const row = page.getByTestId("details-handle").last();
-  await row.getByRole("combobox").selectOption({ label: "WhatsApp" });
-  await row.getByRole("textbox").fill("07700 900123");
-  await panel.getSaveDetailsButton().click();
+  await panel.addHandle("WhatsApp", "07700 900123");
 
   await expect(
     page.getByText("Enter the number with its country code, like +44 7700"),
   ).toBeVisible();
-  await expect(panel.getDetailsStatus()).toHaveText("");
+  // Nothing was written, and the form stays open on what you typed.
+  await expect(panel.getHandle("whatsapp")).toHaveCount(0);
+  await expect(panel.getHandles()).toHaveCount(1);
+});
+
+test("a handle is edited and removed on its own row", async ({ page }) => {
+  const panel = await openPanel(page, "handles");
+
+  await panel
+    .getHandle("instagram")
+    .getByRole("button", { name: "Edit" })
+    .click();
+  await panel.getHandle("instagram").getByLabel("Handle").fill("holly.renamed");
+  await panel
+    .getHandle("instagram")
+    .getByRole("button", { name: "Save" })
+    .click();
+  await expect(panel.getHandle("instagram")).toContainText("holly.renamed");
+
+  await panel
+    .getHandle("instagram")
+    .getByRole("button", { name: "Edit" })
+    .click();
+  await panel
+    .getHandle("instagram")
+    .getByRole("button", { name: "Remove" })
+    .click();
+  await expect(panel.getHandles()).toHaveCount(0);
 });
 
 test("status moves the candidate between the list's filters", async ({
@@ -137,7 +170,7 @@ test("the panel collapses on a phone and opens on demand", async ({ page }) => {
   await expect(panel.getRoot()).toBeHidden();
   await panel.getToggle().click();
   await expect(panel.getRoot()).toBeVisible();
-  await expect(panel.getNameInput()).toBeVisible();
+  await expect(panel.getNameRow()).toBeVisible();
 
   // The thread's header is hidden while the panel covers it, so the panel
   // carries its own way out.

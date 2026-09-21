@@ -13,18 +13,20 @@ import {
   AccordionSection,
   Button,
   Field,
+  FieldError,
   FieldLabel,
   Input,
   NativeSelect,
 } from "@repo/ui";
 import { useMutation } from "convex/react";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { serverErrorMessage } from "../lib/server-error";
 import { PanelHeader } from "../shell/panel-header";
 import { CandidateHistory } from "./candidate-history";
 import { type Membership, membershipMarker } from "./candidate-labels";
 import { CandidateMatches } from "./candidate-matches";
 import { CandidateProfile } from "./candidate-profile";
+import { RecordEditRow, RecordGroup, RecordRow } from "./panel-record";
 import { useWorkspace } from "./workspace-layout";
 
 export type PanelCandidate = {
@@ -69,10 +71,11 @@ export function CandidatePanel({
           details and what they know at once, not one at a time. They scroll as
           this column, under its header — never as the page.
 
-          Details stays open by default: it holds membership and the invite
-          controls, which is what you want on opening a thread you haven't
-          touched in a week, while Profile is a reading surface
-          (prd/phase-2.md §5). */}
+          Details stays open by default: who they are, where they stand and
+          whether they're still active is what you want on opening a thread
+          you haven't touched in a week (the invite controls themselves are in
+          the banner over the thread, where the thread is blocked on them).
+          Profile is the deeper reading surface (prd/phase-2.md §5). */}
       <Accordion
         defaultValue={["details"]}
         className="min-h-0 flex-1 overflow-y-auto"
@@ -100,222 +103,434 @@ export function CandidatePanel({
   );
 }
 
-type HandleRow = { key: string; platform: SocialPlatform; handle: string };
+type Handle = { platform: SocialPlatform; handle: string };
 
+/**
+ * Who this person is, as a record rather than a form (prd/phase-1.md §4.1).
+ *
+ * It used to be a standing form — a name box, a stack of handle rows each
+ * with its own select, input and ✕, a **Save details** button and a status
+ * line — about 480px of controls for five things worth knowing. Details is
+ * the section a matchmaker lands on when they open a thread they haven't
+ * touched in a week, and what they want from it is to *read* it.
+ *
+ * So it uses the panel's rows (`panel-record.tsx`), the same ones Profile
+ * does: one line each, and the ones you can change are a row you click. Email
+ * and membership have no pencil, because the matchmaker cannot change them
+ * here and a row that looks editable and isn't is worse than a plain line.
+ *
+ * **Every write sends both halves**, because `updateDetails` takes the name
+ * and the whole handle list together; each row reads the other half off the
+ * candidate rather than out of a draft it has been holding since mount, which
+ * is also how an edit made in another tab stops being silently overwritten.
+ */
 function Details({ candidate }: { candidate: PanelCandidate }) {
   const workspace = useWorkspace();
-  const idPrefix = useId();
   const update = useMutation(api.candidates.mutations.updateDetails);
   const setStatus = useMutation(api.candidates.mutations.setStatus);
-  const [name, setName] = useState(candidate.name ?? "");
-  const [handles, setHandles] = useState<HandleRow[]>(() =>
-    candidate.socialHandles.map((handle, index) => ({
-      key: `${idPrefix}-${index}`,
-      ...handle,
-    })),
-  );
-  const [nextKey, setNextKey] = useState(candidate.socialHandles.length);
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatusLabel] = useState<"idle" | "saving" | "saved">(
-    "idle",
-  );
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    const invalid =
-      candidateNameError(name) ??
-      handles
-        .map((row) => handleError(row.platform, row.handle))
-        .find((message) => message !== null) ??
-      null;
-    setError(invalid);
-    if (invalid) return;
-    setStatusLabel("saving");
-    try {
-      await update({
-        matchmakerId: workspace.matchmakerId,
-        candidateId: candidate.candidateId,
-        name,
-        socialHandles: handles.map(({ platform, handle }) => ({
-          platform,
-          handle,
-        })),
-      });
-      setStatusLabel("saved");
-    } catch (caught) {
-      setError(serverErrorMessage(caught, "We couldn't save. Try again."));
-      setStatusLabel("idle");
-    }
+  function saveDetails(next: { name?: string; socialHandles?: Handle[] }) {
+    return update({
+      matchmakerId: workspace.matchmakerId,
+      candidateId: candidate.candidateId,
+      name: next.name ?? candidate.name ?? "",
+      socialHandles: next.socialHandles ?? candidate.socialHandles,
+    });
   }
 
   const marker = membershipMarker(candidate.membership);
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
+      <RecordGroup>
+        <NameRow candidate={candidate} onSave={saveDetails} />
+        <RecordRow
+          testId="candidate-detail"
+          field="email"
+          label="Email"
+          value={<span data-testid="candidate-email">{candidate.email}</span>}
+        />
+        {candidate.acceptedAs !== undefined && (
+          <RecordRow
+            testId="candidate-detail"
+            field="acceptedAs"
+            label="Accepted as"
+            value={candidate.acceptedAs}
+          />
+        )}
+        <RecordRow
+          testId="candidate-detail"
+          field="membership"
+          label="Membership"
+          value={
+            <span data-testid="candidate-membership">{marker ?? "Joined"}</span>
+          }
+        />
+        <RecordRow
+          testId="candidate-detail"
+          field="status"
+          label="Status"
+          // A select rather than a row you click: status is a closed list of
+          // three and takes effect the moment it changes, so there is nothing
+          // for a Save button to do. Stripped of its box so it reads as the
+          // row's value, keeping the native arrow that says it is a control.
+          value={
+            <Field>
+              <FieldLabel className="sr-only">Status</FieldLabel>
+              <NativeSelect
+                // `self-start` or the Field's column stretches it across the
+                // whole value column and parks its arrow at the far edge.
+                // `-ms-1.5` pulls the text back onto the value column: a
+                // native select insets it past any padding we set.
+                className="-ms-1.5 h-auto w-auto max-w-full self-start rounded-sm border-0 bg-transparent p-0 text-sm shadow-none"
+                value={candidate.status}
+                data-testid="candidate-status"
+                onChange={(event) =>
+                  void setStatus({
+                    matchmakerId: workspace.matchmakerId,
+                    candidateId: candidate.candidateId,
+                    status: event.target.value as (typeof STATUSES)[number],
+                  })
+                }
+              >
+                {STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {value.charAt(0).toUpperCase() + value.slice(1)}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          }
+        />
+      </RecordGroup>
+
+      <div className="flex flex-col gap-2">
+        <RecordGroup title="Social handles">
+          {candidate.socialHandles.map((row, index) => (
+            <HandleRow
+              // The list has no ids of its own and is short and ordered;
+              // its position is what identifies a row here.
+              key={index}
+              row={row}
+              index={index}
+              handles={candidate.socialHandles}
+              onSave={saveDetails}
+            />
+          ))}
+        </RecordGroup>
+        <AddHandle handles={candidate.socialHandles} onSave={saveDetails} />
+      </div>
+    </div>
+  );
+}
+
+type SaveDetails = (next: {
+  name?: string;
+  socialHandles?: Handle[];
+}) => Promise<unknown>;
+
+function NameRow({
+  candidate,
+  onSave,
+}: {
+  candidate: PanelCandidate;
+  onSave: SaveDetails;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(candidate.name ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const invalid = candidateNameError(draft);
+    setError(invalid);
+    if (invalid) return;
+    try {
+      await onSave({ name: draft });
+      setEditing(false);
+    } catch (caught) {
+      setError(serverErrorMessage(caught, "We couldn't save. Try again."));
+    }
+  }
+
+  if (!editing) {
+    return (
+      <RecordRow
+        testId="candidate-detail"
+        field="name"
+        label="Name"
+        // Nobody named them yet, so the list is calling them by their email;
+        // say that rather than leaving the row blank.
+        value={
+          candidate.name ?? (
+            <span className="text-muted-foreground">{candidate.email}</span>
+          )
+        }
+        onEdit={() => {
+          setDraft(candidate.name ?? "");
+          setError(null);
+          setEditing(true);
+        }}
+      />
+    );
+  }
+
+  return (
+    <RecordEditRow testId="candidate-detail" field="name">
       <form
         noValidate
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-4"
-        data-testid="candidate-details-form"
+        onSubmit={submit}
+        className="flex flex-col gap-2"
+        data-testid="candidate-name-form"
       >
         <Field invalid={error !== null}>
           <FieldLabel>Name</FieldLabel>
           <Input
             maxLength={CANDIDATE_LIMITS.name + 10}
-            value={name}
+            value={draft}
             placeholder={candidate.email}
-            onChange={(event) => {
-              setName(event.target.value);
-              setStatusLabel("idle");
-            }}
+            onChange={(event) => setDraft(event.target.value)}
           />
+          {error && <FieldError match>{error}</FieldError>}
         </Field>
-
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1.5 text-sm font-medium">Social handles</legend>
-          {handles.map((row, index) => (
-            <div
-              key={row.key}
-              className="flex gap-2"
-              data-testid="details-handle"
-            >
-              <Field className="w-28 shrink-0">
-                <FieldLabel className="sr-only">
-                  Platform {index + 1}
-                </FieldLabel>
-                <NativeSelect
-                  value={row.platform}
-                  onChange={(event) =>
-                    setHandles((rows) =>
-                      rows.map((other) =>
-                        other.key === row.key
-                          ? {
-                              ...other,
-                              platform: event.target.value as SocialPlatform,
-                            }
-                          : other,
-                      ),
-                    )
-                  }
-                >
-                  {SOCIAL_PLATFORMS.map((platform) => (
-                    <option key={platform} value={platform}>
-                      {SOCIAL_PLATFORM_LABELS[platform]}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <Field className="flex-1">
-                <FieldLabel className="sr-only">Handle {index + 1}</FieldLabel>
-                <Input
-                  value={row.handle}
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  onChange={(event) =>
-                    setHandles((rows) =>
-                      rows.map((other) =>
-                        other.key === row.key
-                          ? { ...other, handle: event.target.value }
-                          : other,
-                      ),
-                    )
-                  }
-                />
-              </Field>
-              <Button
-                type="button"
-                variant="ghost"
-                aria-label={`Remove handle ${index + 1}`}
-                onClick={() =>
-                  setHandles((rows) =>
-                    rows.filter((other) => other.key !== row.key),
-                  )
-                }
-              >
-                ✕
-              </Button>
-            </div>
-          ))}
-          {handles.length < CANDIDATE_LIMITS.socialHandles && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="self-start"
-              onClick={() => {
-                setHandles((rows) => [
-                  ...rows,
-                  {
-                    key: `${idPrefix}-${nextKey}`,
-                    platform: "instagram",
-                    handle: "",
-                  },
-                ]);
-                setNextKey((key) => key + 1);
-              }}
-            >
-              Add a handle
-            </Button>
-          )}
-        </fieldset>
-
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        <div className="flex items-center gap-3">
-          <Button type="submit" size="sm" disabled={status === "saving"}>
-            {status === "saving" ? "Saving…" : "Save details"}
+        <div className="flex gap-2">
+          <Button type="submit" size="sm">
+            Save
           </Button>
-          <span
-            aria-live="polite"
-            className="text-sm text-muted-foreground"
-            data-testid="candidate-details-status"
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setEditing(false)}
           >
-            {status === "saved" ? "Saved." : ""}
-          </span>
+            Cancel
+          </Button>
         </div>
       </form>
+    </RecordEditRow>
+  );
+}
 
-      <dl className="flex flex-col gap-2 border-t border-border pt-4 text-sm">
-        <div className="flex justify-between gap-3">
-          <dt className="text-muted-foreground">Email</dt>
-          <dd className="truncate" data-testid="candidate-email">
-            {candidate.email}
-          </dd>
-        </div>
-        {candidate.acceptedAs !== undefined && (
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">Accepted as</dt>
-            <dd className="truncate">{candidate.acceptedAs}</dd>
-          </div>
-        )}
-        <div className="flex justify-between gap-3">
-          <dt className="text-muted-foreground">Membership</dt>
-          <dd data-testid="candidate-membership">{marker ?? "Joined"}</dd>
-        </div>
-      </dl>
+function HandleRow({
+  row,
+  index,
+  handles,
+  onSave,
+}: {
+  row: Handle;
+  index: number;
+  handles: Handle[];
+  onSave: SaveDetails;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Handle>(row);
+  const [error, setError] = useState<string | null>(null);
 
-      <Field className="border-t border-border pt-4">
-        <FieldLabel>Status</FieldLabel>
-        <NativeSelect
-          value={candidate.status}
-          data-testid="candidate-status"
-          onChange={(event) =>
-            void setStatus({
-              matchmakerId: workspace.matchmakerId,
-              candidateId: candidate.candidateId,
-              status: event.target.value as (typeof STATUSES)[number],
-            })
-          }
+  async function write(next: Handle[]) {
+    try {
+      await onSave({ socialHandles: next });
+      setEditing(false);
+      return true;
+    } catch (caught) {
+      setError(serverErrorMessage(caught, "We couldn't save. Try again."));
+      return false;
+    }
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const invalid = handleError(draft.platform, draft.handle);
+    setError(invalid);
+    if (invalid) return;
+    await write(handles.map((other, at) => (at === index ? draft : other)));
+  }
+
+  if (!editing) {
+    return (
+      <RecordRow
+        testId="details-handle"
+        field={row.platform}
+        label={SOCIAL_PLATFORM_LABELS[row.platform]}
+        value={row.handle}
+        onEdit={() => {
+          setDraft(row);
+          setError(null);
+          setEditing(true);
+        }}
+      />
+    );
+  }
+
+  return (
+    <RecordEditRow testId="details-handle" field={row.platform}>
+      <form noValidate onSubmit={submit} className="flex flex-col gap-2">
+        <HandleFields value={draft} onChange={setDraft} error={error} />
+        <div className="flex items-center gap-2">
+          <Button type="submit" size="sm">
+            Save
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setEditing(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="ml-auto text-destructive hover:text-destructive"
+            onClick={() => void write(handles.filter((_, at) => at !== index))}
+          >
+            Remove
+          </Button>
+        </div>
+      </form>
+    </RecordEditRow>
+  );
+}
+
+function AddHandle({
+  handles,
+  onSave,
+}: {
+  handles: Handle[];
+  onSave: SaveDetails;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<Handle>({
+    platform: "instagram",
+    handle: "",
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  if (handles.length >= CANDIDATE_LIMITS.socialHandles) return null;
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        data-testid="details-add-handle-open"
+        onClick={() => setOpen(true)}
+      >
+        + Add a handle
+      </Button>
+    );
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const invalid = handleError(draft.platform, draft.handle);
+    setError(invalid);
+    if (invalid) return;
+    try {
+      await onSave({ socialHandles: [...handles, draft] });
+      setDraft({ platform: "instagram", handle: "" });
+      setOpen(false);
+    } catch (caught) {
+      setError(serverErrorMessage(caught, "We couldn't save. Try again."));
+    }
+  }
+
+  return (
+    <form
+      noValidate
+      onSubmit={submit}
+      // `relative` for the `sr-only` labels inside: an absolute box with no
+      // positioned ancestor escapes the panel's scroller and stretches the
+      // document (`specs/app-convex/layout.spec.ts`).
+      className="relative flex flex-col gap-2 rounded-lg border border-border p-3"
+      data-testid="details-add-handle-form"
+    >
+      <HandleFields
+        label="Add a handle"
+        value={draft}
+        onChange={setDraft}
+        error={error}
+      />
+      <div className="flex gap-2">
+        <Button type="submit" size="sm">
+          Add
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setError(null);
+            setOpen(false);
+          }}
         >
-          {STATUSES.map((value) => (
-            <option key={value} value={value}>
-              {value.charAt(0).toUpperCase() + value.slice(1)}
-            </option>
-          ))}
-        </NativeSelect>
-      </Field>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * The platform and the handle, the pair every handle form is made of.
+ *
+ * **Two `Field`s, not one round both controls.** Base UI's Field labels the
+ * one control inside it, so a Field holding a select *and* an input points
+ * both at the same label — the select's own `aria-label` loses to the
+ * inherited `aria-labelledby`, and "Platform" and "Handle" both resolve to two
+ * elements.
+ */
+function HandleFields({
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  label?: string;
+  value: Handle;
+  onChange: (next: Handle) => void;
+  error: string | null;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {label && <span className="text-sm font-medium">{label}</span>}
+      <div className="flex gap-2">
+        <Field className="w-28 shrink-0">
+          <FieldLabel className="sr-only">Platform</FieldLabel>
+          <NativeSelect
+            value={value.platform}
+            onChange={(event) =>
+              onChange({
+                ...value,
+                platform: event.target.value as SocialPlatform,
+              })
+            }
+          >
+            {SOCIAL_PLATFORMS.map((platform) => (
+              <option key={platform} value={platform}>
+                {SOCIAL_PLATFORM_LABELS[platform]}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field className="min-w-0 flex-1" invalid={error !== null}>
+          <FieldLabel className="sr-only">Handle</FieldLabel>
+          <Input
+            value={value.handle}
+            autoCapitalize="none"
+            spellCheck={false}
+            onChange={(event) =>
+              onChange({ ...value, handle: event.target.value })
+            }
+          />
+        </Field>
+      </div>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

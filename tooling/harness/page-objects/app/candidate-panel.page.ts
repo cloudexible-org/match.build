@@ -40,16 +40,38 @@ export class CandidatePanelPage {
 
   // --- Details -------------------------------------------------------------
 
+  /**
+   * One row of the Details record, by what it holds: `name`, `email`,
+   * `acceptedAs`, `membership` or `status`. The same locator finds the row
+   * whether it is reading or being edited.
+   */
+  getDetail(field: "name" | "email" | "acceptedAs" | "membership" | "status") {
+    return this.page.locator(
+      `[data-testid="candidate-detail"][data-field="${field}"]`,
+    );
+  }
+
+  getNameRow() {
+    return this.getDetail("name");
+  }
+
+  /** Opens the name row's editor, unless it is already open. */
+  async openName() {
+    const input = this.getNameInput();
+    if (!(await input.isVisible())) {
+      await this.getNameRow().getByRole("button", { name: "Edit" }).click();
+    }
+    return input;
+  }
+
   getNameInput() {
-    return this.page.getByTestId("candidate-details-form").getByLabel("Name");
+    return this.page.getByTestId("candidate-name-form").getByLabel("Name");
   }
 
-  getSaveDetailsButton() {
-    return this.page.getByRole("button", { name: "Save details" });
-  }
-
-  getDetailsStatus() {
-    return this.page.getByTestId("candidate-details-status");
+  async setName(value: string) {
+    await this.openName();
+    await this.getNameInput().fill(value);
+    await this.getNameRow().getByRole("button", { name: "Save" }).click();
   }
 
   getEmail() {
@@ -58,6 +80,34 @@ export class CandidatePanelPage {
 
   getMembership() {
     return this.page.getByTestId("candidate-membership");
+  }
+
+  /** Every social handle on the record, in the order the panel lists them. */
+  getHandles() {
+    return this.page.getByTestId("details-handle");
+  }
+
+  getHandle(platform: string) {
+    return this.page.locator(
+      `[data-testid="details-handle"][data-field="${platform}"]`,
+    );
+  }
+
+  /** Unfolds the add-a-handle form, which is a button until you reach for it. */
+  async openAddHandle() {
+    const form = this.page.getByTestId("details-add-handle-form");
+    if (!(await form.isVisible())) {
+      await this.page.getByTestId("details-add-handle-open").click();
+    }
+    return form;
+  }
+
+  /** `platform` is the label the select shows, e.g. "WhatsApp". */
+  async addHandle(platform: string, handle: string) {
+    const form = await this.openAddHandle();
+    await form.getByLabel("Platform").selectOption({ label: platform });
+    await form.getByLabel("Handle").fill(handle);
+    await form.getByRole("button", { name: "Add", exact: true }).click();
   }
 
   getStatusSelect() {
