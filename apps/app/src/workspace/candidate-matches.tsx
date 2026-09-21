@@ -25,6 +25,12 @@ import { useWorkspace } from "./workspace-layout";
  * several and the panel is one column wide. The one thing this adds is the
  * **stage**: the board says which stage a card is in by which column it sits
  * in, and a panel has no columns to say it with.
+ *
+ * **The card gets the whole column.** The stage, the counter and both arrows
+ * are one line above it — `Introduced … ‹ 1/2 ›` — the same arrangement the
+ * suggestion stack uses. An arrow either side of the card cost it a seventh of
+ * the panel's width in gutters, in the narrowest column of the product, to say
+ * something the header was already there to say.
  */
 export function CandidateMatches({
   candidateId,
@@ -103,7 +109,7 @@ export function CandidateMatches({
 
   return (
     <div className="flex flex-col gap-2" data-testid="candidate-matches">
-      <div className="flex items-center gap-2">
+      <div className="flex min-h-6 items-center gap-2">
         {/* What the board says by which column the card is in. */}
         <span
           className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground"
@@ -113,30 +119,30 @@ export function CandidateMatches({
           {MATCH_STAGE_LABELS[card.stage]}
         </span>
         <span className="flex-1" />
-        {many && <CarouselCounter index={index} count={items.length} />}
+        {/* The whole control in one place: `‹ 1/2 ›`. `-my-1` so a pair of
+            arrows doesn't push the header taller than its own text. */}
+        {many && (
+          <div className="-my-1 flex shrink-0 items-center gap-0.5">
+            <CarouselArrow
+              direction="previous"
+              label="Previous match"
+              className="size-6"
+              disabled={previousId === null}
+              onClick={() => setSelectedId(previousId)}
+            />
+            <CarouselCounter index={index} count={items.length} />
+            <CarouselArrow
+              direction="next"
+              label="Next match"
+              className="size-6"
+              disabled={nextId === null}
+              onClick={() => setSelectedId(nextId)}
+            />
+          </div>
+        )}
       </div>
 
-      <div className="flex items-center gap-1">
-        {many && (
-          <CarouselArrow
-            direction="previous"
-            label="Previous match"
-            disabled={previousId === null}
-            onClick={() => setSelectedId(previousId)}
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <MatchCard card={card} actions={actions(card)} />
-        </div>
-        {many && (
-          <CarouselArrow
-            direction="next"
-            label="Next match"
-            disabled={nextId === null}
-            onClick={() => setSelectedId(nextId)}
-          />
-        )}
-      </div>
+      <MatchCard card={card} actions={actions(card)} />
 
       {error !== null && (
         <p

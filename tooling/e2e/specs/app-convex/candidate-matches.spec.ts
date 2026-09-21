@@ -115,6 +115,19 @@ test("the carousel walks both sides of the pairs someone is in", async ({
   await expect(panel.getMatchCard()).toHaveText(first ?? "");
 });
 
+test("the card gets the whole column, arrows and all", async ({ page }) => {
+  const panel = await openMatches(page, "sam");
+  await expect(panel.getMatchCounter()).toHaveText("1/2");
+
+  // The stage, the counter and both arrows are one line above the card, so
+  // the card is as wide as the section it sits in — an arrow either side of
+  // it used to cost it a seventh of the panel's width in gutters.
+  const card = await panel.getMatchCard().boundingBox();
+  const section = await panel.getMatches().boundingBox();
+  if (card === null || section === null) throw new Error("No card on screen");
+  expect(Math.round(section.width - card.width)).toBeLessThanOrEqual(1);
+});
+
 test("one match gets no arrows and no counter", async ({ page }) => {
   const panel = await openMatches(page, "jordan");
   await expect(panel.getMatchCard()).toBeVisible();
