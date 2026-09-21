@@ -19,7 +19,8 @@
     "format": "biome format . --write",
     "check": "biome check .",
     "storybook": "pnpm --filter @repo/ui storybook",
-    "setup:envs": "node scripts/setup.mjs"
+    "setup:envs": "node scripts/setup.mjs",
+    "build:icons": "node scripts/build-icons.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

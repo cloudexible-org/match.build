@@ -23,6 +23,14 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/png",
       },
+      {
+        // Android crops any icon it is handed; only a maskable one keeps the
+        // mark inside the safe zone when it does.
+        src: "/icon-maskable-512x512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
     ],
   };
 }
