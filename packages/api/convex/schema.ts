@@ -123,6 +123,7 @@ export const matchClosedBy = v.union(
   v.literal("matchmaker"),
   v.literal("candidateA"),
   v.literal("candidateB"),
+  v.literal("both"),
   // The nightly run taking back its own suggestion after a profile changed
   // under it: the one ending nobody chose.
   v.literal("system"),

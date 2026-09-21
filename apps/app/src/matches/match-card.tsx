@@ -330,12 +330,13 @@ function CloseForm({
   const [archiveBoth, setArchiveBoth] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // The two candidates by name; everything else by what it is.
   const label = (who: MatchClosedBy) =>
     who === "candidateA"
       ? personName(card.a)
       : who === "candidateB"
         ? personName(card.b)
-        : MATCH_CLOSED_BY_LABELS.matchmaker;
+        : MATCH_CLOSED_BY_LABELS[who];
 
   function submit(event: FormEvent) {
     event.preventDefault();

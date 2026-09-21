@@ -148,6 +148,19 @@ describe("how a match ended", () => {
     ).toBe("You: Bad timing.");
   });
 
+  test("and says so plainly when neither of them wanted it", () => {
+    expect(
+      closingLine(
+        card({
+          stage: "closed",
+          closedAs: "didnt_work",
+          closedBy: "both",
+          closingNote: "Nothing after the first message.",
+        }),
+      ),
+    ).toBe("Both of them: Nothing after the first message.");
+  });
+
   test("including the nightly run taking back its own suggestion", () => {
     expect(
       closingLine(
