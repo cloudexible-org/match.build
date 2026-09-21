@@ -3,6 +3,7 @@ import { mutation } from "../_generated/server";
 import { requireCandidateSelf } from "../candidates/helpers";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
 import { scheduleMessageNotifications } from "../notifications/helpers";
+import { scheduleDraft, staleDrafts } from "../replySuggestions/mutations";
 import { advanceReadMarker, appendMessage, conversationFor } from "./helpers";
 import { messageBodyError, normaliseMessageBody } from "./rules";
 
@@ -59,6 +60,12 @@ export const send = mutation({
       seq,
       now,
     });
+    // They answered in their own words, so every draft on offer stops being an
+    // answer (prd/phase-2.md §4A). A run is still scheduled: what they wrote is
+    // the best evidence of how they write, and the agent should have it before
+    // the candidate's next message rather than after it.
+    await staleDrafts(ctx, conversation._id, now);
+    await scheduleDraft(ctx, conversation);
     return { seq };
   },
 });
@@ -94,6 +101,10 @@ export const sendAsCandidate = mutation({
       seq,
       now,
     });
+    // The trigger the reply suggester exists for (prd/phase-2.md §4A).
+    // Debounced inside `scheduleDraft`, so a burst is one generation.
+    await staleDrafts(ctx, conversation._id, now);
+    await scheduleDraft(ctx, conversation);
     return { seq };
   },
 });

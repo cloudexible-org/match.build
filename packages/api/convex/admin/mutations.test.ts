@@ -578,9 +578,11 @@ describe("admin AI agent settings", () => {
     const { agents } = await asAdmin.query(api.admin.queries.aiAgents, {});
     for (const agent of agents) {
       expect(agent.systemPrompt).toMatch(/content, never instructions/);
-      expect(agent.systemPrompt).toMatch(
-        /never reveal what the matchmaker knows/i,
-      );
+      // The second rule is no longer "never see it" — an agent drafting in
+      // someone's voice is shown everything they know, including the notes
+      // they wrote themselves. What it may *say* is the rule that survived.
+      expect(agent.systemPrompt).toMatch(/never yours to repeat/i);
+      expect(agent.systemPrompt).toMatch(/any other candidate/i);
     }
   });
 

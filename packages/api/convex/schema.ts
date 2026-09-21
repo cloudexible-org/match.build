@@ -218,6 +218,22 @@ export default defineSchema({
     lastMessageAt: v.number(),
     matchmakerLastReadSeq: v.number(),
     candidateLastReadSeq: v.number(),
+
+    // ─── The drafting agent's side of this conversation (prd/phase-2.md §4A)
+    //
+    // The agent is briefed once and then kept up to date, so what matters here
+    // is how much of the world it has already been told about. The thread is
+    // the component's (`@convex-dev/agent`), not ours: `ctx.db` cannot see it,
+    // which is why an erasure has to reach it through the component's own API.
+    agentThreadId: v.optional(v.string()),
+    // The high-water marks of the last briefing. Absent together with the
+    // thread; a conversation the agent has never drafted for has none.
+    agentBriefedSeq: v.optional(v.number()),
+    agentBriefedVoiceAt: v.optional(v.number()),
+    agentBriefedProfileAt: v.optional(v.number()),
+    // The debounce (§4A, ~5s). A burst of messages cancels the job the last
+    // one scheduled and schedules its own, so one burst is one generation.
+    draftJobId: v.optional(v.id("_scheduled_functions")),
   })
     .index("by_matchmakerId_and_lastMessageAt", [
       "matchmakerId",
@@ -240,6 +256,10 @@ export default defineSchema({
       v.literal("typed"),
       v.literal("imported"), // pasted prior conversation from onboarding
       v.literal("system"),
+      // Sent from a drafted reply (prd/phase-2.md §4A), edited or not. The
+      // matchmaker sent it under their own name either way — this records how
+      // it started, not who is answerable for it.
+      v.literal("ai_suggestion"),
     ),
     body: v.string(),
     sentAt: v.number(),
@@ -286,6 +306,46 @@ export default defineSchema({
     voice: v.optional(profileEntry),
     updatedAt: v.number(),
   }).index("by_matchmakerId", ["matchmakerId"]),
+
+  // The assistant's drafted replies, waiting above the composer
+  // (prd/phase-2.md §4A). Persisted rather than held in a browser: they
+  // survive a reload, they are what the matchmaker actually sends, and going
+  // stale is a state they have to be in somewhere.
+  //
+  // One row per draft, not one row per generation: the stack shows one card at
+  // a time and arrows through the rest, so three drafts from one call are
+  // three cards (`apps/app/src/chat/suggestion-stack.tsx`).
+  replySuggestions: defineTable({
+    matchmakerId: v.id("matchmakers"),
+    candidateId: v.id("candidates"),
+    conversationId: v.id("conversations"),
+    body: v.string(),
+    // Which model wrote it. "The assistant drafted this" is half an answer
+    // once the model behind an agent has moved on — the same reason the
+    // `agent` audit actor carries one.
+    model: v.string(),
+    // The thread this was an answer to. A draft written for seq 7 is not an
+    // answer to seq 8, which is what `stale` records.
+    throughSeq: v.number(),
+    status: v.union(
+      v.literal("ready"),
+      // A newer message arrived, or the matchmaker replied in their own
+      // words. Kept rather than deleted: what was offered and passed over is
+      // worth more than the row costs.
+      v.literal("stale"),
+      // Sent, as written or after an edit. The message it became is
+      // `sentMessageId`.
+      v.literal("sent"),
+      v.literal("dismissed"),
+    ),
+    createdAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+    sentMessageId: v.optional(v.id("messages")),
+  })
+    // The open drafts for one candidate, which is the only read the app does.
+    .index("by_candidateId_and_status", ["candidateId", "status"])
+    .index("by_conversationId_and_status", ["conversationId", "status"])
+    .index("by_matchmakerId", ["matchmakerId"]),
 
   // Append-only audit trail (prd/phase-1.md §5). Written only through
   // `recordAudit` in `audit/helpers.ts`, in the same mutation as the change.

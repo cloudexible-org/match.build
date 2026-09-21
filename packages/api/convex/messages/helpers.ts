@@ -33,7 +33,7 @@ export async function appendMessage(
     author: "matchmaker" | "candidate" | "system";
     authorUserId?: Id<"users">;
     visibility: "everyone" | "matchmaker";
-    source: "typed" | "imported" | "system";
+    source: "typed" | "imported" | "system" | "ai_suggestion";
     body: string;
     now: number;
   },

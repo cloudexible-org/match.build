@@ -76,4 +76,12 @@ export class SuggestionsPage {
   async dismiss(kind: SuggestionKind) {
     await this.getCard(kind).getByTestId("suggestion-dismiss").click();
   }
+
+  /**
+   * An action that does *not* answer the card — Edit on a drafted reply, which
+   * hands the text to the composer and leaves the draft on offer.
+   */
+  async edit(kind: SuggestionKind) {
+    await this.getCard(kind).getByTestId("suggestion-keep-open").click();
+  }
 }

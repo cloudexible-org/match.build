@@ -63,6 +63,13 @@ export type DevMember = {
    */
   left?: { daysAgo: number; reason?: string };
   profile?: DevProfile;
+  /**
+   * Replies the assistant has drafted and nobody has answered
+   * (prd/phase-2.md §4A). Seeded because a dev deployment may have no gateway,
+   * and because waiting five seconds for a real generation is a poor way to
+   * look at a card. Newest last.
+   */
+  replyDrafts?: string[];
 };
 
 export const DEV_DOMAIN = "matchmaker-dev.test";
@@ -191,6 +198,13 @@ export const DEV_MEMBERS: DevMember[] = [
         },
       ],
     },
+    // Three drafts, so the reply row has arrows and a 1/3 counter — and each
+    // one answers what Sam actually said, in the voice seeded above.
+    replyDrafts: [
+      "Toronto is easy — I have a few people there. What does a good weekend outdoors look like for you?",
+      "Lovely, thank you Sam. Kind and curious I can work with. Are you hiking most weekends, or is it more of a summer thing?",
+      "That helps. One more and I will stop asking: when you picture this going well a year from now, what are you doing?",
+    ],
   },
   {
     userSlug: "jordan",

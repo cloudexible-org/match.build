@@ -28,6 +28,7 @@ const message = v.object({
     v.literal("typed"),
     v.literal("imported"),
     v.literal("system"),
+    v.literal("ai_suggestion"),
   ),
   body: v.string(),
   sentAt: v.number(),

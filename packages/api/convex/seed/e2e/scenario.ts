@@ -117,6 +117,13 @@ export type ScenarioCandidate = {
    * answered yet.
    */
   profile?: ScenarioProfile;
+  /**
+   * Replies the assistant has drafted and nobody has answered
+   * (prd/phase-2.md §4A) — a state this suite cannot otherwise reach, because
+   * the gateway needs a paid Convex Cloud deployment and the e2e backend is a
+   * local anonymous one. Newest last; they show above the composer.
+   */
+  replyDrafts?: string[];
 };
 
 export type ScenarioProfile = {

@@ -29,8 +29,11 @@ import { type SuggestionCard, SuggestionStack } from "./suggestion-stack";
  */
 export function ConversationSuggestions({
   candidateId,
+  onEdit,
 }: {
   candidateId: Id<"candidates">;
+  /** Edit on a drafted reply: hand the text to the composer. */
+  onEdit?: (body: string) => void;
 }) {
   const workspace = useWorkspace();
   const profile = useQuery(api.candidateProfiles.queries.get, {
@@ -46,6 +49,12 @@ export function ConversationSuggestions({
   const resolveVoice = useMutation(
     api.matchmakerProfiles.mutations.resolveVoiceSuggestion,
   );
+  const drafts = useQuery(api.replySuggestions.queries.forCandidate, {
+    matchmakerId: workspace.matchmakerId,
+    candidateId,
+  });
+  const sendDraft = useMutation(api.replySuggestions.mutations.send);
+  const dismissDraft = useMutation(api.replySuggestions.mutations.dismiss);
 
   const cards: SuggestionCard[] = [];
 
@@ -114,6 +123,45 @@ export function ConversationSuggestions({
         },
       ],
       dismiss: answer(false),
+    });
+  }
+
+  for (const draft of drafts ?? []) {
+    cards.push({
+      id: `reply:${draft._id}`,
+      kind: "reply",
+      suggestedAt: draft.createdAt,
+      body: <p className="whitespace-pre-wrap break-words">{draft.body}</p>,
+      actions: [
+        {
+          label: "Send",
+          run: () =>
+            sendDraft({
+              matchmakerId: workspace.matchmakerId,
+              suggestionId: draft._id,
+            }),
+        },
+        // Edit is not an answer: the draft stays open until they send it or
+        // turn it down, because a matchmaker who starts editing and changes
+        // their mind should still have the original.
+        ...(onEdit === undefined
+          ? []
+          : [
+              {
+                label: "Edit",
+                variant: "outline" as const,
+                run: () => {
+                  onEdit(draft.body);
+                },
+                keepOpen: true,
+              },
+            ]),
+      ],
+      dismiss: () =>
+        dismissDraft({
+          matchmakerId: workspace.matchmakerId,
+          suggestionId: draft._id,
+        }),
     });
   }
 

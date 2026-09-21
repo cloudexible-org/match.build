@@ -302,6 +302,41 @@ export const apply = internalMutation({
         );
       }
 
+      // Drafted replies, on the same rule as a profile entry: added where
+      // there are none, and never on top of drafts already waiting.
+      if (member.replyDrafts !== undefined) {
+        const conversation = await ctx.db
+          .query("conversations")
+          .withIndex("by_candidateId", (q) => q.eq("candidateId", candidateId))
+          .unique();
+        if (conversation !== null) {
+          const open = await ctx.db
+            .query("replySuggestions")
+            .withIndex("by_conversationId_and_status", (q) =>
+              q.eq("conversationId", conversation._id).eq("status", "ready"),
+            )
+            .first();
+          if (open === null) {
+            for (const [index, body] of member.replyDrafts.entries()) {
+              await ctx.db.insert("replySuggestions", {
+                matchmakerId,
+                candidateId,
+                conversationId: conversation._id,
+                body,
+                model: "seed/model",
+                throughSeq: conversation.lastSeq,
+                status: "ready",
+                // A millisecond apart, so "newest first" is a total order.
+                createdAt: now + index,
+              });
+            }
+            created.push(
+              `${member.replyDrafts.length} drafted replies for ${user.email}`,
+            );
+          }
+        }
+      }
+
       if (member.profile !== undefined) {
         const seeded = await ctx.db
           .query("candidateProfiles")

@@ -1,0 +1,222 @@
+/**
+ * Gathering what the drafting agent is told, and reading its drafts
+ * (prd/phase-2.md §4A). Plain functions taking a `ctx`; nothing here is
+ * registered as a function.
+ *
+ * The shaping of it into prose is `rules.ts`, which has no Convex imports and
+ * is where a reader can see exactly what leaves this deployment. This file is
+ * only the reads that feed it.
+ */
+
+import type { Doc, Id } from "../_generated/dataModel";
+import { env, type QueryCtx } from "../_generated/server";
+import { candidateProfileFor } from "../candidateProfiles/helpers";
+import { candidateField, candidateNoteLabel } from "../candidateProfiles/rules";
+import { matchmakerProfileFor } from "../matchmakerProfiles/helpers";
+import { displayValue } from "../profiles/rules";
+import {
+  type Brief,
+  type BriefEntry,
+  type BriefedThrough,
+  type BriefMessage,
+  REPLY_DEFAULTS,
+  settingNumber,
+} from "./rules";
+
+/*
+ * ─── The three numbers, from the deployment ─────────────────────────────────
+ *
+ * Every one is a guess only a real matchmaker can correct (prd/phase-2.md
+ * §9.2), so each is a setting rather than a constant. Unset falls back;
+ * nonsense falls back; out of range clamps. None of them can take the feature
+ * down, because a typo in an env var is not a reason for a matchmaker to lose
+ * their drafts.
+ */
+
+/** How long after the last message before drafting. */
+export function debounceSeconds(): number {
+  return settingNumber(
+    env.AI_REPLY_DEBOUNCE_SECONDS,
+    REPLY_DEFAULTS.debounceSeconds,
+    { min: 0, max: 120 },
+  );
+}
+
+/** How many drafts to ask for. */
+export function replyCount(): number {
+  return settingNumber(env.AI_REPLY_COUNT, REPLY_DEFAULTS.count, {
+    min: 1,
+    max: 5,
+  });
+}
+
+/** How many messages go to the agent verbatim. */
+export function liveWindow(): number {
+  return settingNumber(env.AI_REPLY_LIVE_WINDOW, REPLY_DEFAULTS.liveWindow, {
+    min: 1,
+    max: 100,
+  });
+}
+
+/** An entry map as the two profile tables hold it. */
+type Entries = Doc<"candidateProfiles">["facts"];
+
+/**
+ * What to call the candidate in a draft.
+ *
+ * The app falls back to the email address, which is right for a list and wrong
+ * for a greeting — "Hi sam.candidate@matchmaker-dev.test" is not a draft
+ * anybody sends. So: the matchmaker's own label for them, then the name on the
+ * account they joined with, and only then the part of the address before the
+ * `@`, which at least reads like a person.
+ */
+async function candidateName(
+  ctx: QueryCtx,
+  candidate: Doc<"candidates">,
+): Promise<string> {
+  if (candidate.name !== undefined && candidate.name !== "") {
+    return candidate.name;
+  }
+  if (candidate.userId !== undefined) {
+    const user = await ctx.db.get("users", candidate.userId);
+    if (user?.name !== undefined && user.name !== "") return user.name;
+  }
+  return candidate.email.split("@")[0] ?? candidate.email;
+}
+
+/**
+ * The filled entries, rendered the way the Profile section renders them, so
+ * the agent reads "Wants children: maybe" rather than `wantsKids: maybe`.
+ *
+ * An entry held open only by a proposal has an empty value and nothing to say.
+ * **An open proposal is never part of the brief**: nobody has agreed to it, and
+ * an agent told about a change the matchmaker has not accepted would draft as
+ * though they had (prd/phase-2.md §4.2).
+ */
+function briefEntries(
+  entries: Entries,
+  label: (key: string) => string,
+  render: (key: string, value: string) => string,
+): BriefEntry[] {
+  return Object.entries(entries)
+    .filter(([, entry]) => entry.value !== "")
+    .map(([key, entry]) => ({
+      key,
+      label: label(key),
+      value: render(key, entry.value),
+      source: entry.source,
+      updatedAt: entry.updatedAt,
+    }))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+}
+
+/**
+ * Everything the agent gets about one conversation.
+ *
+ * Every message in the live window, whatever its visibility: the matchmaker's
+ * private notes to themselves and the imported history included. The agent is
+ * drafting for the person who wrote them, and a drafter working from half the
+ * file writes worse drafts. What it may *say* is a different question, and
+ * `rules.ts` marks each message so the agent knows which ones the candidate
+ * has actually seen.
+ */
+export async function briefFor(
+  ctx: QueryCtx,
+  conversation: Doc<"conversations">,
+  candidate: Doc<"candidates">,
+  matchmaker: Doc<"matchmakers">,
+  liveWindow: number,
+): Promise<Brief> {
+  const profile = await candidateProfileFor(ctx, candidate._id);
+  const mine = await matchmakerProfileFor(ctx, matchmaker._id);
+
+  // Newest first, then reversed: the window is the *last* N, and a thread can
+  // be long. Taking from the front would be the oldest N.
+  const recent = await ctx.db
+    .query("messages")
+    .withIndex("by_conversationId_and_seq", (q) =>
+      q.eq("conversationId", conversation._id),
+    )
+    .order("desc")
+    .take(liveWindow);
+
+  const messages: BriefMessage[] = recent.reverse().map((message) => ({
+    seq: message.seq,
+    author: message.author,
+    visibility: message.visibility,
+    source: message.source === "ai_suggestion" ? "typed" : message.source,
+    body: message.body,
+  }));
+
+  return {
+    candidateName: await candidateName(ctx, candidate),
+    matchmakerName: matchmaker.displayName,
+    voice: mine?.voice?.value ?? "",
+    facts:
+      profile === null
+        ? []
+        : briefEntries(
+            profile.facts,
+            (key) => candidateField(key)?.label ?? key,
+            (key, value) => {
+              const field = candidateField(key);
+              return field === null ? value : displayValue(field, value);
+            },
+          ),
+    notes:
+      profile === null
+        ? []
+        : briefEntries(
+            profile.notes,
+            candidateNoteLabel,
+            (_key, value) => value,
+          ),
+    messages,
+  };
+}
+
+/** When the matchmaker's voice last moved, or 0 where they have none. */
+export async function voiceUpdatedAt(
+  ctx: QueryCtx,
+  matchmakerId: Id<"matchmakers">,
+): Promise<number> {
+  const mine = await matchmakerProfileFor(ctx, matchmakerId);
+  return mine?.voice?.updatedAt ?? 0;
+}
+
+/** What the agent has already been told about this conversation. */
+export function briefedThrough(
+  conversation: Doc<"conversations">,
+): BriefedThrough {
+  return {
+    seq: conversation.agentBriefedSeq ?? 0,
+    voiceUpdatedAt: conversation.agentBriefedVoiceAt ?? 0,
+    profileUpdatedAt: conversation.agentBriefedProfileAt ?? 0,
+  };
+}
+
+/**
+ * The high-water mark for the profile, which is the latest `updatedAt` on any
+ * entry rather than the row's own. A row's `updatedAt` moves when a *proposal*
+ * is written too, and a proposal is not something the agent is told about.
+ */
+export function profileHighWater(brief: Brief): number {
+  return [...brief.facts, ...brief.notes].reduce(
+    (latest, entry) => Math.max(latest, entry.updatedAt),
+    0,
+  );
+}
+
+/** The drafts still waiting on this candidate, newest first. */
+export async function readyDrafts(
+  ctx: QueryCtx,
+  candidateId: Id<"candidates">,
+): Promise<Doc<"replySuggestions">[]> {
+  return await ctx.db
+    .query("replySuggestions")
+    .withIndex("by_candidateId_and_status", (q) =>
+      q.eq("candidateId", candidateId).eq("status", "ready"),
+    )
+    .order("desc")
+    .take(10);
+}

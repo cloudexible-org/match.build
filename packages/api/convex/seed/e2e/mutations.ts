@@ -166,6 +166,7 @@ const SEEDED_TABLES = [
   "messages",
   "candidateProfiles",
   "matchmakerProfiles",
+  "replySuggestions",
   "auditEvents",
   "pushSubscriptions",
   "notificationSettings",
@@ -411,6 +412,7 @@ export const scenario = internalMutation({
           ),
           unreadForMatchmaker: v.optional(v.boolean()),
           profile: v.optional(scenarioProfile),
+          replyDrafts: v.optional(v.array(v.string())),
         }),
       ),
     ),
@@ -717,6 +719,23 @@ export const scenario = internalMutation({
           facts,
           notes,
           updatedAt: now,
+        });
+      }
+
+      // Written straight in, like a proposal: no gateway on this backend, so
+      // there is no run that could have produced them.
+      for (const [index, body] of (spec.replyDrafts ?? []).entries()) {
+        await ctx.db.insert("replySuggestions", {
+          matchmakerId,
+          candidateId,
+          conversationId,
+          body,
+          model: "seed/model",
+          throughSeq: lastSeq,
+          status: "ready",
+          // A millisecond apart, so "newest first" is a total order and the
+          // arrows walk them in the order the spec listed them.
+          createdAt: now + index,
         });
       }
 

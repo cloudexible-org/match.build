@@ -29,6 +29,13 @@ export type SuggestionAction = {
   label: string;
   variant?: "default" | "outline";
   run: () => unknown;
+  /**
+   * The card stays on offer afterwards, rather than being answered. **Edit**
+   * is the one that does this: it hands the draft to the composer, and a
+   * matchmaker who starts editing and changes their mind should still have the
+   * original sitting there.
+   */
+  keepOpen?: boolean;
 };
 
 export type SuggestionCard = Suggestion & {
@@ -181,8 +188,18 @@ function Row({
               size="sm"
               variant={action.variant ?? "default"}
               disabled={busy}
-              data-testid="suggestion-accept"
-              onClick={() => answer(action.run)}
+              data-testid={
+                action.keepOpen === true
+                  ? "suggestion-keep-open"
+                  : "suggestion-accept"
+              }
+              onClick={() => {
+                if (action.keepOpen === true) {
+                  action.run();
+                  return;
+                }
+                answer(action.run);
+              }}
             >
               {action.label}
             </Button>

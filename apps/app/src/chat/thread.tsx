@@ -6,7 +6,7 @@ export type ThreadMessage = {
   seq: number;
   author: "matchmaker" | "candidate" | "system";
   visibility: "everyone" | "matchmaker";
-  source: "typed" | "imported" | "system";
+  source: "typed" | "imported" | "system" | "ai_suggestion";
   body: string;
   sentAt: number;
 };

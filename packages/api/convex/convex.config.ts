@@ -54,6 +54,22 @@ const app = defineApp({
     // prompt is long, is versioned by the audit trail, and is changed far more
     // often than a deployment setting (prd/phase-2.md §4.4).
     AI_ENABLED: v.optional(v.string()),
+    // The reply suggester's numbers (prd/phase-2.md §9.2), every one of them a
+    // guess only a real matchmaker can correct — so each is a setting rather
+    // than a constant, the way phase 1's two notification delays are. Unset
+    // means `REPLY_DEFAULTS` in `replySuggestions/rules.ts`; a value that
+    // isn't a number, or is out of range, falls back or clamps rather than
+    // taking the feature down.
+    //
+    // How long after the last message before drafting, so a burst of typing
+    // is one generation rather than four.
+    AI_REPLY_DEBOUNCE_SECONDS: v.optional(v.string()),
+    // How many drafts to offer. Three may be choice paralysis on a phone.
+    AI_REPLY_COUNT: v.optional(v.string()),
+    // How many messages go to the agent verbatim. Older ones are the
+    // summariser's job, which is not built yet — until it is, a long thread
+    // simply starts here.
+    AI_REPLY_LIVE_WINDOW: v.optional(v.string()),
   },
 });
 app.use(staticHosting, { name: "www" });

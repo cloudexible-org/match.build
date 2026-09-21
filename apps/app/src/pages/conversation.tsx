@@ -143,6 +143,11 @@ function Thread({
   useMarkRead(results[0]?.seq, markRead);
   // Push is offered after the first message they send, not on load (prd §8.2).
   const [justSent, setJustSent] = useState(false);
+  // Edit on a drafted reply puts its text in the composer. The token counts
+  // presses, so editing the same draft twice fills the box again.
+  const [draft, setDraft] = useState<{ token: number; body: string } | null>(
+    null,
+  );
 
   // Where the composer would be, so the reason is at the end of the timeline
   // as well as in the banner above it (prd/phase-1.md §3.4).
@@ -168,10 +173,16 @@ function Thread({
       {justSent && closed === undefined && <PushNudge />}
       {/* Above the composer, and above the reason the composer is closed: a
           proposal about someone who left is still worth answering. */}
-      <ConversationSuggestions candidateId={candidateId} />
+      <ConversationSuggestions
+        candidateId={candidateId}
+        onEdit={(body) =>
+          setDraft((current) => ({ token: (current?.token ?? 0) + 1, body }))
+        }
+      />
       <Composer
         placeholder={`Message ${name}`}
         disabledReason={closed}
+        draft={draft}
         onSend={async (body) => {
           await send({ ...args, body });
           setJustSent(true);
