@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardPaste, MessagesSquare, Send } from "lucide-react";
+import { ClipboardPaste, LayoutGrid, MessagesSquare, Send } from "lucide-react";
 import { motion } from "motion/react";
 import { revealGroup, revealItem } from "@/components/landing/reveal";
 import { SectionHeading } from "@/components/landing/section-heading";
@@ -20,7 +20,12 @@ const STEPS = [
   {
     icon: MessagesSquare,
     title: "Carry on in the chat",
-    body: "They sign up with their name and email, accept, and the conversation carries on in a private chat with you. There's no app to download.",
+    body: "They sign up with their name and email, accept, and the conversation carries on in a private chat with you. Drafts in your voice wait above the composer, and what you learn goes on their profile.",
+  },
+  {
+    icon: LayoutGrid,
+    title: "Work the match board",
+    body: "Every night your book is scored pair by pair, and the strongest land on the board as suggestions with the arithmetic on the card. You introduce, you record how it went.",
   },
 ] as const;
 
@@ -34,8 +39,8 @@ export function HowItWorks(): React.ReactNode {
       <div className="mx-auto max-w-6xl">
         <SectionHeading
           eyebrow="How it works"
-          title="From a DM to a candidate in three steps"
-          lead="Keep meeting people where you already do. When someone's ready to work with you, invite them in."
+          title="From a DM to an introduction"
+          lead="Keep meeting people where you already do. When someone's ready to work with you, invite them in — and the other half of the job, finding who to put them in front of, happens in the same place."
           className="mb-16"
         />
 
@@ -44,7 +49,7 @@ export function HowItWorks(): React.ReactNode {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, amount: 0.2 }}
-          className="grid gap-6 md:grid-cols-3"
+          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
         >
           {STEPS.map((step, index) => (
             <motion.li

@@ -89,6 +89,14 @@ export class LandingPage {
     return this.page.getByTestId("conversation-mock");
   }
 
+  /**
+   * The drafted reply inside the still. It sits above the composer and is
+   * never a message bubble — the whole point of the card in the product.
+   */
+  getMockSuggestion() {
+    return this.page.getByTestId("mock-suggestion");
+  }
+
   /** Every link that opens a new tab, by DOM attribute. */
   getNewTabLinks() {
     return this.page.locator('a[target="_blank"]');
@@ -114,7 +122,10 @@ export class LandingPage {
     return this.page.getByTestId("feature-card");
   }
 
-  /** The AI roadmap callout under the feature grid — planned, not shipped. */
+  /**
+   * The roadmap callout under the feature grid. It names what is *not* built
+   * yet; anything shipped belongs in `getFeatureCards()` instead.
+   */
   getComingNext() {
     return this.page.getByTestId("coming-next");
   }

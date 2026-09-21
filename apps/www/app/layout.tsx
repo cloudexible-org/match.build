@@ -26,7 +26,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 const DESCRIPTION =
-  "One workspace for independent matchmakers: bring candidates over from your DMs with an invitation, then run every relationship in one private chat, with the DM history, your notes and a full record of what changed.";
+  "One workspace for independent matchmakers: bring candidates over from your DMs with an invitation, run every relationship in one private chat with drafts in your voice, and work a match board that scores your whole book every night and shows its reasons.";
 
 export const metadata: Metadata = {
   title: "match.build — the matchmaker's operating system",

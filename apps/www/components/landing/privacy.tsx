@@ -11,6 +11,7 @@ const GUARANTEES = [
   "If someone is a candidate of two matchmakers, they get two separate records. Neither of you can find out about the other.",
   "Candidates only see their chat with you. Never your notes, the DM history you pasted in, the change history or other candidates.",
   "Nothing is deleted. If a candidate leaves or closes their account, you keep the conversation and your notes. They're told this before they accept your invitation.",
+  "Matching only ever looks inside your own book. A pair is two of your candidates, scored on what you have on them, and no part of it reaches across accounts.",
 ] as const;
 
 export function Privacy(): React.ReactNode {

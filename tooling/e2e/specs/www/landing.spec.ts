@@ -26,9 +26,9 @@ test.describe("landing chrome", () => {
   });
 
   /**
-   * The product still is an illustration: its fake composer button ("Send")
-   * must not reach assistive technology as a control, and its figcaption is
-   * the single description of it.
+   * The product still is an illustration: its fake buttons ("Send" on both the
+   * composer and the drafted reply) must not reach assistive technology as
+   * controls, and its figcaption is the single description of it.
    */
   test("the product mock is described once, not read out", async ({ page }) => {
     const landing = new LandingPage(page);
@@ -39,10 +39,21 @@ test.describe("landing chrome", () => {
     await expect(mock.locator("figcaption")).toContainText("invitation");
     // The imported DM history is the matchmaker's alone, and says so.
     await expect(mock.getByText(/Only visible to you/)).toBeVisible();
+    // The drafted reply sits above the composer and is never a bubble: a
+    // suggestion in the message list would read as something the candidate
+    // said (prd/phase-2.md §2).
+    const suggestion = landing.getMockSuggestion();
+    await expect(suggestion).toBeVisible();
+    await expect(suggestion).toContainText("Suggested reply");
+    await expect(mock.locator("figcaption")).toContainText("suggested reply");
+
     // Role queries honour `aria-hidden`, so the mock's pretend controls are
-    // absent from the accessibility tree even though they render.
-    await expect(mock.getByText("Send", { exact: true })).toBeVisible();
+    // absent from the accessibility tree even though they render. There are
+    // two "Send"s now — the composer's and the draft's — and neither is a
+    // control.
+    await expect(mock.getByText("Send", { exact: true })).toHaveCount(2);
     await expect(page.getByRole("button", { name: "Send" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Dismiss" })).toHaveCount(0);
   });
 
   /**
@@ -113,17 +124,21 @@ test.describe("landing chrome", () => {
     ] as const) {
       await expect(landing.getSection(name)).toBeAttached();
     }
-    await expect(landing.getSteps()).toHaveCount(3);
-    await expect(landing.getFeatureCards()).toHaveCount(6);
-    await expect(landing.getFaqItems()).toHaveCount(7);
+    await expect(landing.getSteps()).toHaveCount(4);
+    await expect(landing.getFeatureCards()).toHaveCount(9);
+    await expect(landing.getFaqItems()).toHaveCount(8);
   });
 
   /**
-   * The phase-1 onboarding flow (prd/phase-1.md §3.1–3.2): onboard from the
-   * DM, the candidate gets an invitation, the conversation continues in the
-   * app. Email is never the conversation channel.
+   * The onboarding flow (prd/phase-1.md §3.1–3.2): onboard from the DM, the
+   * candidate gets an invitation, the conversation continues in the app. Email
+   * is never the conversation channel.
+   *
+   * The fourth step is phase 3's board (prd/phase-3.md §2), and it is the step
+   * that stops the page describing half the product: the site ran three steps
+   * ending at the chat for as long as the chat was all there was.
    */
-  test("how it works follows the invitation flow", async ({ page }) => {
+  test("how it works runs from the DM to the board", async ({ page }) => {
     const landing = new LandingPage(page);
     await landing.goto();
 
@@ -133,18 +148,35 @@ test.describe("landing chrome", () => {
     await expect(steps.nth(1)).toContainText("invites@match.build");
     await expect(steps.nth(1)).toContainText("invite link");
     await expect(steps.nth(2)).toContainText("Carry on in the chat");
+    await expect(steps.nth(3)).toContainText("match board");
   });
 
-  /** AI is phase 2: presented, but set apart from the shipped feature list. */
-  test("AI features are framed as coming next", async ({ page }) => {
+  /**
+   * The shipped/unshipped line, asserted from both sides.
+   *
+   * Reply drafting shipped (prd/phase-2.md §4A) and belongs in the grid; the
+   * extraction that fills a profile from the conversation did not (§4B) and
+   * belongs in the callout. This test exists because the page spent a while
+   * claiming the opposite of both — the callout is the one block on the site
+   * that goes stale by *standing still*, so it is worth pinning down.
+   */
+  test("shipped AI is a feature, unshipped AI is the callout", async ({
+    page,
+  }) => {
     const landing = new LandingPage(page);
     await landing.goto();
 
-    await expect(landing.getComingNext()).toBeAttached();
-    await expect(landing.getComingNext()).toContainText("Coming next");
     await expect(
-      landing.getFeatureCards().filter({ hasText: /suggested repl/i }),
-    ).toHaveCount(0);
+      landing.getFeatureCards().filter({ hasText: /Drafts in your voice/ }),
+    ).toHaveCount(1);
+    await expect(
+      landing.getFeatureCards().filter({ hasText: /match board/i }),
+    ).toHaveCount(1);
+
+    await expect(landing.getComingNext()).toBeAttached();
+    await expect(landing.getComingNext()).toContainText(
+      "A profile that fills itself",
+    );
   });
 
   test("theme toggle switches the document theme", async ({ page }) => {

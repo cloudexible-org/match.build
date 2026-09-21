@@ -66,7 +66,8 @@ export function Hero(): React.ReactNode {
             >
               Your business runs on DMs, a spreadsheet and your memory.
               match.build moves each candidate into one private chat with you,
-              with the DM history they came from and your notes kept beside it.
+              keeps what they tell you on a profile worth matching on, and
+              scores your whole book every night so you know who to look at.
             </Typography>
           </motion.div>
 
@@ -93,7 +94,11 @@ export function Hero(): React.ReactNode {
           </motion.div>
         </motion.div>
 
-        <div className="mx-auto w-full max-w-md lg:max-w-none">
+        {/* `min-w-0`: a grid item's `min-width` defaults to `auto`, so this
+            column was sized by the mock's min-content (~373px) rather than by
+            its track, and overflowed a 375px screen by 14px — invisible only
+            because the section clips. The track is the constraint. */}
+        <div className="mx-auto w-full min-w-0 max-w-md lg:max-w-none">
           <ConversationMock />
         </div>
       </motion.div>

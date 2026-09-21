@@ -7,7 +7,7 @@ import { Typography } from "@/components/ui/typography";
 const PRINCIPLES = [
   {
     title: "Nothing sends without you",
-    body: "Every message a candidate reads is one you chose to send. When AI suggestions arrive, they'll wait for your approval too.",
+    body: "Every message a candidate reads is one you pressed Send on, drafted by you or not. The board introduces nobody to anybody: it records what you did.",
   },
   {
     title: "Private means private",
@@ -15,11 +15,11 @@ const PRINCIPLES = [
   },
   {
     title: "Every change is on the record",
-    body: "Edited details, invitations, notes, who joined and who left: each is logged with who did it and when. Removing something never erases it.",
+    body: "Edited details, invitations, profile changes, who joined and who left: each is logged with who did it and when — and when it was the assistant, which model. Removing something never erases it.",
   },
   {
     title: "It works without the AI",
-    body: "The first version is a complete inbox and candidate list with no AI in it. AI help comes next, and if it ever fails you keep working.",
+    body: "Turn the drafts off, or let the model fail, and you still have the whole inbox, the profiles and the board. Nothing waits on a model, and the matching has none in it.",
   },
 ] as const;
 
