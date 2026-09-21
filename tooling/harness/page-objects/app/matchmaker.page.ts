@@ -82,8 +82,9 @@ export class WorkspacePage {
     return this.page.getByTestId("workspace-conversation");
   }
 
+  /** The workspace's own settings — the header's other one is the account's. */
   getSettingsLink() {
-    return this.page.getByRole("link", { name: "Settings" });
+    return this.page.getByRole("link", { name: "Profile settings" });
   }
 
   getOnboardLink() {

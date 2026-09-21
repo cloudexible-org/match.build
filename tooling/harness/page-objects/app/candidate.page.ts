@@ -22,11 +22,6 @@ export class CandidateShellPage {
     return this.page.getByTestId("candidate-shell");
   }
 
-  /** The signed-in account's name in the shared header. */
-  getAccountName() {
-    return this.page.getByTestId("header-account-name");
-  }
-
   getMatchmakerList() {
     return this.page.getByTestId("candidate-matchmakers");
   }

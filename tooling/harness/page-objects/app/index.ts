@@ -1,6 +1,7 @@
 export * from "./account-settings.page";
 export * from "./candidate.page";
 export * from "./candidate-panel.page";
+export * from "./header.page";
 export * from "./home.page";
 export * from "./invite.page";
 export * from "./matches.page";

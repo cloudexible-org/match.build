@@ -21,14 +21,6 @@ export class HomePage {
     return this.page.getByRole("heading", { level: 1, name: /^Welcome/ });
   }
 
-  getAccountName() {
-    return this.page.getByTestId("header-account-name");
-  }
-
-  getSignOutButton() {
-    return this.page.getByRole("button", { name: "Sign out" });
-  }
-
   getInvitationsSection() {
     return this.page.getByTestId("home-invitations");
   }
