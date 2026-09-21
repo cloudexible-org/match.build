@@ -1,6 +1,6 @@
 {
-  "name": "Matchmaker",
-  "short_name": "Matchmaker",
+  "name": "match.build",
+  "short_name": "match.build",
   "description": "Your conversations with your matchmaker, and your matchmaker's book of candidates.",
   "start_url": "/app/",
   "scope": "/app/",

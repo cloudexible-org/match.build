@@ -60,7 +60,9 @@ export function SiteNav(): React.ReactNode {
           >
             <BrandMark className="h-4 w-4" />
           </motion.span>
-          <span className="font-display text-2xl leading-none">Matchmaker</span>
+          <span className="font-display text-2xl leading-none">
+            match.build
+          </span>
         </a>
 
         <ul className="hidden items-center gap-1 md:flex">

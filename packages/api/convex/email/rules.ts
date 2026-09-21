@@ -15,10 +15,10 @@ export const SIGN_IN_CODE_LENGTH = 6;
 export const SIGN_IN_CODE_TTL_SECONDS = 10 * 60;
 
 /**
- * Must be on a domain verified in Resend. `aileenlancif.com` is the interim
- * production domain (prd/phase-1.md §10) until a product domain is bought.
+ * Must be on a domain verified in Resend. `match.build` is the production
+ * domain (prd/phase-1.md §10).
  */
-export const SIGN_IN_FROM = "Matchmaker <no-reply@aileenlancif.com>";
+export const SIGN_IN_FROM = "match.build <no-reply@match.build>";
 
 /**
  * Deleting an account is confirmed with a one-time code too (prd/phase-1.md
@@ -58,14 +58,14 @@ export type EmailMessage = { subject: string; text: string; html: string };
 export function signInCodeEmail(code: string): EmailMessage {
   const minutes = SIGN_IN_CODE_TTL_SECONDS / 60;
   return {
-    subject: `${code} is your Matchmaker sign-in code`,
+    subject: `${code} is your match.build sign-in code`,
     text: [
-      `Your Matchmaker sign-in code is ${code}.`,
+      `Your match.build sign-in code is ${code}.`,
       "",
       `It expires in ${minutes} minutes. If you didn't ask for it, you can ignore this email.`,
     ].join("\n"),
     html: [
-      `<p>Your Matchmaker sign-in code is</p>`,
+      `<p>Your match.build sign-in code is</p>`,
       `<p style="font-size:28px;font-weight:600;letter-spacing:4px">${code}</p>`,
       `<p>It expires in ${minutes} minutes. If you didn't ask for it, you can ignore this email.</p>`,
     ].join(""),
@@ -75,16 +75,16 @@ export function signInCodeEmail(code: string): EmailMessage {
 export function accountDeletionCodeEmail(code: string): EmailMessage {
   const minutes = ACCOUNT_DELETION_CODE_TTL_SECONDS / 60;
   return {
-    subject: `${code} is your Matchmaker account deletion code`,
+    subject: `${code} is your match.build account deletion code`,
     text: [
-      `Someone asked to delete your Matchmaker account. To confirm, enter ${code}.`,
+      `Someone asked to delete your match.build account. To confirm, enter ${code}.`,
       "",
       "Matchmakers you have worked with keep their copy of your past conversations.",
       "",
       `The code expires in ${minutes} minutes. If this wasn't you, ignore this email — nothing has been deleted, and your account is safe.`,
     ].join("\n"),
     html: [
-      `<p>Someone asked to delete your Matchmaker account. To confirm, enter</p>`,
+      `<p>Someone asked to delete your match.build account. To confirm, enter</p>`,
       `<p style="font-size:28px;font-weight:600;letter-spacing:4px">${code}</p>`,
       `<p>Matchmakers you have worked with keep their copy of your past conversations.</p>`,
       `<p>The code expires in ${minutes} minutes. If this wasn't you, ignore this email — nothing has been deleted, and your account is safe.</p>`,

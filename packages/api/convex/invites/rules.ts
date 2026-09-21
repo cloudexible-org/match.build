@@ -27,15 +27,15 @@ export function invitePath(token: string): string {
 
 /**
  * The invite email's sender: the matchmaker's display name (prd §8) on the
- * verified sending domain (`aileenlancif.com`, prd §10, like the sign-in
- * codes). The name is
+ * verified sending domain (`match.build`, prd §10, like the sign-in codes).
+ * The name is
  * the matchmaker's own text, so anything that could break out of the quoted
  * display name is dropped.
  */
 export function inviteFrom(matchmakerName: string): string {
   const name =
     matchmakerName.replace(/["<>\\\r\n]/g, "").trim() || "Your matchmaker";
-  return `"${name}" <invites@aileenlancif.com>`;
+  return `"${name}" <invites@match.build>`;
 }
 
 const MONTHS = [
@@ -67,16 +67,16 @@ export function inviteEmail(args: {
   const name = args.matchmakerName;
   const until = formatEmailDate(args.expiresAt);
   return {
-    subject: `${name} invited you to Matchmaker`,
+    subject: `${name} invited you to match.build`,
     text: [
-      `${name} has invited you to continue your conversation on Matchmaker.`,
+      `${name} has invited you to continue your conversation on match.build.`,
       "",
       `Accept the invitation: ${args.link}`,
       "",
       `The link works until ${until}. If you weren't expecting this, you can ignore this email.`,
     ].join("\n"),
     html: [
-      `<p>${escapeHtml(name)} has invited you to continue your conversation on Matchmaker.</p>`,
+      `<p>${escapeHtml(name)} has invited you to continue your conversation on match.build.</p>`,
       `<p><a href="${escapeHtml(args.link)}">Accept the invitation</a></p>`,
       `<p>The link works until ${until}. If you weren't expecting this, you can ignore this email.</p>`,
     ].join(""),

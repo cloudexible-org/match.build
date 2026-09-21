@@ -19,7 +19,7 @@ export function AdminLayout() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
             <span className="shrink-0 font-display text-xl">
-              Matchmaker <span className="text-muted-foreground">Admin</span>
+              match.build <span className="text-muted-foreground">Admin</span>
             </span>
             <nav className="flex gap-1" aria-label="Admin">
               {NAV.map((item) => (

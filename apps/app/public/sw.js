@@ -46,7 +46,7 @@ self.addEventListener("push", (event) => {
   }
   const url = new URL(payload.url ?? "./", self.registration.scope).href;
   event.waitUntil(
-    self.registration.showNotification(payload.title ?? "Matchmaker", {
+    self.registration.showNotification(payload.title ?? "match.build", {
       body: payload.body ?? "",
       icon: ICON,
       badge: ICON,

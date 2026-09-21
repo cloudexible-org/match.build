@@ -130,7 +130,7 @@ test.describe("landing chrome", () => {
     const steps = landing.getSteps();
     await expect(steps.nth(0)).toContainText("Onboard them from the DM");
     await expect(steps.nth(0)).toContainText("only ever visible to you");
-    await expect(steps.nth(1)).toContainText("invites@matchmaker.io");
+    await expect(steps.nth(1)).toContainText("invites@match.build");
     await expect(steps.nth(1)).toContainText("invite link");
     await expect(steps.nth(2)).toContainText("Carry on in the chat");
   });

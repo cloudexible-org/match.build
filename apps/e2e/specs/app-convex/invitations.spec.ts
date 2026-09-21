@@ -62,7 +62,7 @@ test("an invited person accepts from their home page and joins", async ({
 
   const invite = new InvitePage(page);
   await expect(invite.getTitle()).toHaveText(
-    `${world.displayName("book")} invited you to Matchmaker`,
+    `${world.displayName("book")} invited you to match.build`,
   );
   await expect(invite.getPrivacyNotice()).toContainText(
     "including if you later leave or delete your account",

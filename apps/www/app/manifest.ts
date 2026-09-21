@@ -5,8 +5,8 @@ export const dynamic = "force-static";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Matchmaker",
-    short_name: "Matchmaker",
+    name: "match.build",
+    short_name: "match.build",
     description: "The operating system for independent matchmakers",
     start_url: "/",
     display: "standalone",

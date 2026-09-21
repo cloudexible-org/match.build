@@ -135,7 +135,7 @@ export function candidateChatPath(matchmakerUsername: string): string {
  */
 
 /** Must be on a domain verified in Resend (see `email/rules.ts`). */
-export const NOTIFICATION_FROM = "Matchmaker <notifications@aileenlancif.com>";
+export const NOTIFICATION_FROM = "match.build <notifications@match.build>";
 
 export function newMessageEmail(args: {
   fromName: string;
@@ -145,14 +145,14 @@ export function newMessageEmail(args: {
   return {
     subject: `You have a new message from ${fromName}`,
     text: [
-      `${fromName} sent you a message on Matchmaker.`,
+      `${fromName} sent you a message on match.build.`,
       "",
       `Read it: ${link}`,
       "",
       "You can turn these emails off in your account settings.",
     ].join("\n"),
     html: [
-      `<p>${escapeHtml(fromName)} sent you a message on Matchmaker.</p>`,
+      `<p>${escapeHtml(fromName)} sent you a message on match.build.</p>`,
       `<p><a href="${escapeHtml(link)}">Read it</a></p>`,
       `<p>You can turn these emails off in your account settings.</p>`,
     ].join(""),
@@ -171,12 +171,12 @@ export function membershipEmail(args: {
   const subject = {
     accepted: `${name} accepted your invitation`,
     left: `${name} left`,
-    account_deleted: `${name} deleted their Matchmaker account`,
+    account_deleted: `${name} deleted their match.build account`,
   }[args.event];
   const line = {
-    accepted: `${name} accepted your invitation and can now message you on Matchmaker.`,
+    accepted: `${name} accepted your invitation and can now message you on match.build.`,
     left: `${name} has left. Your conversation, notes and history are all still there, and you can invite them back.`,
-    account_deleted: `${name} deleted their Matchmaker account. Your conversation, notes and history are all still there.`,
+    account_deleted: `${name} deleted their match.build account. Your conversation, notes and history are all still there.`,
   }[args.event];
   return {
     subject,

@@ -84,7 +84,7 @@ describe("seed.dev.mutations.apply", () => {
   });
 
   test("refuses to run where SITE_URL is not on .localhost", async () => {
-    vi.stubEnv("SITE_URL", "https://www.aileenlancif.com/app");
+    vi.stubEnv("SITE_URL", "https://www.match.build/app");
     const t = convexTest(schema, modules);
     await expect(
       t.mutation(internal.seed.dev.mutations.apply, {}),

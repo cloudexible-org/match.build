@@ -29,15 +29,15 @@ const DESCRIPTION =
   "One workspace for independent matchmakers: bring candidates over from your DMs with an invitation, then run every relationship in one private chat, with the DM history, your notes and a full record of what changed.";
 
 export const metadata: Metadata = {
-  title: "Matchmaker — the matchmaker's operating system",
+  title: "match.build — the matchmaker's operating system",
   description: DESCRIPTION,
   openGraph: {
-    title: "Matchmaker — the matchmaker's operating system",
+    title: "match.build — the matchmaker's operating system",
     description: DESCRIPTION,
     type: "website",
-    siteName: "Matchmaker",
+    siteName: "match.build",
   },
-  twitter: { card: "summary", title: "Matchmaker", description: DESCRIPTION },
+  twitter: { card: "summary", title: "match.build", description: DESCRIPTION },
 };
 
 export default function RootLayout({

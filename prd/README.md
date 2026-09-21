@@ -1,6 +1,6 @@
-# Matchmaker OS — Product Requirements
+# match.build — Product Requirements
 
-**Working name:** matchmaker.io
+**Product domain:** match.build
 
 The product spec, split into phases. **Phase 1 is final** and is what we build now. Later phases are drafts: their open questions must be settled before building starts.
 
@@ -55,8 +55,8 @@ These matchmakers today run on a stack of: a marketing website with a contact fo
 
 | Workspace | What it is | Served at |
 |---|---|---|
-| `apps/app` | React + Vite SPA: home page, matchmaker workspaces, candidate chats. | `app.matchmaker.io` |
-| `apps/www` | Next.js marketing site, static export. No auth; CTAs link to the app. | `www.matchmaker.io` |
+| `apps/app` | React + Vite SPA: home page, matchmaker workspaces, candidate chats. | `app.match.build` |
+| `apps/www` | Next.js marketing site, static export. No auth; CTAs link to the app. | `www.match.build` |
 | `packages/api` | Convex backend: schema, functions, agents, HTTP actions, static-hosting mounts. | `/api/…` |
 | `packages/ui` | Shared shadcn/ui + Base UI components (no Radix). | — |
 | `apps/e2e` | Playwright suites for both apps plus a seeded local Convex backend. | — |

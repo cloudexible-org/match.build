@@ -121,7 +121,7 @@ function EmailStep({
   return (
     <>
       <CardHeader>
-        <CardTitle>Sign in to Matchmaker</CardTitle>
+        <CardTitle>Sign in to match.build</CardTitle>
         <CardDescription>
           New here? Use the same form — we'll set up your account.
         </CardDescription>

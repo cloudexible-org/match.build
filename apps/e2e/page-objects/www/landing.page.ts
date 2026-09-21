@@ -29,7 +29,7 @@ export class LandingPage {
   }
 
   getBrandLink() {
-    return this.getNav().getByRole("link", { name: "Matchmaker" });
+    return this.getNav().getByRole("link", { name: "match.build" });
   }
 
   /** Sign-in lives in the Vite app; the marketing site only links to it. */

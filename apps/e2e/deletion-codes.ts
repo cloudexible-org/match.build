@@ -9,7 +9,7 @@ import { latestSignInEmail } from "./sign-in-codes";
  * `signInAs` has already put a sign-in code in the same outbox.
  */
 
-const SUBJECT = /^(\d{6}) is your Matchmaker account deletion code$/;
+const SUBJECT = /^(\d{6}) is your match\.build account deletion code$/;
 
 /**
  * Waits for a deletion code emailed to `email` other than `previous` (a code

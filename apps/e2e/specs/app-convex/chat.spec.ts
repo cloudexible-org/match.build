@@ -65,7 +65,7 @@ test.beforeAll(async () => {
             source: "imported",
             body: "Imported DMs: Pat is 34 and lives in London.",
           },
-          { author: "matchmaker", body: "Welcome to Matchmaker, Pat!" },
+          { author: "matchmaker", body: "Welcome to match.build, Pat!" },
         ],
       },
       {
@@ -182,7 +182,7 @@ test("a private message stays with the matchmaker", async ({
   );
   await expect(chat.getMessages()).toHaveCount(1);
   await expect(chat.getMessages().first()).toContainText(
-    "Welcome to Matchmaker, Pat!",
+    "Welcome to match.build, Pat!",
   );
   await expect(candidatePage.locator("body")).not.toContainText("Imported DMs");
   await candidatePage.context().close();

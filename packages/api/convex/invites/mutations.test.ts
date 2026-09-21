@@ -105,7 +105,7 @@ describe("the invite email", () => {
     const [email] = await outbox(w.t, "jane@example.test");
     expect(email).toMatchObject({
       kind: "invite",
-      subject: "Maya's Matches invited you to Matchmaker",
+      subject: "Maya's Matches invited you to match.build",
     });
     const link = email?.text.match(
       /https:\/\/app\.example\.test\/app\/invite\/([A-Za-z0-9_-]{43})/,

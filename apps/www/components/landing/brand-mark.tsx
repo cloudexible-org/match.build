@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Two interlocking rings — a match, drawn plainly. Decorative: it always sits
- * next to the visible "Matchmaker" wordmark.
+ * next to the visible "match.build" wordmark.
  */
 export function BrandMark({
   className,

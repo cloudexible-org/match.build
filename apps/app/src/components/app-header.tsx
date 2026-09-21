@@ -36,7 +36,7 @@ export function AppHeader({
             can't shrink, and at 380px something has to. */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link to="/" className="truncate font-display text-xl">
-            Matchmaker
+            match.build
           </Link>
           {nav}
         </div>

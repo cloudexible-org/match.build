@@ -223,7 +223,8 @@ export function Waitlist(): React.ReactNode {
                       )}
                     </Button>
                     <Typography variant="muted" className="text-center text-xs">
-                      We'll only use your email to contact you about Matchmaker.
+                      We'll only use your email to contact you about
+                      match.build.
                     </Typography>
                   </Form>
                 </motion.div>

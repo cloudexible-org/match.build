@@ -4,14 +4,12 @@ import { formatEmailDate, inviteEmail, inviteFrom } from "./rules";
 describe("the invite email", () => {
   test("the sender is the matchmaker's name, unable to break out of its quotes", () => {
     expect(inviteFrom("Maya's Matches")).toBe(
-      '"Maya\'s Matches" <invites@aileenlancif.com>',
+      '"Maya\'s Matches" <invites@match.build>',
     );
     expect(inviteFrom('Evil" <x@evil.test>\r\nBcc: y')).toBe(
-      '"Evil x@evil.testBcc: y" <invites@aileenlancif.com>',
+      '"Evil x@evil.testBcc: y" <invites@match.build>',
     );
-    expect(inviteFrom(' "" ')).toBe(
-      '"Your matchmaker" <invites@aileenlancif.com>',
-    );
+    expect(inviteFrom(' "" ')).toBe('"Your matchmaker" <invites@match.build>');
   });
 
   test("carries the link and expiry, with the name escaped in HTML", () => {
@@ -20,7 +18,7 @@ describe("the invite email", () => {
       link: "https://app.example.test/app/invite/abc",
       expiresAt: Date.UTC(2026, 9, 19, 23, 30),
     });
-    expect(email.subject).toBe("<b>Maya</b> invited you to Matchmaker");
+    expect(email.subject).toBe("<b>Maya</b> invited you to match.build");
     expect(email.text).toContain(
       "Accept the invitation: https://app.example.test/app/invite/abc",
     );

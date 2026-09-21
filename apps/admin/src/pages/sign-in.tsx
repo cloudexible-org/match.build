@@ -81,7 +81,7 @@ function EmailStep({ onSent }: { onSent: (email: string) => void }) {
   return (
     <>
       <CardHeader>
-        <CardTitle>Matchmaker Admin</CardTitle>
+        <CardTitle>match.build Admin</CardTitle>
         <CardDescription>
           Sign in with a platform admin's email.
         </CardDescription>

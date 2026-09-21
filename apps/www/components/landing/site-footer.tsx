@@ -15,7 +15,7 @@ export function SiteFooter(): React.ReactNode {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
         <div className="flex items-center gap-2 text-foreground">
           <BrandMark className="h-4 w-4 text-primary" />
-          <span className="font-display text-xl leading-none">Matchmaker</span>
+          <span className="font-display text-xl leading-none">match.build</span>
         </div>
 
         <nav aria-label="Footer">

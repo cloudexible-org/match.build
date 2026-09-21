@@ -97,16 +97,16 @@ export function InvitePage() {
   const problem = open?.problem ?? null;
   return (
     <InviteCard
-      title={`${name} invited you to Matchmaker`}
+      title={`${name} invited you to match.build`}
       description={`Accept to continue your conversation with ${name} here.`}
     >
       <div
         className="rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground"
         data-testid="invite-privacy-notice"
       >
-        {name} will keep your conversation on Matchmaker, including if you later
-        leave or delete your account. What you share here is private to {name}:
-        no other matchmaker can see it.
+        {name} will keep your conversation on match.build, including if you
+        later leave or delete your account. What you share here is private to{" "}
+        {name}: no other matchmaker can see it.
       </div>
       {problem !== null ? (
         <>

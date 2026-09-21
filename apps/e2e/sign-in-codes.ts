@@ -16,7 +16,7 @@ export async function latestSignInEmail(email: string): Promise<OutboxEmail> {
 }
 
 /** How `email/rules.ts` subjects a sign-in code: "123456 is your …". */
-const SIGN_IN_SUBJECT = /^(\d{6}) is your Matchmaker sign-in code$/;
+const SIGN_IN_SUBJECT = /^(\d{6}) is your match\.build sign-in code$/;
 
 /**
  * Waits for a sign-in code newer than `previous` (the email returned by

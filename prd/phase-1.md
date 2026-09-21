@@ -17,8 +17,8 @@
 
 | Profile | What it is | Created by | URL |
 |---|---|---|---|
-| **Matchmaker profile** | A tenant: one matchmaker's business and book of candidates. | The account holder, from the home page. Asks for a **username** (§1.1) and display name. | `app.matchmaker.io/mm/<username>` |
-| **Candidate profile** | A person's membership in *one* matchmaker's book. | The matchmaker, when they onboard someone (§3.1). Linked to an account when the invitation is accepted. | `app.matchmaker.io/c/<matchmakerUsername>` |
+| **Matchmaker profile** | A tenant: one matchmaker's business and book of candidates. | The account holder, from the home page. Asks for a **username** (§1.1) and display name. | `app.match.build/mm/<username>` |
+| **Candidate profile** | A person's membership in *one* matchmaker's book. | The matchmaker, when they onboard someone (§3.1). Linked to an account when the invitation is accepted. | `app.match.build/c/<matchmakerUsername>` |
 
 - The same account can be a candidate of several matchmakers, and a matchmaker at the same time.
 - An account is a candidate of a given matchmaker **at most once**. That is why the candidate URL is keyed by the matchmaker's username, and candidates never need a username of their own.
@@ -54,7 +54,7 @@ Extend the list rather than blocking substrings: a substring rule would reject l
 
 ## 2. Home page
 
-Shown after sign-in at `app.matchmaker.io/`. Sections:
+Shown after sign-in at `app.match.build/`. Sections:
 
 1. **Invitations** — pending invites for this account's verified email. Hidden when empty.
 2. **Your matchmaker profiles** — with a **Create matchmaker profile** button, hidden once one exists.
@@ -94,7 +94,7 @@ Empty state for a new account: a prompt to create a matchmaker profile, plus a l
 Two ways in, both ending at the same accept screen:
 
 - **From the home page.** When a signed-in account's verified email matches a pending invite, it appears under **Invitations**.
-- **From the invite link** `app.matchmaker.io/invite/<token>`. Signed-out visitors go through sign-up/sign-in and return to the link. **The token works for any signed-in account**, even if its email differs from the one the matchmaker typed — this rescues typos and second email addresses. The token is single-use.
+- **From the invite link** `app.match.build/invite/<token>`. Signed-out visitors go through sign-up/sign-in and return to the link. **The token works for any signed-in account**, even if its email differs from the one the matchmaker typed — this rescues typos and second email addresses. The token is single-use.
 
 The accept screen shows the matchmaker's display name, a short privacy notice (§9.3), and **Accept** / **Decline**. On accept:
 
@@ -147,7 +147,7 @@ In `/settings`: **Delete account**, confirmed with a fresh one-time code. The co
 
 ## 4. UI
 
-`app.matchmaker.io` routes:
+`app.match.build` routes:
 
 | Route | View |
 |---|---|
@@ -438,15 +438,15 @@ Domains under `packages/api/convex/`, each split into `rules.ts` / `mutations.ts
 
 ## 8. Email and notifications
 
-Email is used for exactly three things, all sent from `matchmaker.io` through the Convex Resend component. **Email is not a conversation channel**: there is no reply-by-email and no inbound mail.
+Email is used for exactly three things, all sent from `match.build` through the Convex Resend component. **Email is not a conversation channel**: there is no reply-by-email and no inbound mail.
 
 | Email | From | Content |
 |---|---|---|
-| Sign-in code | `no-reply@matchmaker.io` | One-time code |
-| Invitation | `invites@matchmaker.io`, display name = the matchmaker's display name | "<Display name> invited you to Matchmaker" + invite link |
-| New-message notification | `notifications@matchmaker.io` | "You have a new message from <name>" + link. **No message content:** conversations are sensitive, and inbox previews are visible to others. |
+| Sign-in code | `no-reply@match.build` | One-time code |
+| Invitation | `invites@match.build`, display name = the matchmaker's display name | "<Display name> invited you to match.build" + invite link |
+| New-message notification | `notifications@match.build` | "You have a new message from <name>" + link. **No message content:** conversations are sensitive, and inbox previews are visible to others. |
 
-Only `matchmaker.io` needs DNS setup for sending (SPF, DKIM, DMARC).
+Only `match.build` needs DNS setup for sending (SPF, DKIM, DMARC).
 
 ### 8.1 Notification rules
 
@@ -503,8 +503,8 @@ Candidate conversations include sexual orientation, religion, health and family 
 
 ## 10. Platform & hosting
 
-- **Domain (interim): `aileenlancif.com`.** Until a neutral product domain is bought, the production deployment is served at `https://www.aileenlancif.com` with path-based hosting (option 3 below): the marketing site at `/`, the app at `/app/`, HTTP actions at `/api/`. The apex redirects to `www`. This is a stopgap — a matchmaker's personal name is the wrong long-term domain for a multi-matchmaker product. `aileenlancif.com` can later become Aileen's own custom domain (see backlog).
-- **Frontends (target):** `app.<product-domain>` (Vite app) and `www.<product-domain>` (Next.js static export). `matchmaker.io`, `.app` and `.co` are all taken; candidates checked 2026-09-19 include `usematchmaker.com` and `introdesk.app`. The marketing site's CTAs link to the app.
+- **Domain: `match.build`** (bought 2026-09-21, replacing the interim `aileenlancif.com`). Production is served at `https://www.match.build` with path-based hosting (option 3 below): the marketing site at `/`, the app at `/app/`, HTTP actions at `/api/`. The apex redirects to `www`. The brand is the domain itself, written lowercase — **match.build** — while *matchmaker* stays the word for the role and the tenant, in the product's copy and in the code.
+- **Frontends (target):** `app.match.build` (Vite app) and `www.match.build` (Next.js static export), if the subdomain split below is chosen. The marketing site's CTAs link to the app.
 - **Auth:** Convex Auth (`@convex-dev/auth`) with an email one-time-code provider. Replaces turbostack's Clerk wiring. Convex validates session tokens through the OpenID discovery document at `<site>/.well-known/openid-configuration`, which has to sit at the site root. So `convex/http.ts` owns the whole URL space: `/.well-known/…` for auth, `/api/…` for HTTP actions, then the static sites as catch-alls (`/app/…`, then `/`).
 - Nothing in `apps/www` may need a Node server at request time. All server logic lives in Convex.
 - **Hosting on two subdomains is an open decision.** Static sites are routed by path only (today: `www` at `/`, `app` at `/app/`), so pointing `app.` and `www.` at one deployment would serve the same paths on both. Options:

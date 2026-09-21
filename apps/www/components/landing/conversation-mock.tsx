@@ -34,7 +34,7 @@ export function ConversationMock(): React.ReactNode {
   return (
     <figure data-testid="conversation-mock" className="relative w-full">
       <figcaption className="sr-only">
-        An example conversation in Matchmaker: the Instagram DM history the
+        An example conversation in match.build: the Instagram DM history the
         matchmaker pasted in when onboarding a candidate, marked as visible only
         to the matchmaker, then the candidate accepting the invitation and the
         chat carrying on in the app, with the candidate's history of changes

@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a problem with Matchmaker
+description: Report a problem with match.build
 labels: [bug]
 body:
   - type: textarea

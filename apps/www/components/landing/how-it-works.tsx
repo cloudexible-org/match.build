@@ -15,7 +15,7 @@ const STEPS = [
   {
     icon: Send,
     title: "They get an invitation",
-    body: "We email them an invitation from invites@matchmaker.io with your name on it. Or copy the invite link and drop it straight into the DM. Meanwhile you can read the history and add notes.",
+    body: "We email them an invitation from invites@match.build with your name on it. Or copy the invite link and drop it straight into the DM. Meanwhile you can read the history and add notes.",
   },
   {
     icon: MessagesSquare,

@@ -137,7 +137,7 @@ export function OnboardPage() {
         <CardHeader>
           <CardTitle>Onboard a candidate</CardTitle>
           <CardDescription>
-            They'll get an invitation to join you on Matchmaker. Until they
+            They'll get an invitation to join you on match.build. Until they
             accept, only you can see anything here.
           </CardDescription>
         </CardHeader>

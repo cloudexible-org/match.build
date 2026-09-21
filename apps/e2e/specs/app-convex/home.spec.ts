@@ -95,7 +95,7 @@ test("an invitation opens the accept screen", async ({ page }) => {
 
   const invite = new InvitePage(page);
   await expect(invite.getTitle()).toHaveText(
-    `${world.displayName("inviting")} invited you to Matchmaker`,
+    `${world.displayName("inviting")} invited you to match.build`,
   );
   await expect(page).toHaveURL(
     `/app/invitations/${world.candidateId("invite-for-invitee")}`,

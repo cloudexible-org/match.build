@@ -8,7 +8,7 @@ import { SectionHeading } from "@/components/landing/section-heading";
 const QUESTIONS = [
   {
     q: "Is this a dating app?",
-    a: "No. Your candidates never browse or swipe through anyone. Matchmaker is the tool you use to run your business, and the matching is still done by you.",
+    a: "No. Your candidates never browse or swipe through anyone. match.build is the tool you use to run your business, and the matching is still done by you.",
   },
   {
     q: "Do my candidates need to download anything?",

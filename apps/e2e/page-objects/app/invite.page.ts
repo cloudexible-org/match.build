@@ -13,7 +13,7 @@ export class InvitePage {
 
   getTitle() {
     return this.getCard()
-      .getByText(/invited you to Matchmaker|isn't valid|declined/)
+      .getByText(/invited you to match\.build|isn't valid|declined/)
       .first();
   }
 

@@ -109,16 +109,16 @@ publish atomically, so a failed upload leaves the previous version live.
 
 ### Custom domain
 
-Production is served at **https://www.aileenlancif.com** (interim, until a
-product domain is bought). DNS is on Cloudflare; custom domains need the
-Convex Pro plan. The production deployment has two custom domains:
+Production is served at **https://www.match.build**. DNS is on Cloudflare;
+custom domains need the Convex Pro plan. The production deployment has two
+custom domains:
 
 | Domain | Convex side | Serves |
 | --- | --- | --- |
-| `www.aileenlancif.com` | HTTP actions (`.convex.site`), overrides `CONVEX_SITE_URL` | `/` (www), `/app/` (app), `/api/`, `/.well-known/` (auth) |
-| `api.aileenlancif.com` | API (`.convex.cloud`), overrides `CONVEX_CLOUD_URL` | The WebSocket/HTTP client API. The sites are built against it, so removing it breaks them until they are rebuilt. |
+| `www.match.build` | HTTP actions (`.convex.site`), overrides `CONVEX_SITE_URL` | `/` (www), `/app/` (app), `/api/`, `/.well-known/` (auth) |
+| `api.match.build` | API (`.convex.cloud`), overrides `CONVEX_CLOUD_URL` | The WebSocket/HTTP client API. The sites are built against it, so removing it breaks them until they are rebuilt. |
 
-The apex `aileenlancif.com` redirects to `www`. Nothing is hosted on Vercel.
+The apex `match.build` redirects to `www`. Nothing is hosted on Vercel.
 
 To set it up again, or to move to a new domain:
 
@@ -155,7 +155,7 @@ To set it up again, or to move to a new domain:
    `npx convex env set SITE_URL https://www.<domain>/app --prod`
 7. Email: verify the domain in Resend, set `RESEND_API_KEY` on production,
    and make sure `SIGN_IN_FROM` in `packages/api/convex/email/rules.ts` uses
-   that domain (today `no-reply@aileenlancif.com`). Resend refuses to send from
+   that domain (today `no-reply@match.build`). Resend refuses to send from
    an unverified domain.
 8. Only then remove any old custom domain: in the Convex dashboard first, then
    its DNS record.

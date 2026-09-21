@@ -65,7 +65,7 @@ export function Hero(): React.ReactNode {
               className="max-w-xl text-lg leading-relaxed sm:text-xl"
             >
               Your business runs on DMs, a spreadsheet and your memory.
-              Matchmaker moves each candidate into one private chat with you,
+              match.build moves each candidate into one private chat with you,
               with the DM history they came from and your notes kept beside it.
             </Typography>
           </motion.div>
