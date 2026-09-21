@@ -7,12 +7,12 @@
 - **Repo:** https://github.com/cloudexible-org/match.build
 - **Frontend:** Convex static hosting
 - **Convex deployment:** https://api.match.build (CONVEX_CLOUD_URL custom domain)
-- **Components:** @convex-dev/static-hosting (three instances: `www`, `app`, `admin`)
-- **Convex features:** schema, tables, indexes, queries, mutations, actions, internal functions, scheduled functions, pagination, paginated queries, HTTP actions, realtime queries, typed env vars
+- **Components:** @convex-dev/static-hosting (three instances: `www`, `app`, `admin`), @convex-dev/agent
+- **Convex features:** schema, tables, indexes, queries, mutations, actions, internal functions, scheduled functions, crons, pagination, paginated queries, HTTP actions, realtime queries, typed env vars
 - **Auth:** Convex Auth
-- **AI models:** none
+- **AI models:** openai/gpt-5.6-luna, through the Convex AI Gateway (`convexGateway(settings.model)`; the id is seeded into `aiAgentSettings` and editable at /admin/ai)
 - **Started:** 2026-09-19T15:37:25Z
-- **Last updated:** 2026-09-21T11:09:35Z
+- **Last updated:** 2026-09-21T17:05:55Z
 
 ## Log
 
@@ -272,3 +272,87 @@ no trace of the person afterwards *and* that each matchmaker can still open the
 thread, the notes and the history through their own queries. Convex features:
 mutations, indexes, queries (`packages/api/convex/admin/mutations.ts`,
 `packages/api/convex/users/helpers.ts`, `apps/admin/src/pages/erasure.tsx`).
+
+### 2026-09-21 - 0f0ad37
+The candidate side became a three-column chat shell at `/app/c`, mirroring the
+matchmaker workspace from the other side: their matchmakers on the left with
+open invitations as badged cards, the thread in the middle, who that matchmaker
+is on the right. The matchmaker is in the hash, so switching swaps the thread
+without remounting the shell, and `/` now routes by whether the account owns a
+matchmaker profile. The two apps share one shell and settled on two page widths
+(`apps/app/src/candidate/`, `apps/app/src/shell/`).
+
+### 2026-09-21 - d6583f8
+Reached a model for the first time, through the **Convex AI Gateway** — no
+provider key in the deployment, since the gateway holds the credentials.
+Registered `@convex-dev/agent` for threads and message history, with the
+product's own `conversations` and `messages` staying the source of truth. A
+probe action proves the round trip. Convex features: actions, registered
+component, typed env vars (`packages/api/convex/ai/`, `convex.config.ts`).
+
+### 2026-09-21 - 2e7a08f
+Three AI agents — conversation, candidate profile, voice profile — each with a
+model and a standing instruction in an `aiAgentSettings` row, edited by a
+platform admin at `/admin/ai` and audited on every change. Nothing in the code
+supplies a default, so an agent nobody has configured is off rather than
+quietly running on something. The admin app also got a collapsible sidebar.
+Convex features: schema, mutations, queries, indexes
+(`packages/api/convex/ai/`, `packages/api/convex/seed/ai/`).
+
+### 2026-09-21 - 4ced6f7
+Candidate and matchmaker **profiles** replaced the old notes table: one
+document per candidate holding `facts` keyed by a registry of ~48 typed fields
+and free-text `notes`, every value carrying who wrote it, when, and an agent's
+proposal waiting on it. Who may write a field is declared per field, an agent
+never overwrites what a person typed, and the history of a value is the audit
+trail rather than a second copy of it. Convex features: schema, mutations,
+queries, indexes (`packages/api/convex/candidateProfiles/`,
+`packages/api/convex/profiles/`).
+
+### 2026-09-21 - a8924ed
+A notifications overlay under the bell in the header, built against a fixed
+sample first so the UI could be judged before there was anything to read.
+Opening it is what marks everything read; the dots are snapshotted so the list
+still says which were new while it is on screen (`apps/app/src/notifications/`).
+
+### 2026-09-21 - a5294d4
+Suggestion cards above the message composer: one row per kind, one card
+showing, arrows through the rest. Two of the four kinds have a source today —
+the open proposals on a candidate's profile and on the matchmaker's voice — and
+the same proposal is answerable here or in the candidate panel, with either
+resolving it. The dev seed now writes profiles and open proposals, because a
+proposal is a state only an agent can reach (`apps/app/src/chat/`,
+`packages/api/convex/seed/dev/`).
+
+### 2026-09-21 - 60041b6
+The notifications panel started reading the backend. The feed is **derived on
+every read, not stored**: unread conversations, recent membership changes and
+waiting invitations, merged newest-first — so it cannot disagree with the
+workspace beside it. Seen is not read; opening the bell sets one watermark per
+account and leaves the conversation's own read marker alone. Convex features:
+queries, indexes (`packages/api/convex/notifications/`).
+
+### 2026-09-21 - 4687fbb
+The reply suggester, the feature phase 2 exists for: a candidate writes, and a
+few seconds later the matchmaker has one to three drafts waiting above the
+composer in their own voice, each with Send, Edit and Dismiss. One agent thread
+per conversation is briefed once and then told only what changed, tracked by
+high-water marks on `conversations`. Drafts are rows, so they survive a reload
+and going stale is a state; sending one sends an ordinary message under the
+matchmaker's name. Every failure path ends with no drafts rather than a broken
+composer. Convex features: actions, scheduled functions, mutations, indexes,
+agent component (`packages/api/convex/replySuggestions/`).
+
+### 2026-09-21 - ae6b79a
+The **match board** and the matching algorithm behind it (`/app/mm/:username/matches`):
+five columns with Rejected as a lane under them, cards produced by a nightly
+cron that scores every pair in every book. **Deliberately no AI in it** — the
+whole algorithm is plain code, so a matchmaker can be told exactly why two
+people are on a card, and the same book scored twice gives the same answer
+twice. Missing data never disqualifies, every score is symmetric because a pair
+is unordered, and a score carries the coverage it was based on, so two
+near-empty profiles agreeing about everything still do not reach the board. The
+cron fans out one transaction per book and only ever revises its own untouched
+suggestions. Convex features: crons, scheduled functions, mutations, queries,
+indexes (`packages/api/convex/crons.ts`, `packages/api/convex/matches/`,
+`apps/app/src/matches/`).
