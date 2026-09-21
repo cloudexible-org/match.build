@@ -1,13 +1,18 @@
 import { expect, type Page, test } from "@playwright/test";
 import { CandidatePanelPage } from "../../page-objects/app/candidate-panel.page";
 import { ConversationPage } from "../../page-objects/app/matchmaker.page";
+import { SuggestionsPage } from "../../page-objects/app/suggestions.page";
 import { type Scenario, seedScenario } from "../../scenario";
 import { signInAs } from "../../session";
 
 /**
  * The Profile section of the candidate panel (prd/phase-2.md §3, §5): the
- * structured facts from the registry, the free-text notes, and an agent's
- * suggestion waiting to be answered.
+ * structured facts from the registry and the free-text notes.
+ *
+ * An agent's proposal is answered in the stack above the composer, not here,
+ * so the last test drives that and asserts what it does to the record. The
+ * stack's own behaviour — rows, arrows, counters — is
+ * `chat-suggestions.spec.ts`.
  *
  * One seeded candidate per test that writes, so an edit in one test can't
  * change what another sees.
@@ -120,31 +125,37 @@ test("an empty note is refused", async ({ page }) => {
   await expect(page.getByText("Write something first.")).toBeVisible();
 });
 
-test("a suggestion sits apart until it is answered", async ({ page }) => {
+test("a proposal changes nothing until the stack answers it", async ({
+  page,
+}) => {
   const panel = await openProfile(page, "suggested");
+  const suggestions = new SuggestionsPage(page);
 
-  await expect(panel.getSuggestions()).toHaveCount(3);
+  // Three proposals, all in the one row, oldest-to-newest ties broken on key:
+  // orientation, pets, wantsKids.
+  await expect(suggestions.getCounter("candidateProfile")).toHaveText("1/3");
   // The record itself hasn't moved.
   await expect(panel.getField("wantsKids")).toContainText("no");
   await expect(panel.getField("orientation")).toHaveCount(0);
 
-  await panel.acceptSuggestion("facts", "wantsKids");
-  await expect(panel.getSuggestion("facts", "wantsKids")).toHaveCount(0);
+  // Dismissing leaves nothing behind: nothing was there before it.
+  await suggestions.dismiss("candidateProfile");
+  await expect(panel.getField("orientation")).toHaveCount(0);
+  await expect(suggestions.getCounter("candidateProfile")).toHaveText("1/2");
+
+  // A proposal can be that the entry go, and it reads as one.
+  const removal = suggestions.getCard("candidateProfile");
+  await expect(removal).toContainText("Remove this");
+  await expect(removal).toContainText("A cat");
+  await suggestions.accept("candidateProfile");
+  await expect(panel.getField("pets")).toHaveCount(0);
+
+  // The last one, and approving it says who wrote the value and who agreed.
+  await expect(suggestions.getCounter("candidateProfile")).toHaveCount(0);
+  await suggestions.accept("candidateProfile");
+  await expect(suggestions.getRow("candidateProfile")).toHaveCount(0);
   await expect(panel.getField("wantsKids")).toContainText("yes");
   await expect(panel.getField("wantsKids")).toContainText(
     "Suggested by the assistant, approved by you",
   );
-
-  // Dismissing the other leaves nothing behind: nothing was there before it.
-  await panel.dismissSuggestion("facts", "orientation");
-  await expect(panel.getSuggestion("facts", "orientation")).toHaveCount(0);
-  await expect(panel.getField("orientation")).toHaveCount(0);
-
-  // A proposal can be that the entry go, and it reads as one.
-  const removal = panel.getSuggestion("facts", "pets");
-  await expect(removal).toContainText("Remove this");
-  await expect(removal).toContainText("A cat");
-  await panel.acceptSuggestion("facts", "pets");
-  await expect(panel.getSuggestions()).toHaveCount(0);
-  await expect(panel.getField("pets")).toHaveCount(0);
 });

@@ -143,31 +143,6 @@ export class CandidatePanelPage {
     await this.getNote(key).getByRole("button", { name: "Remove" }).click();
   }
 
-  // --- Profile: suggestions ------------------------------------------------
-
-  getSuggestions() {
-    return this.page.getByTestId("profile-suggestion");
-  }
-
-  /** By the entry it is about, so a test never depends on their order. */
-  getSuggestion(kind: "facts" | "notes", key: string) {
-    return this.page.locator(
-      `[data-testid="profile-suggestion"][data-kind="${kind}"][data-field="${key}"]`,
-    );
-  }
-
-  async acceptSuggestion(kind: "facts" | "notes", key: string) {
-    await this.getSuggestion(kind, key)
-      .getByTestId("profile-suggestion-accept")
-      .click();
-  }
-
-  async dismissSuggestion(kind: "facts" | "notes", key: string) {
-    await this.getSuggestion(kind, key)
-      .getByTestId("profile-suggestion-dismiss")
-      .click();
-  }
-
   // --- History -------------------------------------------------------------
 
   getHistoryEntries() {

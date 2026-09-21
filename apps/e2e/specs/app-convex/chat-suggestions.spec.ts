@@ -181,14 +181,13 @@ test("dismissing answers only the card showing", async ({ page }) => {
     "candidateProfile:facts.pets",
   );
 
-  // Dismissed for good, not merely skipped: it is gone after a reload, and
-  // the panel — the other place a proposal is answered — agrees.
+  // Dismissed for good, not merely skipped: still gone after a reload.
   await page.reload();
   await expect(suggestions.getCounter("candidateProfile")).toHaveText("1/2");
-  const panel = new CandidatePanelPage(page);
-  await panel.openSection("Profile");
-  await expect(panel.getSuggestions()).toHaveCount(2);
-  await expect(panel.getSuggestion("facts", "orientation")).toHaveCount(0);
+  await expect(suggestions.getCard("candidateProfile")).toHaveAttribute(
+    "data-suggestion-id",
+    "candidateProfile:facts.pets",
+  );
 });
 
 test("accepting a change puts it on the profile", async ({ page }) => {
@@ -205,7 +204,6 @@ test("accepting a change puts it on the profile", async ({ page }) => {
   const panel = new CandidatePanelPage(page);
   await panel.openSection("Profile");
   await expect(panel.getField("wantsKids")).toContainText("yes");
-  await expect(panel.getSuggestions()).toHaveCount(0);
 });
 
 test("the drafted voice is answered from the conversation", async ({

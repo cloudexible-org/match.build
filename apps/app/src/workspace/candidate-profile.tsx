@@ -30,7 +30,6 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useState } from "react";
 import { serverErrorMessage } from "../lib/server-error";
-import { ProposalQuote, ProposedChange } from "./profile-proposal";
 import { useWorkspace } from "./workspace-layout";
 
 /**
@@ -43,8 +42,10 @@ import { useWorkspace } from "./workspace-layout";
  * screen imports the same one the server validates against, so a value the
  * form accepts is a value the mutation accepts.
  *
- * Suggestions sit at the top, visually apart from the record, because a
- * proposal nobody has answered is not yet part of it.
+ * **An agent's open proposals are not here.** They are answered in the stack
+ * above the composer (`chat/suggestion-stack.tsx`), where the conversation
+ * that produced them is. This section is the record: what is on it, and the
+ * ways a matchmaker changes it by hand.
  */
 
 type Entry = {
@@ -54,14 +55,9 @@ type Entry = {
   model?: string;
   sourceQuote?: string;
   confidence?: number;
-  pending?: {
-    action: "set" | "clear";
-    value: string;
-    suggestedAt: number;
-    model: string;
-    confidence?: number;
-    sourceQuote?: string;
-  };
+  // The query also carries `pending`, an agent's open proposal. It is read by
+  // the stack above the composer, which is where one is answered, and never
+  // here: a proposal is not part of the record.
 };
 
 type Entries = Record<string, Entry>;
@@ -84,114 +80,9 @@ export function CandidateProfile({
 
   return (
     <div className="flex flex-col gap-5" data-testid="candidate-profile">
-      <Suggestions
-        candidateId={candidateId}
-        facts={profile.facts}
-        notes={profile.notes}
-      />
       <Facts candidateId={candidateId} entries={profile.facts} />
       <Notes candidateId={candidateId} entries={profile.notes} />
     </div>
-  );
-}
-
-/*
- * ─── Suggestions ────────────────────────────────────────────────────────────
- */
-
-function Suggestions({
-  candidateId,
-  facts,
-  notes,
-}: {
-  candidateId: Id<"candidates">;
-  facts: Entries;
-  notes: Entries;
-}) {
-  const workspace = useWorkspace();
-  const resolve = useMutation(
-    api.candidateProfiles.mutations.resolveSuggestion,
-  );
-
-  const pending = [
-    ...pendingIn("facts", facts),
-    ...pendingIn("notes", notes),
-  ].sort((a, b) => a.proposal.suggestedAt - b.proposal.suggestedAt);
-  if (pending.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <h4 className="text-sm font-medium">
-        Suggested {pending.length === 1 ? "change" : "changes"}
-      </h4>
-      <ul className="flex flex-col gap-2">
-        {pending.map(({ kind, key, entry, proposal }) => {
-          return (
-            <li
-              key={`${kind}.${key}`}
-              // Deliberately unlike a saved value: nothing here is on the
-              // record until somebody says so.
-              className="flex flex-col gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/5 p-3"
-              data-testid="profile-suggestion"
-              data-kind={kind}
-              data-field={key}
-            >
-              <span className="text-xs text-muted-foreground">
-                {labelFor(kind, key)}
-              </span>
-              <ProposedChange
-                proposal={proposal}
-                current={renderValue(kind, key, entry.value)}
-                proposed={renderValue(kind, key, proposal.value)}
-              />
-              <ProposalQuote quote={proposal.sourceQuote} />
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  data-testid="profile-suggestion-accept"
-                  onClick={() =>
-                    void resolve({
-                      matchmakerId: workspace.matchmakerId,
-                      candidateId,
-                      kind,
-                      key,
-                      accept: true,
-                    })
-                  }
-                >
-                  Accept
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  data-testid="profile-suggestion-dismiss"
-                  onClick={() =>
-                    void resolve({
-                      matchmakerId: workspace.matchmakerId,
-                      candidateId,
-                      kind,
-                      key,
-                      accept: false,
-                    })
-                  }
-                >
-                  Dismiss
-                </Button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-/** The entries carrying a proposal, with the proposal already narrowed out. */
-function pendingIn(kind: EntryKind, entries: Entries) {
-  return Object.entries(entries).flatMap(([key, entry]) =>
-    entry.pending === undefined
-      ? []
-      : [{ kind, key, entry, proposal: entry.pending }],
   );
 }
 
