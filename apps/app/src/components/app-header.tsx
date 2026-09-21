@@ -2,6 +2,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { Button, cn } from "@repo/ui";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { HeaderNotifications } from "../notifications/header-notifications";
 import { ThemeToggle } from "./theme-toggle";
 
 /**
@@ -42,6 +43,7 @@ export function AppHeader({ name, nav }: { name: string; nav?: ReactNode }) {
           >
             {name}
           </Link>
+          <HeaderNotifications />
           <ThemeToggle />
           <Button variant="outline" size="sm" onClick={() => void signOut()}>
             Sign out
