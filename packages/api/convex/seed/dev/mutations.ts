@@ -20,7 +20,8 @@ import {
   internalMutation,
   type MutationCtx,
 } from "../../_generated/server";
-import { runMatchPass } from "../../matches/helpers";
+import { factsOf, insertMatch, runMatchPass } from "../../matches/helpers";
+import { evaluatePair } from "../../matches/rules";
 import { findLiveUserByEmail } from "../../users/helpers";
 import {
   DEV_INVITED_SLUGS,
@@ -223,6 +224,42 @@ async function seedMember(
   return candidateId;
 }
 
+/**
+ * Pairs two seeded people by hand, scored by the same algorithm the run uses
+ * (prd/phase-3.md §2) — the state a matchmaker reaches with "Pair two people".
+ * Returns whether it wrote one.
+ */
+async function handMadePair(
+  ctx: MutationCtx,
+  args: {
+    matchmakerId: Id<"matchmakers">;
+    a: Id<"candidates"> | undefined;
+    b: Id<"candidates"> | undefined;
+    now: number;
+  },
+): Promise<boolean> {
+  if (args.a === undefined || args.b === undefined) return false;
+  const facts = [];
+  for (const candidateId of [args.a, args.b]) {
+    const profile = await ctx.db
+      .query("candidateProfiles")
+      .withIndex("by_candidateId", (q) => q.eq("candidateId", candidateId))
+      .unique();
+    facts.push(profile === null ? {} : factsOf(profile));
+  }
+  await insertMatch(ctx, {
+    matchmakerId: args.matchmakerId,
+    candidateAId: args.a,
+    candidateBId: args.b,
+    origin: "manual",
+    verdict: evaluatePair(facts[0], facts[1], args.now),
+    actor: { type: "system", job: "seed" },
+    action: "match.created",
+    now: args.now,
+  });
+  return true;
+}
+
 export const apply = internalMutation({
   args: {},
   returns: v.object({
@@ -274,6 +311,9 @@ export const apply = internalMutation({
     }
     if (matchmaker === null) throw new Error("Matchmaker insert failed.");
     const matchmakerId = matchmaker._id;
+
+    /** Candidate id by fixture slug, for the hand-made pair below. */
+    const memberIds: Record<string, Id<"candidates">> = {};
 
     for (const member of DEV_MEMBERS) {
       const user = devUser(member.userSlug);
@@ -337,6 +377,8 @@ export const apply = internalMutation({
           }
         }
       }
+
+      memberIds[member.userSlug] = candidateId;
 
       if (member.profile !== undefined) {
         const seeded = await ctx.db
@@ -440,49 +482,86 @@ export const apply = internalMutation({
       .withIndex("by_matchmakerId", (q) => q.eq("matchmakerId", matchmakerId))
       .first();
     if (anyMatch === null) {
+      // A pair the matchmaker made themselves, written *before* the run so
+      // the run sees the pair already has a card and leaves it alone. Both in
+      // Vancouver and neither wanting children — and she has written a
+      // dealbreaker no algorithm reads, so the card carries the flag that
+      // says so.
+      const byHand = await handMadePair(ctx, {
+        matchmakerId,
+        a: memberIds.hana,
+        b: memberIds.felix,
+        now,
+      });
+      if (byHand) created.push("a match paired by hand");
+
       const report = await runMatchPass(ctx, matchmakerId, {
         type: "system",
         job: "seed",
       });
       created.push(`${report.created} proposed matches`);
 
-      // Three of them moved along, so the board is a board rather than one
-      // full column beside two empty ones — and one of each way a card can
-      // sit: introduced, connected, and closed off the board entirely.
+      // Move some of them along, so the board is a board rather than one
+      // full column beside two empty ones — and so every state a card can be
+      // in is on screen: introduced, connected, closed both ways, a card
+      // nobody has looked at, and one that has been read and left.
       const proposed = await ctx.db
         .query("matches")
         .withIndex("by_matchmakerId_and_stage", (q) =>
           q.eq("matchmakerId", matchmakerId).eq("stage", "proposed"),
         )
         .order("desc")
-        .take(3);
-      const [introduced, connected, closed] = proposed;
-      if (introduced !== undefined) {
-        await ctx.db.patch("matches", introduced._id, {
-          stage: "introduced",
-          stageChangedAt: now,
-          seenAt: now,
-          updatedAt: now,
-        });
-      }
-      if (connected !== undefined) {
-        await ctx.db.patch("matches", connected._id, {
-          stage: "connected",
-          stageChangedAt: now,
-          seenAt: now,
-          updatedAt: now,
-        });
-      }
-      if (closed !== undefined) {
-        await ctx.db.patch("matches", closed._id, {
+        .take(7);
+      const moves: {
+        stage: "introduced" | "connected" | "closed";
+        patch?: Record<string, unknown>;
+      }[] = [
+        { stage: "introduced" },
+        { stage: "introduced" },
+        { stage: "connected" },
+        {
+          // The one the whole product is for.
           stage: "closed",
+          patch: {
+            closedAs: "together",
+            closingNote: "Engaged, eighteen months later.",
+          },
+        },
+        {
+          stage: "closed",
+          patch: {
+            closedAs: "didnt_work",
+            closedBy: "candidateB",
+            closingNote: "Not ready to meet anyone until the spring.",
+          },
+        },
+        {
+          // Neither of them wanting it is its own answer, and the commonest
+          // way an introduction quietly ends.
+          stage: "closed",
+          patch: {
+            closedAs: "didnt_work",
+            closedBy: "both",
+            closingNote: "Polite on both sides, and nothing after.",
+          },
+        },
+      ];
+      for (const [index, move] of moves.entries()) {
+        const match = proposed[index];
+        if (match === undefined) continue;
+        await ctx.db.patch("matches", match._id, {
+          stage: move.stage,
           stageChangedAt: now,
-          closedAs: "didnt_work",
-          closedBy: "candidateB",
-          closingNote: "Not ready to meet anyone until the spring.",
           seenAt: now,
           updatedAt: now,
+          ...move.patch,
         });
+      }
+      // One left on the board and read, so the "new" dot is visibly a state
+      // and not just how every card looks.
+      const read = proposed[moves.length];
+      if (read !== undefined) {
+        await ctx.db.patch("matches", read._id, { seenAt: now });
       }
     }
 
