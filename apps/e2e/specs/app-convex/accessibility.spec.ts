@@ -146,7 +146,7 @@ test("profile settings", async ({ page }) => {
   await signInAs(page, world.email("maya"));
   const settings = new MatchmakerSettingsPage(page);
   await settings.goto(world.username("book"));
-  await expect(settings.getHistoryEntries().first()).toBeVisible();
+  await expect(settings.getDisplayNameInput()).toBeVisible();
   await expectNoA11yViolations(page);
 });
 

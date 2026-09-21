@@ -98,9 +98,7 @@ test("the workspace URL accepts any case or dot placement", async ({
   await expect(page).toHaveURL(new RegExp(`/app/mm/${username}/settings$`));
 });
 
-test("settings edit the display and business names, and record the history", async ({
-  page,
-}) => {
+test("settings edit the display and business names", async ({ page }) => {
   await signInAs(page, world.email("editor"));
   const settings = new MatchmakerSettingsPage(page);
   await settings.goto(world.username("editable"));
@@ -114,22 +112,13 @@ test("settings edit the display and business names, and record the history", asy
   await expect(settings.getStatus()).toHaveText("Saved.");
   await expect(new WorkspacePage(page).getName()).toHaveText("Renamed Book");
 
-  const history = settings.getHistoryEntries();
-  await expect(history).toHaveCount(2);
-  await expect(history.first()).toContainText(
-    "Changed display name from “Editable Book” to “Renamed Book”",
-  );
-  await expect(history.first()).toContainText(
-    "Set business name to “Renamed & Co”",
-  );
-  await expect(history.last()).toContainText("Created the profile");
-
-  // A blank business name removes it, and that is recorded too.
+  // A blank business name removes it. The change is still audited
+  // (`matchmakers.queries.profileHistory`, covered by its own convex-test);
+  // settings no longer shows that log.
   await settings.save({ businessName: "" });
   await expect(settings.getStatus()).toHaveText("Saved.");
-  await expect(settings.getHistoryEntries().first()).toContainText(
-    "Removed business name “Renamed & Co”",
-  );
+  await page.reload();
+  await expect(settings.getBusinessNameInput()).toHaveValue("");
 });
 
 test("settings reject an empty display name before sending it", async ({

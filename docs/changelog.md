@@ -11,6 +11,10 @@ The monorepo was bootstrapped from [turbostack](https://github.com/cloudexible-o
 ## [Unreleased]
 
 ### Changed
+- **Profile settings is the two fields it edits.** The card repeated the page's own title, its description said one thing about one field, and below it sat a log of changes to those same two fields on the same screen. The title is gone, "Candidates see your display name" moved under the display-name input, and **History is off the page**. The events are still recorded (prd §5.1) and still readable through `matchmakers.queries.profileHistory` — only the page stopped showing them, so `workspace/profile-history.ts` and its unit tests went with it. A candidate's own History, in the workspace panel, is untouched.
+
+### Fixed
+- **A `Card` with no `CardHeader` had no top padding.** `CardContent` was `p-6 pt-0`, which assumes a header above paid for the top — true until Onboard and Create profile moved their titles out to the page header, and their first field ended up against the card's border. It now pays for its own top padding unless it follows something.
 - **One shell for both sides, and one page shape for everything else.** The matchmaker workspace and the candidate shell are the same thing from opposite sides, and after the last change three of their layout rules were byte-identical in two files — the kind of duplication where a fix lands in one place and silently misses the other. They now share `src/shell/`:
   - **`ChatShell`** — the list column beside the conversation, and the rule that only one of them shows on a phone.
   - **`ConversationPanes`** — the conversation beside its side panel, the panel's collapse state, and the header above it. It fixes a bug in passing: the candidate shell had two `<h1>`s (the list's and the conversation's); the conversation's title is an `<h2>` on both sides now, as the workspace always had it.

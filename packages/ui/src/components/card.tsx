@@ -44,5 +44,13 @@ export function CardContent({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  return <div className={cn("p-6 pt-0", className)} {...props} />;
+  // Padded on every side, except where a `CardHeader` above has already
+  // paid for the top. A card whose content is all it has — no header —
+  // would otherwise start hard against its own border.
+  return (
+    <div
+      className={cn("p-6 [&:not(:first-child)]:pt-0", className)}
+      {...props}
+    />
+  );
 }

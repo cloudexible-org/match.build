@@ -8,25 +8,25 @@ import {
   Button,
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Field,
   FieldDescription,
   FieldError,
   FieldLabel,
   Input,
 } from "@repo/ui";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { type FormEvent, useState } from "react";
 import { serverErrorMessage } from "../lib/server-error";
-import { CardList, Page, PageHeader, PageSection } from "../shell/page";
-import { describeProfileEvent } from "../workspace/profile-history";
+import { Page, PageHeader } from "../shell/page";
 import { useWorkspace } from "../workspace/workspace-layout";
 
 /**
  * Matchmaker profile settings (prd/phase-1.md §4): display name and business
- * name, the fixed username, and the profile's own change history (§5.1).
+ * name, and the fixed username.
+ *
+ * The profile's own change history is still recorded (§5.1) and still
+ * readable through `matchmakers.queries.profileHistory`; it is no longer
+ * shown here, where it was a log of the two fields on the same screen.
  */
 export function MatchmakerSettingsPage() {
   const workspace = useWorkspace();
@@ -37,7 +37,6 @@ export function MatchmakerSettingsPage() {
         description="How you appear to the candidates in your book."
       />
       <ProfileForm key={workspace.matchmakerId} />
-      <ProfileHistory />
     </Page>
   );
 }
@@ -84,10 +83,6 @@ function ProfileForm() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Profile</CardTitle>
-        <CardDescription>Candidates see your display name.</CardDescription>
-      </CardHeader>
       <CardContent>
         <form
           noValidate
@@ -115,8 +110,12 @@ function ProfileForm() {
                 edited();
               }}
             />
-            {errors.displayName && (
+            {errors.displayName ? (
               <FieldError match>{errors.displayName}</FieldError>
+            ) : (
+              <FieldDescription>
+                Candidates see your display name.
+              </FieldDescription>
             )}
           </Field>
 
@@ -159,43 +158,5 @@ function ProfileForm() {
         </form>
       </CardContent>
     </Card>
-  );
-}
-
-const when = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-function ProfileHistory() {
-  const workspace = useWorkspace();
-  const history = useQuery(api.matchmakers.queries.profileHistory, {
-    matchmakerId: workspace.matchmakerId,
-  });
-
-  return (
-    <PageSection title="History" testId="profile-history">
-      {history === undefined ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        <CardList ordered>
-          {history.map((event) => (
-            <li key={event._id} className="flex flex-col gap-0.5 px-4 py-3">
-              {describeProfileEvent(event.action, event.changes).map((line) => (
-                <span key={line} className="text-sm">
-                  {line}
-                </span>
-              ))}
-              <time
-                dateTime={new Date(event._creationTime).toISOString()}
-                className="text-xs text-muted-foreground"
-              >
-                You · {when.format(event._creationTime)}
-              </time>
-            </li>
-          ))}
-        </CardList>
-      )}
-    </PageSection>
   );
 }

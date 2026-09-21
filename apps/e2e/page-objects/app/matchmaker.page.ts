@@ -104,8 +104,8 @@ export class WorkspacePage {
 }
 
 /**
- * `/app/mm/:username/settings`: display name, business name and the
- * profile's history. Rendered by `apps/app/src/pages/matchmaker-settings.tsx`.
+ * `/app/mm/:username/settings`: display name and business name. Rendered by
+ * `apps/app/src/pages/matchmaker-settings.tsx`.
  */
 export class MatchmakerSettingsPage {
   constructor(public readonly page: Page) {}
@@ -146,11 +146,6 @@ export class MatchmakerSettingsPage {
       await this.getBusinessNameInput().fill(fields.businessName);
     }
     await this.getSaveButton().click();
-  }
-
-  /** History entries, newest first. */
-  getHistoryEntries() {
-    return this.page.getByTestId("profile-history").getByRole("listitem");
   }
 }
 
