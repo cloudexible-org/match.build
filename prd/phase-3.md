@@ -3,7 +3,7 @@
 **Status:** Draft, **except §2, §4 and the first half of §5, which are built** — see
 [Built so far](#built-so-far). The rest still needs design, especially the
 introduction moment (§6).
-**Depends on:** [phase-2.md](phase-2.md) — matching runs on structured facts.
+**Depends on:** [phase-2.md](phase-2.md) — matching runs on structured facts. **The dependency is only half met, and the board was built anyway.** Phase 2 built the `candidateProfiles` those facts live in, and the board reads them (`matches/helpers.ts`: a candidate with no facts is left out of the run rather than scored against everyone at zero). What phase 2 has *not* built is the extractor that fills a profile from the conversation, so every fact the scorer reads today was typed by a matchmaker by hand. That is the right order — a scorer that could not be fed by hand could not be checked by hand either — but it means the board's usefulness is capped by how much somebody has typed, and phase 2 step 3 is what lifts that cap.
 **Goal:** help the matchmaker find, track and make introductions within their own book, and let new candidates find matchmakers.
 
 ---
@@ -103,6 +103,7 @@ you have not, is a property of a card and is now a dot on it.
 - **Apply** creates a `candidates` row in that matchmaker's book with `membership: "applied"`, `userId` set to the applicant, and an optional message (a new optional field). One row per (matchmaker, user) still holds, so a person can't apply twice.
 - The matchmaker sees applications in their workspace and approves (`joined`, and the conversation is created) or declines (`declined`). Both are audited.
 - Open: what a matchmaker's public profile contains, and whether matchmakers opt in to being listed.
+- **The route exists and the feature does not.** `/c/mm/discover` (`apps/app/src/pages/discover.tsx`) renders a card saying the directory isn't open and pointing the reader back to their matchmakers, and **nothing in the UI links to it** — the only way into a book is still an invitation (prd/phase-1.md §3.2), and `candidates` has no `applied` membership. It is the shell this section's work lands in, kept so that a candidate who reaches it by hand gets an answer rather than a 404.
 
 ## 4. Data model (as built)
 

@@ -2,13 +2,13 @@
 
 **Product domain:** match.build
 
-The product spec, split into phases. **Phase 1 is final** and is what we build now. Later phases are drafts: their open questions must be settled before building starts.
+The product spec, split into phases. **Phase 1 is shipped, and phases 2 and 3 are each partly built** — every phase file marks which of its sections are built and which are still a draft, and that marking is the thing to trust. Nothing in a later phase's draft half has been agreed; its open questions still have to be settled before that part is built.
 
 | Phase | File | Status | What it delivers |
 |---|---|---|---|
-| 1 | [phase-1.md](phase-1.md) | **Final — build now** | Accounts and profiles, onboarding by invitation, in-app chat, notifications, audit trail, leaving and account deletion. A complete inbox with zero AI. |
-| 2 | [phase-2.md](phase-2.md) | Draft — AI questions open | AI suggested replies, fact extraction and reconciliation, the candidate profile (facts), voice profile, thread summaries, evals. |
-| 3 | [phase-3.md](phase-3.md) | Draft | Matching: match board, AI match candidates, introductions, the Discover page, reminders. |
+| 1 | [phase-1.md](phase-1.md) | **Built — pilot gated on terms** | Accounts and profiles, onboarding by invitation, in-app chat, notifications, audit trail, leaving and account deletion. A complete inbox with zero AI. |
+| 2 | [phase-2.md](phase-2.md) | Partly built — profiles and reply suggestions | The AI plumbing, the candidate profile and the matchmaker's voice, and suggested replies in the conversation. **Left:** the extraction that fills a profile, and evals. Thread summaries are cut from v1. |
+| 3 | [phase-3.md](phase-3.md) | Partly built — the board, no AI in it | The match board and a deterministic nightly scorer. **Left:** the AI stage on the shortlist, the introduction moment (still an open design question), the Discover page, reminders. |
 | — | [backlog.md](backlog.md) | Unscheduled | Everything deliberately deferred. |
 
 ---

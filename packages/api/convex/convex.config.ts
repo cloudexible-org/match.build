@@ -79,7 +79,12 @@ app.use(staticHosting, { name: "admin" });
 // component's tables are its own and hold a copy of what the model is shown, so
 // an erasure has to reach them through the component's API
 // (`components.agent.users.deleteAllForUserId`) — `ctx.db` cannot see them.
-// Nothing creates a thread yet; see #3 before anything does.
+//
+// This comment used to end "nothing creates a thread yet; see #3 before
+// anything does". `replySuggestions/` now creates one per conversation and
+// `admin.mutations.eraseAccount` still does not knock on that door, so an
+// erasure leaves the model's copy standing. Wiring it is the next change to
+// phase 2's code; see #3 and prd/phase-2.md §4.
 app.use(agent);
 
 export default app;

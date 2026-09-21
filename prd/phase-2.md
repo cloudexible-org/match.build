@@ -1,7 +1,7 @@
 # Phase 2 — AI assistance
 
-**Status:** Partly built. §3 (profiles) and §4.4 (the agent settings page) are shipped and marked as such; everything else is proposed, not agreed. §9 sorts what's left into what must be settled before any code, what ships as a setting and gets tuned with the pilot, and what is still an open product question.
-**Depends on:** [phase-1.md](phase-1.md) shipped *and used by a real matchmaker* — which is gated on the terms in [#1](https://github.com/cloudexible-org/match.build/issues/1), not on engineering. The AI plumbing itself is built (§4.3); §9.1 is what is left before a feature sits on top of it.
+**Status:** Partly built. Build steps 0, 1 and 2 are shipped (§8) — the AI plumbing and `/admin/ai` (§4.3, §4.4), profiles and voice (§3), and **the reply suggester** (§4A), which is the feature this phase exists for. Sections are marked *built* where they describe what shipped; everything else is proposed, not agreed. **What is left is what fills a profile:** the extractor and the voice-profile agent (§4B, §4C), extraction from the imported history, and the eval harness. §9 sorts the remaining questions into what must be settled before any code, what ships as a setting and gets tuned with the pilot, and what is still an open product question.
+**Depends on:** [phase-1.md](phase-1.md) shipped *and used by a real matchmaker* — which is gated on the terms in [#1](https://github.com/cloudexible-org/match.build/issues/1), not on engineering. The AI plumbing itself is built (§4.3), and two features now sit on top of it — which is why §9.1's prompt-injection bullet is marked overdue rather than pending.
 **Data protection:** everything this phase adds is swept in [#3](https://github.com/cloudexible-org/match.build/issues/3) before v1 ships. A profile is the matchmaker's own record, like their notes were (§7).
 **Goal:** make the matchmaker faster and sharper inside the conversation they already run in the app: suggested replies in their voice, and a candidate profile that builds itself from the conversation.
 
@@ -11,11 +11,11 @@
 
 ## 1. Scope
 
-1. **Reply suggestions** in the conversation, in the matchmaker's voice.
+1. **Reply suggestions (§4A, built):** a candidate writes, and a few seconds later the matchmaker has one to three drafts waiting above the composer, in their own voice, each with **Send**, **Edit** and **Dismiss** — plus a switch to turn them off for one conversation. The welcome draft on acceptance is the one part not built.
 2. **Candidate profiles (§3, built):** a structured record per candidate — registry-typed facts and free-text notes — with a per-field rule about who may write it, provenance on every value, and an agent's proposal sitting beside a value rather than replacing it. What is left is the extraction that feeds it.
 3. **Profile section (built)** in the candidate panel: filled fields grouped by the registry, their source and quote, manual add/edit/clear, and suggestions above the record.
 4. **Voice (§3, built)** in matchmaker settings, one `suggest` field the voice-profile agent may draft but never change under them.
-5. **Eval harness** for reconciliation.
+5. **Eval harness** for reconciliation. Not built, and blocked on where its data comes from (§9.1).
 
 **Thread summaries are not in v1.** A long thread is simply read from its last
 50 messages and no further back. The summariser was the answer to "what happens
@@ -29,12 +29,13 @@ Every profile change and voice change is written to the phase-1 audit trail, wit
 
 ---
 
-## 2. Conversation experience (proposed)
+## 2. Conversation experience — drafting is built, extraction is not
 
-- On each candidate message (debounced, §4A), the reply suggester produces 1–3 suggested replies, rendered inline as a visually distinct card (never styled like a real message), each with **Send**, **Edit**, **Dismiss**. A matchmaker must never mistake an AI suggestion for something the candidate said.
-- When a candidate accepts an invitation, a suggested welcome message appears.
-- Fact extraction runs in the background. What the agent may write it writes, and what it may only propose lands in the Profile section as a suggestion (§3.2); the field's policy decides, not the model's confidence.
-- The composer always works without AI.
+- *Built.* On each message (debounced, §4A), the reply suggester produces 1–3 suggested replies, each with **Send**, **Edit**, **Dismiss**. A matchmaker must never mistake an AI suggestion for something the candidate said — and where the draft said "rendered inline", what shipped is **a stack above the composer**, between the thread and the input, which is stronger: a card that never sits in the message list can never be read as a message. One row per kind of suggestion, at most one card per row (§5).
+- *Built.* **A switch per conversation**, in the thread header. Absent means on, so only the exception is stored. Turning it off retires the drafts on offer, cancels the pending job and deletes the agent's thread; turning it back on starts again from nothing rather than from a fortnight it did not watch.
+- *Not built.* When a candidate accepts an invitation, a suggested welcome message appears. The trigger belongs in `convex/invites/` and is not wired: today the only thing that schedules a draft is a message being sent (`messages/mutations.ts`).
+- *Not built.* Fact extraction runs in the background. What the agent may write it writes, and what it may only propose lands in the Profile section as a suggestion (§3.2); the field's policy decides, not the model's confidence.
+- *Built, and the point of the principle.* The composer always works without AI. Every way out of the drafting run is quiet: the agent may be off, the deployment may have no gateway, the model may refuse — and in all of them the matchmaker simply has no drafts.
 
 ---
 
@@ -169,24 +170,26 @@ Two domains and a shared kernel, which is one more directory than `CLAUDE.md` §
 
 A fourth writer — **the candidate editing their own profile** — is deliberately absent rather than stubbed (§9.3). It would be a policy the registry grows and a `writer` the mutations pass; nothing else would move.
 
-## 4. Agents and jobs (proposed)
+## 4. Agents and jobs — §4A is built, §4B and §4C are proposed
 
 They communicate **through the database**, never by sharing context. Phase 3's match and reminder agents reuse the same mechanism.
 
-**Components, not hand-rolled plumbing.** Three of the four things this phase needs around an LLM call already exist as Convex components, and phase 1 hand-rolled nothing it didn't have to:
+**Components, not hand-rolled plumbing.** Three of the four things this phase needs around an LLM call already exist as Convex components, and phase 1 hand-rolled nothing it didn't have to. **One of the four is installed**, and the table says what each of the others is still waiting for — they were listed here as decisions, and three of them have not been made yet:
 
-| Component | What it does here |
-|---|---|
-| `@convex-dev/workpool` | Every background job below. Gives §4B its "one job per candidate at a time" as configuration rather than as a lock invented in a profile row. |
-| `@convex-dev/persistent-text-streaming` | §4A's streamed replies. A mutation per token is a database write per token, which is what "streamed into a `replySuggestions` row" would otherwise mean. |
-| `@convex-dev/rate-limiter` | §6's per-matchmaker AI budget. |
-| `@convex-dev/agent` | Threads, message history, tool calls and usage tracking for the AI side. **Installed** (§4.3). |
+| Component | What it does here | State |
+|---|---|---|
+| `@convex-dev/agent` | Threads, message history, tool calls and usage tracking for the AI side. | **Installed** (§4.3), and **used** by §4A — one thread per conversation, deleted when the switch goes off. |
+| `@convex-dev/workpool` | Every background job below. Gives §4B its "one job per candidate at a time" as configuration rather than as a lock invented in a profile row. | Not installed. Nothing needs it until §4B exists; §4A serialises by cancelling and replacing its own scheduled job, which is a debounce rather than a queue. |
+| `@convex-dev/persistent-text-streaming` | §4A's streamed replies. A mutation per token is a database write per token, which is what "streamed into a `replySuggestions` row" would otherwise mean. | Not installed, **and §4A shipped without it** — one `generateText` per run, drafts written in one mutation when they are all there. See §6, where the latency requirement this was the answer to is restated as what actually happens. |
+| `@convex-dev/rate-limiter` | §6's per-matchmaker AI budget. | Not installed. The budget is still an open question rather than an unimplemented number (§9.2), so there is nothing to enforce yet. |
 
 **`@convex-dev/agent`, on one condition.** An earlier draft of this section ruled it out, on the grounds that it brings its own threads and messages tables while the product already has `conversations` and `messages` that are tenanted, audited, read-markered, notification-driving and erasure-aware. The first half of that is true and the conclusion was wrong: the component's thread is the *model's* record of a conversation, not the product's, and the two can coexist as long as one of them is unambiguously the source of truth.
 
 So: **`conversations` and `messages` stay the product's source of truth.** Nothing the UI renders, nothing a notification fires from, and nothing a matchmaker keeps comes out of a component table. An agent thread is the context the model is given, downstream of the real thread and rebuildable from it.
 
-The condition is the one that made the earlier draft nervous, and it is concrete rather than a matter of taste: **a component's tables are invisible to `ctx.db`**, so `admin.mutations.eraseAccount` cannot walk them the way it walks `candidates` and `auditEvents`. The component has its own door — `components.agent.users.deleteAllForUserId` — and an erasure has to knock on it. Nothing creates a thread until that is wired; see [#3](https://github.com/cloudexible-org/match.build/issues/3).
+The condition is the one that made the earlier draft nervous, and it is concrete rather than a matter of taste: **a component's tables are invisible to `ctx.db`**, so `admin.mutations.eraseAccount` cannot walk them the way it walks `candidates` and `auditEvents`. The component has its own door — `components.agent.users.deleteAllForUserId` — and an erasure has to knock on it.
+
+> **The condition has been crossed, and this is the one open item in this phase that is a defect rather than a decision.** This section used to end "nothing creates a thread until that is wired". §4A now creates one per conversation, and `eraseAccount` still does not knock on that door: an erasure anonymises the person across `candidates`, `messages` and the rest, and leaves the model's copy of what it was shown standing in a table the erasure cannot see. Two things reach a thread today — turning a conversation's switch off, and the same switch coming back on — and neither is an erasure. **Wiring `eraseAccount` into the component is the next change to this phase's code**, ahead of §4B; tracked in [#3](https://github.com/cloudexible-org/match.build/issues/3). Recorded here rather than quietly fixed because the sentence that used to be here was load-bearing, and the next reader deserves to know it stopped being true before anyone noticed.
 
 `@convex-dev/rag` is worth a look in phase 3 for cross-conversation retrieval, not here.
 
@@ -206,15 +209,16 @@ An earlier draft listed five jobs (A reply suggester, B fact extractor, C fact r
 
 **Each agent has one model and one standing instruction, platform-wide, stored in the database and edited at `/admin/ai`** (§4.4). A matchmaker's own character does not vary the prompt — it is the voice profile, which is *data a prompt reads*.
 
-**A. `conversation`** (foreground for the draft, background for the rest)
-- Trigger: a candidate message, **debounced** (~5 s after the last one, so a burst produces one generation). Also once when a candidate accepts, for a welcome message — triggered from `convex/invites/`, which owns accepting.
+**A. `conversation`** — *built*, in `convex/replySuggestions/`, for the drafting half
+- Trigger: a message, **debounced** (`AI_REPLY_DEBOUNCE_SECONDS`, ~5 s after the last one, so a burst produces one generation). The pending job is cancelled and replaced on each send, which is what makes the window slide rather than fire on the first message of a burst. *Not built:* the welcome draft when a candidate accepts, which belongs in `convex/invites/`.
 - Input: the standing prompt + voice profile + the candidate's whole profile, facts *and* the matchmaker's own notes + last N messages (including the private imported history and the matchmaker's private notes to themselves).
-- Output: 1–3 replies; and candidate facts, each with a verbatim source quote.
-- Live window: last **50** messages verbatim, and nothing older. With no summariser (§2), message 51 is simply not seen — which is the v1 trade, and the reason the window is 50 rather than 20.
-- Earlier `ready` suggestions become `stale` when a new message arrives or the matchmaker replies manually.
+- **The thread is the memory, so the input is sent once and then kept up to date.** The first run briefs the agent with all of the above; every run after it sends only what has changed — the new messages, a voice that was rewritten, profile entries that moved. Re-sending the world each time pays twice for what the thread already holds, and buries the new message under text the model has read four times.
+- Output: 1–3 replies (`AI_REPLY_COUNT`). *Not built:* the candidate facts with a verbatim source quote, which is what §4B is waiting on.
+- Live window: last **50** messages verbatim (`AI_REPLY_LIVE_WINDOW`), and nothing older. With no summariser (§2), message 51 is simply not seen — which is the v1 trade, and the reason the window is 50 rather than 20.
+- Earlier `ready` suggestions become `stale` when a new message arrives or the matchmaker replies manually. Marked, never deleted: what was offered and passed over is worth more than the row costs, and a `sent` draft needs somewhere to have come from.
 - Never receives another candidate's data.
 
-**B. `candidate_profile`** (background) — *the write path is built (§3); what feeds it is not.*
+**B. `candidate_profile`** (background) — *the write path is built (§3); what feeds it is not. This is build step 3, and the next feature to be built.*
 - Runs once per message over all the facts the conversation agent noticed, serialised per candidate — a `workpool` with a per-candidate key, one job at a time. Parallel per-fact jobs would race: two facts from one message could both add a duplicate or both supersede the same fact.
 - Input: those candidate facts + the source message + the candidate's current profile, including any open proposals, so it does not keep asking the same question.
 - Output per entry: a registry key and a value, or a removal. It does **not** say whether to write or to suggest — `candidateProfiles.mutations:applyAgentEntries` decides that from the field's policy, and an agent that could choose would make the policy advisory.
@@ -271,11 +275,11 @@ The plumbing is in, with no product feature on top of it yet:
 - **`AI_ENABLED`, because off is a supported state.** The gateway needs a paid Convex Cloud deployment, so a local backend and the e2e suite's anonymous one cannot reach it. `pnpm --filter @repo/api ai:setup` sets the flag, seeds any agent that has never been set up, and then calls each agent's model — a flag reading "on" while the gateway refuses us is the one state worse than off.
 - **`ai/actions.ts:probe`** — one generation with nothing of the product in it: no candidate, no conversation, no thread. It answers the only question a unit test cannot, which is whether this deployment can reach the model an agent is configured with.
 - **No `"use node"`, anywhere in `convex/`.** The provider's README uses it and it is not needed — the gateway is reached over `fetch`, which Convex's own runtime has. It is also not *allowed*: a local anonymous backend cannot run Node actions, so a single `"use node"` file fails the **whole** push with `DeploymentNotConfiguredForNodeActions` and every e2e spec then runs against stale functions. Recorded in `CLAUDE.md` §8, because it binds the whole backend and not just this domain.
-- **The `agent` component is registered and unused.** No thread is created anywhere yet, by the condition above.
+- ~~**The `agent` component is registered and unused.**~~ It is used: §4A creates one thread per conversation. The condition above went with it, and did not travel — see the note in §4.
 
 ## 5. UI additions
 
-- **Conversation:** reply-suggestion cards, fact-suggestion cards, system notes with Undo (all private to the matchmaker).
+- **Conversation (partly built):** a stack of suggestion cards **above the composer**, between the thread and the input — one row per kind, at most one card per row, the four kinds named and ordered in `apps/app/src/chat/suggestions.ts`. A drafted reply sits nearest the box being typed in. *Built:* the drafted reply, with **Send**, **Edit** and **Dismiss**, and the per-conversation switch in the header. *Not built:* the cards that need §4B and §4C behind them — a proposed change to either profile — and system notes with Undo. All of it is private to the matchmaker. A match suggestion was once listed here and is not: a match is about two people and the composer is addressed to one, so it lives in the candidate panel (prd/phase-3.md §2).
 - **Candidate panel (built):** a **Profile** section, second after Details. It renders **what is filled in, not the whole registry** — forty-odd empty rows would bury the four that say something — grouped by the registry, each with its source and its verbatim quote, and an inline editor whose control comes from the field's value kind. Suggestions sit above the record, visually apart, because a proposal nobody has answered is not part of it. **Details stays open by default:** it holds membership state and the invite controls, which is what a matchmaker needs on opening a thread they haven't touched in a week.
 - **History tab (built):** profile and agent entries, the agent's actor line naming the model it ran on. New filter: **Profile**, which also covers the `note.*` events the old table left behind.
 - **Matchmaker settings (built):** their voice, with the agent's draft above the box rather than in it.
@@ -285,7 +289,7 @@ The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invit
 
 ## 6. Non-functional requirements
 
-- **Suggested-reply latency:** first token under ~2 s, through `persistent-text-streaming` (§4). On failure, fail silently.
+- **Suggested-reply latency — the requirement changed with the feature.** "First token under ~2 s, through `persistent-text-streaming`" was written for a draft that appeared *while the matchmaker waited for it*. What shipped does not make them wait: drafting is triggered by the candidate's message and lands seconds later, above a composer they are free to type in meanwhile, so there is no first token to be under 2 s of. The run therefore makes one `generateText` call and writes all of its drafts in one mutation — three drafts from one call have to arrive together, or a matchmaker sees one card, then two more, and wonders which came first. **What holds instead:** a run must never delay a message being sent, and must fail silently. Streaming comes back if a draft is ever generated on demand.
 - **Cost control:** keep the reply suggester's context tight; background jobs use a cheaper model; `rate-limiter` caps AI calls per matchmaker.
 - **Audit:** every auto-applied fact is undoable and shows provenance.
 - **Switches, models and prompts are database settings** edited at `/admin/ai` (§4.4), with no code-level default behind them. **Every remaining number is a deployment setting**, declared in `convex.config.ts` beside phase 1's: the auto-apply threshold, the suggested-reply count, the debounce window, the voice-sample minimum, the live-window size and the per-matchmaker budget. Phase 1 did this for its two notification delays once prd/phase-1.md §12 admitted they were guesses that only a real matchmaker could correct (`NOTIFICATION_PUSH_DELAY_SECONDS`, `NOTIFICATION_EMAIL_DELAY_SECONDS`). Every number in §9.2 is the same kind of guess, and tuning one should not need a deploy.
@@ -304,8 +308,8 @@ The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invit
 
 0. *Done.* **AI plumbing** (§4.5) and **the settings page** (§4.4): the `agent` component, the gateway, `convex/ai/`, the three agents seeded from `convex/seed/ai/`, `/admin/ai`, and `ai:setup`. No product feature on it yet.
 1. *Done.* **Profiles** (§3): the two tables, the registry, the write engine with its per-field policy, the three write paths, the Profile section, voice in settings, audit integration, the erasure branch, and the migration off `notes`. **No agent calls the write path yet** — the door is built, nobody has come through it.
-2. Reply suggester (streaming, debounce, stale handling), reading the voice.
-3. Extractor feeding `candidateProfiles.mutations:applyAgentEntries`, and the voice-profile agent feeding `matchmakerProfiles.mutations:applyAgentVoice`.
+2. *Done.* **Reply suggester** (§4A): the debounce and its sliding window, staleness on both sides of the thread, the drafts and the answers to them, the per-conversation switch, the agent thread that gets briefed once and updated after that, and the voice read into every run. **Not streamed** — see §6 for why the latency requirement that asked for streaming no longer describes the feature. *Left over from this step:* the welcome draft on acceptance, in `invites/`.
+3. **Next.** Extractor feeding `candidateProfiles.mutations:applyAgentEntries`, and the voice-profile agent feeding `matchmakerProfiles.mutations:applyAgentVoice`. Both write paths are built, tested and unused: **no agent has yet come through either door**, and the suggestion cards that would show a proposal have nothing to render outside the dev seed. **Wire `eraseAccount` into the `agent` component first** (§4) — this step gives the model a second reason to hold a copy of a candidate.
 4. Extraction from the imported history at onboarding.
 5. Eval harness.
 *Also done:* the migration off `notes` and the removal of the table (§3).
@@ -318,23 +322,23 @@ The first draft listed eleven of these flat, which made a number that wants a we
 
 ### 9.1 Must be settled before any code
 
-- ~~**LLM provider and models.**~~ *Resolved by building it (§4.3).* Calls go through the Convex AI gateway, so there is no provider to choose, no key to hold and no second contract: Convex is the sub-processor, and the models are `anthropic/claude-opus-5` for drafting and `anthropic/claude-haiku-4-5` for extraction, both overridable per deployment. **What is left is a question for [#1](https://github.com/cloudexible-org/match.build/issues/1), not for this phase:** confirm the gateway's training and retention terms and what they say about the providers behind it. Still do that before the DPA is drafted — amending a signed DPA means going back to every matchmaker who signed it — but it is now a paragraph to verify rather than a vendor to pick.
-- **Prompt injection and leakage.** Not "is a system-prompt guardrail enough" — that framing invites a yes. Special-category data, plus an LLM drafting messages a human sends under their own name, is the one place in this product where a leak harms a real person. It needs a mechanism: what checks a suggestion before it can reach the Send button, and what a failed check does.
+- ~~**LLM provider and models.**~~ *Resolved by building it (§4.3).* Calls go through the Convex AI gateway, so there is no provider to choose, no key to hold and no second contract: Convex is the sub-processor. **The models are not named here and should not be**, because they are not a decision this document holds: each agent's model is a database setting edited at `/admin/ai` (§4.4), starting from whatever `convex/seed/ai/fixture.ts` seeds — today `openai/gpt-5.6-luna` for all three. A model named in a PRD is a model that goes stale the first time somebody changes the one that runs. **What is left is a question for [#1](https://github.com/cloudexible-org/match.build/issues/1), not for this phase:** confirm the gateway's training and retention terms and what they say about the providers behind it. Still do that before the DPA is drafted — amending a signed DPA means going back to every matchmaker who signed it — but it is now a paragraph to verify rather than a vendor to pick.
+- **Prompt injection and leakage — open, and now overdue.** Not "is a system-prompt guardrail enough" — that framing invites a yes. Special-category data, plus an LLM drafting messages a human sends under their own name, is the one place in this product where a leak harms a real person. It needs a mechanism: what checks a suggestion before it can reach the Send button, and what a failed check does. **This section is headed "must be settled before any code", and §4A shipped without it.** What stands in its place today is weaker and should be named honestly: the seeded instruction tells the agent that candidate messages are content and never commands, a draft is never sent without a human pressing Send, and a run only ever sees one candidate's data. That is a guardrail and a human in the loop — it is not the check this bullet asks for, and it is not a reason to relax the bullet. Settle it before the extractor (step 3) starts writing what a message told it to.
 - ~~**Key registry contents**~~ *Resolved by building it (§3.4).* The registry is ~48 fields in `convex/candidateProfiles/rules.ts`; adding a key is an edit to that file and renaming one is still a migration, which is the part that has not changed.
-- **Eval data.** Where realistic but synthetic or consented conversations come from (§4.2). The reconciler cannot be built honestly without them, and it must never be raw candidate data.
+- **Eval data.** Where realistic but synthetic or consented conversations come from (§4.2). The reconciler cannot be built honestly without them, and it must never be raw candidate data. Still open, and step 3 is the step that needs it: an extractor with no evals is a feature whose accuracy nobody can state.
 
 ### 9.2 Ship as a setting, tune with the pilot
 
-None of these blocks a line of code: each ships as a deployment env var with the value below as its default, exactly as phase 1's notification delays did (§6). (Models and prompts are *not* in this table — they are database settings on a page, §4.4.)
+None of these blocks a line of code: each ships as a deployment env var with the value below as its default, exactly as phase 1's notification delays did (§6). Three of them shipped with §4A and are waiting for a matchmaker to correct them; the **State** column says which. (Models and prompts are *not* in this table — they are database settings on a page, §4.4.)
 
-| Setting | Starting value | Why it's a guess |
-|---|---|---|
-| ~~Auto-apply threshold~~ | — | *Resolved by building it (§3.2):* whether a change is applied or proposed is a property of the **field**, not of a number the model produces. A model's confidence is not calibrated across fields, and a threshold would have let a bad 0.9 on `orientation` through while blocking a good 0.7 on `pets`. `confidence` is still stored, as something to show and to tune against later. |
-| Suggested replies shown | 3 | Three may be choice paralysis on a phone. |
-| Debounce window | ~5 s | Depends how people actually type in bursts. |
-| Voice samples required | 20 sent messages | Unknown whether fewer already stops sounding generic. |
-| Live window | 50 messages | With no summariser, this is the whole of what the agent sees. Too low and a long thread loses its thread; too high and every call pays for context nobody reads. |
-| Per-matchmaker AI budget | — | Both the limit *and* what happens when it's hit: degrade to no suggestions, or tell them? |
+| Setting | Starting value | State | Why it's a guess |
+|---|---|---|---|
+| ~~Auto-apply threshold~~ | — | Gone | *Resolved by building it (§3.2):* whether a change is applied or proposed is a property of the **field**, not of a number the model produces. A model's confidence is not calibrated across fields, and a threshold would have let a bad 0.9 on `orientation` through while blocking a good 0.7 on `pets`. `confidence` is still stored, as something to show and to tune against later. |
+| Suggested replies shown | 3 | Shipped — `AI_REPLY_COUNT` | Three may be choice paralysis on a phone. |
+| Debounce window | ~5 s | Shipped — `AI_REPLY_DEBOUNCE_SECONDS` | Depends how people actually type in bursts. |
+| Voice samples required | 20 sent messages | Waits on §4C | Unknown whether fewer already stops sounding generic. |
+| Live window | 50 messages | Shipped — `AI_REPLY_LIVE_WINDOW` | With no summariser, this is the whole of what the agent sees. Too low and a long thread loses its thread; too high and every call pays for context nobody reads. |
+| Per-matchmaker AI budget | — | Not built | Both the limit *and* what happens when it's hit: degrade to no suggestions, or tell them? This one is not a number waiting for a pilot: with drafting live on every message, it is the only thing between a busy book and a bill nobody chose. |
 
 ### 9.3 Open product question
 
