@@ -15,6 +15,11 @@ export class CandidatePanelPage {
     return this.page.getByTestId("toggle-candidate-panel");
   }
 
+  /** The panel's scroller: the sections, below its header. */
+  getScroll() {
+    return this.page.getByTestId("candidate-panel-scroll");
+  }
+
   /**
    * Each section's header button. By test id, not by name: "Notes" also
    * labels a filter inside the History section.

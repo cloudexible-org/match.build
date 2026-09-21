@@ -11,6 +11,12 @@ import type { ReactNode } from "react";
  * here rather than in both pages, because getting it half-right in one of
  * them is how a page starts scrolling sideways.
  *
+ * The shell fills what the header leaves and never grows past it
+ * (`overflow-hidden`): every column scrolls inside itself, so the window
+ * never does and the composer stays on screen. Each column is handed
+ * `min-h-0` for the same reason — a flex item's automatic minimum size is
+ * its content, and without this the tallest column pushes the page open.
+ *
  * `list` is a render prop rather than a node so the column's classes reach
  * the list's own element: neither list wants a wrapper around it.
  */
@@ -28,17 +34,17 @@ export function ChatShell({
   children: ReactNode;
 }) {
   return (
-    <main className="flex min-h-0 flex-1" data-testid={testId}>
+    <main className="flex min-h-0 flex-1 overflow-hidden" data-testid={testId}>
       {list(
         cn(
-          "w-full md:flex md:w-80 md:shrink-0 md:border-r",
+          "min-h-0 w-full md:flex md:w-80 md:shrink-0 md:border-r",
           open ? "hidden" : "flex",
         ),
       )}
       <section
         aria-label="Conversation"
         className={cn(
-          "min-w-0 flex-1 flex-col md:flex",
+          "min-h-0 min-w-0 flex-1 flex-col md:flex",
           open ? "flex" : "hidden",
         )}
         data-testid={`${testId}-conversation`}

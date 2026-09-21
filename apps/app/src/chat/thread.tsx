@@ -1,5 +1,5 @@
 import { Button, cn } from "@repo/ui";
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 export type ThreadMessage = {
   _id: string;
@@ -24,8 +24,8 @@ const day = new Intl.DateTimeFormat(undefined, {
  * "Only visible to you" badge and a distinct treatment; they are only ever
  * passed in on the matchmaker's side.
  *
- * Scrolls to the newest message as it arrives, unless the reader has scrolled
- * up to read older ones.
+ * Opens on the newest message, and follows the conversation as it arrives —
+ * unless the reader has scrolled up to read older ones.
  */
 export function Thread({
   messages,
@@ -44,24 +44,36 @@ export function Thread({
   loadingOlder: boolean;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
-  const bottom = useRef<HTMLDivElement>(null);
+  /** Whether this thread has been put on its newest message yet. */
+  const opened = useRef(false);
   const latestSeq = messages.at(-1)?.seq ?? 0;
 
-  useEffect(() => {
+  // Before paint, not after: the first page of messages is taller than the
+  // column, and an effect that runs after it would show the oldest of them
+  // for a frame before jumping.
+  useLayoutEffect(() => {
     const element = scroller.current;
     if (element === null) return;
-    // Only follow the conversation if they're already near the bottom.
+    // The first messages to arrive: open on the newest, however far down it
+    // is. A thread is read from the bottom, and the composer is there too.
+    // The paginated query starts empty, so this is not the first run.
+    if (!opened.current) {
+      if (messages.length === 0) return;
+      opened.current = true;
+      element.scrollTop = element.scrollHeight;
+      return;
+    }
+    // After that, only follow the conversation if they're already near the
+    // bottom — never yank someone out of the older messages they're reading.
     const distance =
       element.scrollHeight - element.scrollTop - element.clientHeight;
-    if (distance < 200) {
-      bottom.current?.scrollIntoView({ block: "end" });
-    }
-  }, [latestSeq]);
+    if (distance < 200) element.scrollTop = element.scrollHeight;
+  }, [latestSeq, messages.length]);
 
   return (
     <div
       ref={scroller}
-      className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4"
       data-testid="conversation-messages"
     >
       {canLoadOlder && (
@@ -90,7 +102,6 @@ export function Thread({
           ))}
         </ol>
       )}
-      <div ref={bottom} />
     </div>
   );
 }

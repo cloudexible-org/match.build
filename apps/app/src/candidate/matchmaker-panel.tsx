@@ -34,7 +34,7 @@ export function MatchmakerPanel({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-col overflow-y-auto"
+      className="flex h-full min-h-0 w-full flex-col"
       data-testid="matchmaker-panel"
     >
       <PanelHeader
@@ -43,7 +43,12 @@ export function MatchmakerPanel({
         closeTestId="close-matchmaker-panel"
       />
 
-      <div className="flex flex-col gap-4 p-4">
+      {/* Scrolls under the header, so the way back to the conversation on a
+          phone stays where it was put. */}
+      <div
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
+        data-testid="matchmaker-panel-scroll"
+      >
         <div className="flex flex-col gap-0.5">
           <h2
             className="font-display text-xl"

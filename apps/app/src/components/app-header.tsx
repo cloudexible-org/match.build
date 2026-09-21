@@ -20,7 +20,7 @@ import { ThemeToggle } from "./theme-toggle";
 export function AppHeader({ name, nav }: { name: string; nav?: ReactNode }) {
   const { signOut } = useAuthActions();
   return (
-    <header className="border-b border-border bg-card">
+    <header className="shrink-0 border-b border-border bg-card">
       <div className="flex h-14 items-center justify-between gap-4 px-4">
         {/* The brand and workspace name give way; the controls on the right
             can't shrink, and at 380px something has to. */}

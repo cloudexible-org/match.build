@@ -66,8 +66,11 @@ export function WorkspaceLayout() {
   }
 
   const base = `/mm/${workspace.username}`;
+  // `h-dvh`, not `min-h-dvh`: the workspace is a chat shell, and its columns
+  // scroll inside themselves. A frame that can grow is a frame that takes the
+  // composer off the bottom of the screen.
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex h-dvh flex-col overflow-hidden">
       <AppHeader
         name={me.name ?? ""}
         nav={
@@ -105,7 +108,13 @@ export function WorkspaceLayout() {
           </nav>
         }
       />
-      <Outlet context={workspace satisfies Workspace} />
+      {/* Two page shapes live under this header. The chat shell fills this
+          box exactly and scrolls inside its own columns, so this never
+          scrolls; the workspace's settings and onboard are ordinary pages
+          taller than the screen, and this is what scrolls them. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <Outlet context={workspace satisfies Workspace} />
+      </div>
     </div>
   );
 }

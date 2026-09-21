@@ -41,12 +41,17 @@ export function ConversationPanes({
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
   // `min-w-0`: without it this flex row can grow past a phone's viewport and
-  // the whole page scrolls sideways.
+  // the whole page scrolls sideways. `min-h-0` is the same thing downwards —
+  // the conversation and the panel each scroll inside themselves, and neither
+  // may push the shell taller than the viewport.
   return (
-    <div className="flex min-h-0 min-w-0 flex-1" data-testid={testId}>
+    <div
+      className="flex min-h-0 min-w-0 flex-1 overflow-hidden"
+      data-testid={testId}
+    >
       <div
         className={cn(
-          "min-w-0 flex-1 flex-col",
+          "min-h-0 min-w-0 flex-1 flex-col",
           panelOpen ? "hidden lg:flex" : "flex",
         )}
       >
@@ -84,7 +89,7 @@ export function ConversationPanes({
       <aside
         aria-label={panelLabel}
         className={cn(
-          "min-w-0 flex-1 border-border lg:flex lg:max-w-sm lg:border-l",
+          "min-h-0 min-w-0 flex-1 overflow-hidden border-border lg:flex lg:max-w-sm lg:border-l",
           panelOpen ? "flex" : "hidden",
         )}
       >

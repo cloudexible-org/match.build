@@ -67,8 +67,13 @@ export function CandidatePanel({
         closeTestId="close-candidate-panel"
       />
       {/* Sections rather than tabs: a matchmaker reading a thread wants the
-          details and their notes at once, not one at a time. */}
-      <Accordion defaultValue={["details"]} className="overflow-y-auto">
+          details and their notes at once, not one at a time. They scroll as
+          this column, under its header — never as the page. */}
+      <Accordion
+        defaultValue={["details"]}
+        className="min-h-0 flex-1 overflow-y-auto"
+        data-testid="candidate-panel-scroll"
+      >
         <AccordionSection value="details" title="Details">
           <Details candidate={candidate} />
         </AccordionSection>
