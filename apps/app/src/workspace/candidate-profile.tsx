@@ -42,6 +42,13 @@ import { useWorkspace } from "./workspace-layout";
  * screen imports the same one the server validates against, so a value the
  * form accepts is a value the mutation accepts.
  *
+ * **It reads as a record, not as a form.** This is the narrowest column on
+ * the screen, so a fact is one line — label left, value in a second column
+ * you can scan straight down — and the ways to change it (the pencil, the
+ * add-a-field control) stay out of the way until you reach for them. The old
+ * shape spent three lines and a row of buttons on every fact, which buried
+ * five facts under a screenful of chrome.
+ *
  * **An agent's open proposals are not here.** They are answered in the stack
  * above the composer (`chat/suggestion-stack.tsx`), where the conversation
  * that produced them is. This section is the record: what is on it, and the
@@ -79,7 +86,7 @@ export function CandidateProfile({
   }
 
   return (
-    <div className="flex flex-col gap-5" data-testid="candidate-profile">
+    <div className="flex flex-col gap-6" data-testid="candidate-profile">
       <Facts candidateId={candidateId} entries={profile.facts} />
       <Notes candidateId={candidateId} entries={profile.notes} />
     </div>
@@ -110,24 +117,29 @@ function Facts({
       {groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
       ) : (
-        groups.map(({ group, fields }) => (
-          <div key={group} className="flex flex-col gap-2">
-            <h4 className="text-sm font-medium">
-              {CANDIDATE_GROUP_LABELS[group]}
-            </h4>
-            <ul className="flex flex-col divide-y divide-border">
-              {fields.map((field) => (
-                <FactRow
-                  key={field.key}
-                  candidateId={candidateId}
-                  field={field}
-                  // biome-ignore lint/style/noNonNullAssertion: `filled` proves it
-                  entry={entries[field.key]!}
-                />
-              ))}
-            </ul>
-          </div>
-        ))
+        <div className="flex flex-col gap-4">
+          {groups.map(({ group, fields }) => (
+            <section key={group} className="flex flex-col gap-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {CANDIDATE_GROUP_LABELS[group]}
+              </h4>
+              {/* `-mx-2` so a row's hover background bleeds into the panel's
+                  own padding and reads as a full-width row, the way a list
+                  row should. */}
+              <ul className="-mx-2 flex flex-col">
+                {fields.map((field) => (
+                  <FactRow
+                    key={field.key}
+                    candidateId={candidateId}
+                    field={field}
+                    // biome-ignore lint/style/noNonNullAssertion: `filled` proves it
+                    entry={entries[field.key]!}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
       <AddFact candidateId={candidateId} filled={filled} />
     </div>
@@ -169,13 +181,15 @@ function FactRow({
     }
   }
 
-  return (
-    <li
-      className="flex flex-col gap-1 py-2"
-      data-testid="profile-field"
-      data-field={field.key}
-    >
-      {editing ? (
+  const source = PROFILE_SOURCE_LABELS[entry.source];
+
+  if (editing) {
+    return (
+      <li
+        className="px-2 py-2"
+        data-testid="profile-field"
+        data-field={field.key}
+      >
         <form noValidate onSubmit={submit} className="flex flex-col gap-2">
           <Field invalid={error !== null}>
             <FieldLabel>{field.label}</FieldLabel>
@@ -183,10 +197,14 @@ function FactRow({
             {error ? (
               <FieldError match>{error}</FieldError>
             ) : (
-              field.hint && <FieldDescription>{field.hint}</FieldDescription>
+              // Where the value came from is worth knowing exactly when you
+              // are about to replace it, and nowhere else.
+              <FieldDescription>
+                {field.hint ? `${field.hint} · ${source}` : source}
+              </FieldDescription>
             )}
           </Field>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button type="submit" size="sm">
               Save
             </Button>
@@ -202,34 +220,11 @@ function FactRow({
             >
               Cancel
             </Button>
-          </div>
-        </form>
-      ) : (
-        <>
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm text-muted-foreground">{field.label}</span>
-            <span className="break-words text-right text-sm">
-              {displayValue(field, entry.value)}
-              {field.key === "dateOfBirth" && ageOf(entry.value)}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {PROFILE_SOURCE_LABELS[entry.source]}
-            </span>
             <Button
+              type="button"
               size="sm"
               variant="ghost"
-              onClick={() => {
-                setDraft(entry.value);
-                setEditing(true);
-              }}
-            >
-              Edit
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
+              className="ml-auto text-destructive hover:text-destructive"
               onClick={() =>
                 void clear({
                   matchmakerId: workspace.matchmakerId,
@@ -242,12 +237,48 @@ function FactRow({
               Clear
             </Button>
           </div>
-          {entry.sourceQuote && (
-            <p className="border-l-2 border-border pl-2 text-xs italic text-muted-foreground">
-              “{entry.sourceQuote}”
-            </p>
-          )}
-        </>
+        </form>
+      </li>
+    );
+  }
+
+  return (
+    // `relative`: the `sr-only` line below is absolutely positioned, and an
+    // absolute box with no positioned ancestor is not clipped by the panel's
+    // scroller — it would sit at its static offset in the *document* and give
+    // the window a thousand pixels to scroll (`specs/app-convex/layout.spec`).
+    <li className="relative" data-testid="profile-field" data-field={field.key}>
+      {/* The whole row is the edit control. A narrow column cannot afford a
+          permanent pair of buttons per fact, and a row you click to change is
+          the thing every records panel already taught people. */}
+      <button
+        type="button"
+        title={source}
+        className="group/row flex w-full items-baseline gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        onClick={() => {
+          setDraft(entry.value);
+          setEditing(true);
+        }}
+      >
+        <span className="w-32 shrink-0 text-sm text-muted-foreground">
+          {field.label}
+        </span>
+        <span className="min-w-0 flex-1 break-words text-sm">
+          {entry.source !== "matchmaker" && <AssistantMark />}
+          {displayValue(field, entry.value)}
+          {field.key === "dateOfBirth" && ageOf(entry.value)}
+        </span>
+        <PencilIcon className="size-3.5 shrink-0 self-center text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-visible/row:opacity-100" />
+        {/* The button's name is its content — label, value, then this — so a
+            screen reader hears the fact before it hears what the button does.
+            An `aria-label` here would replace all of it with "Edit …". */}
+        <span className="sr-only">Edit</span>
+      </button>
+      <span className="sr-only">{source}</span>
+      {entry.sourceQuote && (
+        <p className="ml-2 border-l-2 border-border pl-2 text-xs italic text-muted-foreground">
+          “{entry.sourceQuote}”
+        </p>
       )}
     </li>
   );
@@ -262,6 +293,7 @@ function AddFact({
 }) {
   const workspace = useWorkspace();
   const save = useMutation(api.candidateProfiles.mutations.setEntry);
+  const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -271,6 +303,23 @@ function AddFact({
   );
   const field = key ? candidateField(key) : null;
   if (available.length === 0) return null;
+
+  // Folded away by default: a reading surface should not end in a form that
+  // is empty nine visits out of ten.
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        data-testid="profile-add-field-open"
+        onClick={() => setOpen(true)}
+      >
+        + Add a field
+      </Button>
+    );
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -291,6 +340,7 @@ function AddFact({
       });
       setKey("");
       setDraft("");
+      setOpen(false);
     } catch (caught) {
       setError(serverErrorMessage(caught, "We couldn't save that."));
     }
@@ -300,7 +350,7 @@ function AddFact({
     <form
       noValidate
       onSubmit={submit}
-      className="flex flex-col gap-2"
+      className="flex flex-col gap-2 rounded-lg border border-border p-3"
       data-testid="profile-add-field-form"
     >
       <Field invalid={error !== null}>
@@ -338,11 +388,26 @@ function AddFact({
           field?.hint && <FieldDescription>{field.hint}</FieldDescription>
         )}
       </Field>
-      {field && (
-        <Button type="submit" size="sm" className="self-start">
-          Add
+      <div className="flex gap-2">
+        {field && (
+          <Button type="submit" size="sm">
+            Add
+          </Button>
+        )}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setKey("");
+            setDraft("");
+            setError(null);
+            setOpen(false);
+          }}
+        >
+          Cancel
         </Button>
-      )}
+      </div>
     </form>
   );
 }
@@ -431,12 +496,14 @@ function Notes({
     .sort((a, b) => candidateNoteLabel(a).localeCompare(candidateNoteLabel(b)));
 
   return (
-    <div className="flex flex-col gap-3">
-      <h4 className="text-sm font-medium">Notes</h4>
+    <div className="flex flex-col gap-2 border-t border-border pt-4">
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Notes
+      </h4>
       {filled.length === 0 ? (
         <p className="text-sm text-muted-foreground">No notes yet.</p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-2">
           {filled.map((key) => (
             <NoteRow
               key={key}
@@ -488,17 +555,64 @@ function NoteRow({
     }
   }
 
+  const source = PROFILE_SOURCE_LABELS[entry.source];
+
   return (
     <li
-      className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3"
+      // `relative` for the same reason the fact row has it: it contains the
+      // absolutely positioned `sr-only` line.
+      className="group/note relative rounded-lg border border-border bg-card px-3 py-2.5"
       data-testid="profile-note"
       data-note={noteKey}
     >
-      <span className="text-xs font-medium text-muted-foreground">
-        {candidateNoteLabel(noteKey)}
-      </span>
+      <div className="flex items-center gap-1">
+        <span
+          className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground"
+          title={source}
+        >
+          {entry.source !== "matchmaker" && <AssistantMark />}
+          {candidateNoteLabel(noteKey)}
+        </span>
+        {!editing && (
+          // Present but quiet: the note body is what you came to read, and a
+          // pair of buttons per note is what made this column a wall of them.
+          <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/note:opacity-100">
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label="Edit"
+              title="Edit"
+              className="size-7 p-0"
+              onClick={() => {
+                setDraft(entry.value);
+                setEditing(true);
+              }}
+            >
+              <PencilIcon className="size-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label="Remove"
+              title="Remove"
+              className="size-7 p-0 text-muted-foreground hover:text-destructive"
+              onClick={() =>
+                void clear({
+                  matchmakerId: workspace.matchmakerId,
+                  candidateId,
+                  kind: "notes",
+                  key: noteKey,
+                })
+              }
+            >
+              <TrashIcon className="size-3.5" />
+            </Button>
+          </span>
+        )}
+      </div>
+      <span className="sr-only">{source}</span>
       {editing ? (
-        <form noValidate onSubmit={submit} className="flex flex-col gap-2">
+        <form noValidate onSubmit={submit} className="mt-2 flex flex-col gap-2">
           <Field invalid={error !== null}>
             <FieldLabel className="sr-only">
               {candidateNoteLabel(noteKey)}
@@ -510,7 +624,11 @@ function NoteRow({
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
             />
-            {error && <FieldError match>{error}</FieldError>}
+            {error ? (
+              <FieldError match>{error}</FieldError>
+            ) : (
+              <FieldDescription>{source}</FieldDescription>
+            )}
           </Field>
           <div className="flex gap-2">
             <Button type="submit" size="sm">
@@ -531,40 +649,9 @@ function NoteRow({
           </div>
         </form>
       ) : (
-        <>
-          <p className="whitespace-pre-wrap break-words text-sm">
-            {entry.value}
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {PROFILE_SOURCE_LABELS[entry.source]}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setDraft(entry.value);
-                setEditing(true);
-              }}
-            >
-              Edit
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                void clear({
-                  matchmakerId: workspace.matchmakerId,
-                  candidateId,
-                  kind: "notes",
-                  key: noteKey,
-                })
-              }
-            >
-              Remove
-            </Button>
-          </div>
-        </>
+        <p className="mt-0.5 whitespace-pre-wrap break-words text-sm">
+          {entry.value}
+        </p>
       )}
     </li>
   );
@@ -581,6 +668,7 @@ function AddNote({
 }) {
   const workspace = useWorkspace();
   const save = useMutation(api.candidateProfiles.mutations.setEntry);
+  const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState("");
   const [customKey, setCustomKey] = useState("");
   const [body, setBody] = useState("");
@@ -590,6 +678,28 @@ function AddNote({
     (note) => !filled.includes(note.key),
   );
   const key = choice === CUSTOM_NOTE ? customKey : choice;
+
+  function reset() {
+    setChoice("");
+    setCustomKey("");
+    setBody("");
+    setError(null);
+  }
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-1 self-start"
+        data-testid="profile-add-note-open"
+        onClick={() => setOpen(true)}
+      >
+        + Add a note
+      </Button>
+    );
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -604,16 +714,20 @@ function AddNote({
         key,
         value: body,
       });
-      setChoice("");
-      setCustomKey("");
-      setBody("");
+      reset();
+      setOpen(false);
     } catch (caught) {
       setError(serverErrorMessage(caught, "We couldn't save that note."));
     }
   }
 
   return (
-    <form noValidate onSubmit={submit} className="flex flex-col gap-2">
+    <form
+      noValidate
+      onSubmit={submit}
+      className="mt-1 flex flex-col gap-2 rounded-lg border border-border p-3"
+      data-testid="profile-add-note-form"
+    >
       <Field invalid={error !== null}>
         <FieldLabel>Add a note</FieldLabel>
         <NativeSelect
@@ -654,12 +768,73 @@ function AddNote({
         )}
         {error && <FieldError match>{error}</FieldError>}
       </Field>
-      {choice && (
-        <Button type="submit" size="sm" className="self-start">
-          Add note
+      <div className="flex gap-2">
+        {choice && (
+          <Button type="submit" size="sm">
+            Add note
+          </Button>
+        )}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
+        >
+          Cancel
         </Button>
-      )}
+      </div>
     </form>
+  );
+}
+
+/*
+ * ─── Marks ──────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * The one piece of provenance worth a pixel in read mode. Whose record it is
+ * is the default; that a model touched a value is the exception, and the
+ * exception is what a mark is for. The full wording is on the row's `title`,
+ * in its `sr-only` line and in the edit form.
+ */
+function AssistantMark() {
+  return (
+    <span
+      aria-hidden
+      className="mr-1 inline-block align-baseline text-xs text-primary"
+    >
+      ✦
+    </span>
+  );
+}
+
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 16 16" fill="none" className={className}>
+      <path
+        d="M11.3 2.7a1.7 1.7 0 0 1 2.4 2.4L5.6 13.2 2 14l.8-3.6 8.5-7.7Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 16 16" fill="none" className={className}>
+      <path
+        d="M2.5 4h11M6 4V2.5h4V4m-6 0 .6 9a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9L12 4"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

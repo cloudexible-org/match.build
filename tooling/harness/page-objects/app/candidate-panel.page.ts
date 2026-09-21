@@ -88,7 +88,20 @@ export class CandidatePanelPage {
       .getByTestId("profile-value");
   }
 
+  /**
+   * Unfolds the add-a-field form. It is a button until you reach for it, so
+   * the panel reads as a record rather than ending in an empty form.
+   */
+  async openAddField() {
+    const form = this.page.getByTestId("profile-add-field-form");
+    if (!(await form.isVisible())) {
+      await this.page.getByTestId("profile-add-field-open").click();
+    }
+    return form;
+  }
+
   async addField(key: string, value: string) {
+    await this.openAddField();
     await this.page.getByTestId("profile-add-field").selectOption(key);
     await this.fillValue(this.getAddFieldValue(), value);
     await this.page.getByRole("button", { name: "Add", exact: true }).click();
@@ -111,8 +124,15 @@ export class CandidatePanelPage {
     await row.getByRole("button", { name: "Save" }).click();
   }
 
+  /**
+   * Clearing lives inside the row's edit form: the read row is one line with
+   * no room for a pair of buttons, and emptying a field is worth the extra
+   * click anyway.
+   */
   async clearField(key: string) {
-    await this.getField(key).getByRole("button", { name: "Clear" }).click();
+    const row = this.getField(key);
+    await row.getByRole("button", { name: "Edit" }).click();
+    await row.getByRole("button", { name: "Clear" }).click();
   }
 
   // --- Profile: free-text notes --------------------------------------------
@@ -127,7 +147,17 @@ export class CandidatePanelPage {
     );
   }
 
+  /** Unfolds the add-a-note form, which is a button until you reach for it. */
+  async openAddNote() {
+    const form = this.page.getByTestId("profile-add-note-form");
+    if (!(await form.isVisible())) {
+      await this.page.getByTestId("profile-add-note-open").click();
+    }
+    return form;
+  }
+
   async addNote(key: string, body: string) {
+    await this.openAddNote();
     await this.page.getByTestId("profile-add-note-key").selectOption(key);
     await this.page.getByTestId("profile-add-note-body").fill(body);
     await this.page.getByRole("button", { name: "Add note" }).click();

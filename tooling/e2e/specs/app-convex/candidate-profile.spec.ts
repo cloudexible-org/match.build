@@ -71,6 +71,9 @@ test("a fact is added, edited and cleared", async ({ page }) => {
 
   await panel.addField("wantsKids", "yes");
   await expect(panel.getField("wantsKids")).toContainText("yes");
+  // Provenance is on the row, not shouted from it: a value you typed is the
+  // default, so the wording lives in the row's title and its screen-reader
+  // line rather than on a third line of every fact.
   await expect(panel.getField("wantsKids")).toContainText("You added this");
 
   await panel.editField("wantsKids", "maybe");
@@ -89,6 +92,7 @@ test("a fact is added, edited and cleared", async ({ page }) => {
 test("a value the registry refuses never reaches the row", async ({ page }) => {
   const panel = await openProfile(page, "facts");
 
+  await panel.openAddField();
   await page.getByTestId("profile-add-field").selectOption("partnerAgeRange");
   await panel.getAddFieldValue().fill("36-28");
   await page.getByRole("button", { name: "Add", exact: true }).click();
@@ -119,7 +123,8 @@ test("a note is added, edited and removed", async ({ page }) => {
 });
 
 test("an empty note is refused", async ({ page }) => {
-  await openProfile(page, "notes");
+  const panel = await openProfile(page, "notes");
+  await panel.openAddNote();
   await page.getByTestId("profile-add-note-key").selectOption("hobbies");
   await page.getByRole("button", { name: "Add note" }).click();
   await expect(page.getByText("Write something first.")).toBeVisible();
