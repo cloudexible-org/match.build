@@ -365,7 +365,12 @@ test("the board fills the frame, and never scrolls past it", async ({
     // A page scrollbar on a board is a page scrollbar into nothing: the
     // columns have already given up their slack, so there is nothing under
     // the bottom of the board to find.
-    expect(await board.frameOverflow(), `at ${height}px tall`).toBe(0);
+    expect(await board.frameOverflow(), `frame at ${height}px tall`).toBe(0);
+    // And the document itself must not scroll either. The workspace is a
+    // `h-dvh` shell, so it can only happen when something inside is
+    // absolutely positioned without a positioned ancestor — nothing clips
+    // such an element, and a column of cards then stretches the whole page.
+    expect(await board.pageScroll(), `page at ${height}px tall`).toBe(0);
   }
 
   // The height goes somewhere: a column out of room scrolls its own cards.

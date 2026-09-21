@@ -92,7 +92,12 @@ export function MatchCard({
       data-score={card.score ?? ""}
       data-new={isNew}
       className={cn(
-        "flex cursor-grab flex-col gap-2 rounded-xl border bg-card p-3 text-left shadow-sm transition-opacity active:cursor-grabbing",
+        // `relative`: the card carries an `sr-only` label, which is absolutely
+        // positioned. Without a positioned ancestor its containing block is
+        // the page itself, so no scroll container clips it — and a column of
+        // cards then stretches the *document* to the height of its content,
+        // giving the whole page a scrollbar into empty space.
+        "relative flex cursor-grab flex-col gap-2 rounded-xl border bg-card p-3 text-left shadow-sm transition-opacity active:cursor-grabbing",
         dimmed && "opacity-60",
         isNew ? "border-primary/40" : "border-border",
       )}
