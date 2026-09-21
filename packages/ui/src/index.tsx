@@ -20,5 +20,10 @@ export {
 } from "./components/field";
 export { Menu, MenuItem } from "./components/menu";
 export { NativeSelect } from "./components/native-select";
+export {
+  Popover,
+  PopoverClose,
+  PopoverTitle,
+} from "./components/popover";
 export { Textarea } from "./components/textarea";
 export { cn } from "./lib/cn";
