@@ -191,9 +191,19 @@ test("the board is three columns, reachable from the workspace", async ({
   await expect(board.getColumn("proposed")).toBeVisible();
   await expect(board.getColumn("connected")).toBeVisible();
 
-  // What is over is off the board, behind a line that counts it.
+  // What is over is not one of them. It is counted above the board, and that
+  // count is the way to it.
   await expect(board.getColumn("proposed")).not.toContainText("Backa One");
+  await expect(board.getClosed()).toHaveCount(0);
   await expect(board.getClosedToggle()).toContainText("closed");
+
+  await board.openClosed();
+  await expect(page.getByTestId("match-column")).toHaveCount(4);
+  await expect(board.getClosed()).toContainText("Backa One");
+
+  // And it puts itself away again.
+  await board.openClosed();
+  await expect(board.getClosed()).toHaveCount(0);
 });
 
 test("a card says who, how well, and why", async ({ page }) => {
@@ -249,7 +259,7 @@ test("closing a match that didn't work records who ended it and why", async ({
   await card.getByTestId("close-note").fill("She's moving to Berlin.");
   await card.getByTestId("close-submit").click();
 
-  // Off the board's columns, and into the line underneath.
+  // Off the board's live columns, and into the count above it.
   await expect(board.getColumn("proposed")).not.toContainText("Reja One");
   await board.openClosed();
   const closed = board.getCard("Reja One", "Rejb Two");

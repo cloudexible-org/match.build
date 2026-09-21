@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
-/** The three columns, left to right. Closed is off the board and below it. */
-export type MatchStage = "proposed" | "introduced" | "connected";
+/** The three columns, left to right, and the one hidden until it is asked for. */
+export type MatchStage = "proposed" | "introduced" | "connected" | "closed";
 
 /**
  * The match board (prd/phase-3.md §2), at `/mm/:username/matches`. Rendered by
@@ -60,17 +60,22 @@ export class MatchesPage {
     return this.getColumn(stage).getByTestId("match-column-count");
   }
 
-  /** The collapsed line under the board, and what it opens. */
-  getClosed() {
-    return this.page.getByTestId("match-closed");
-  }
-
+  /**
+   * The count above the board — "14 closed · 3 together" — which is also the
+   * way into the Closed column. Absent while nothing has ended.
+   */
   getClosedToggle() {
     return this.page.getByTestId("match-closed-toggle");
   }
 
+  /** Shows the Closed column. */
   async openClosed() {
     await this.getClosedToggle().click();
+  }
+
+  /** The Closed column itself, which is not rendered until it is opened. */
+  getClosed() {
+    return this.getColumn("closed");
   }
 
   getCards() {
@@ -88,7 +93,7 @@ export class MatchesPage {
     return this.page.locator(`[data-match-id="${matchId}"]`);
   }
 
-  getCardsIn(stage: MatchStage | "closed") {
+  getCardsIn(stage: MatchStage) {
     return this.page.locator(
       `[data-testid="match-card"][data-stage="${stage}"]`,
     );
