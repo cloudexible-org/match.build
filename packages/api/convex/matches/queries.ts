@@ -14,12 +14,12 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { type QueryCtx, query } from "../_generated/server";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
 import {
-  matchRejectedBy,
-  matchResponse,
+  matchClosedBy,
+  matchOutcome,
   matchSignal,
   matchStage,
 } from "../schema";
-import { MATCH_LIMITS, MATCH_STAGES, rejectedIsVisible } from "./rules";
+import { MATCH_LIMITS, MATCH_STAGES } from "./rules";
 
 /** One person on a card. The app falls back to the email, as the list does. */
 const person = v.object({
@@ -41,11 +41,10 @@ const card = v.object({
   checkDealbreakers: v.optional(v.boolean()),
   algorithmVersion: v.optional(v.number()),
   lastScoredAt: v.optional(v.number()),
-  candidateAResponse: v.optional(matchResponse),
-  candidateBResponse: v.optional(matchResponse),
-  rejectedBy: v.optional(matchRejectedBy),
-  rejectionReason: v.optional(v.string()),
-  outcome: v.optional(v.string()),
+  closedAs: v.optional(matchOutcome),
+  closedBy: v.optional(matchClosedBy),
+  closingNote: v.optional(v.string()),
+  seenAt: v.optional(v.number()),
 });
 
 /**
@@ -53,16 +52,15 @@ const card = v.object({
  * bounded read per column, so a Rejected lane a year deep can never crowd the
  * columns out of the query.
  *
- * Rejected cards age out of the *view* after a month (§2) rather than out of the
- * table: they are taste signal, and the one thing the platform should keep of a
- * match that didn't work is why.
+ * Closed cards come back too, under their own cap: they are off the board, not
+ * out of reach, and the board shows them behind a summary line. Nothing ages
+ * out — what a match ended as, and why, is the one thing worth keeping of it.
  */
 export const board = query({
   args: { matchmakerId: v.id("matchmakers") },
   returns: v.array(card),
   handler: async (ctx, args) => {
     const { matchmaker } = await requireMatchmaker(ctx, args.matchmakerId);
-    const now = Date.now();
     const people = new Map<Id<"candidates">, Doc<"candidates"> | null>();
 
     const cards = [];
@@ -73,14 +71,12 @@ export const board = query({
           q.eq("matchmakerId", matchmaker._id).eq("stage", stage),
         )
         .order("desc")
-        .take(MATCH_LIMITS.cardsPerColumn);
+        .take(
+          stage === "closed"
+            ? MATCH_LIMITS.closedShown
+            : MATCH_LIMITS.cardsPerColumn,
+        );
       for (const match of rows) {
-        if (
-          stage === "rejected" &&
-          !rejectedIsVisible(match.stageChangedAt, now)
-        ) {
-          continue;
-        }
         const a = await personOn(ctx, people, match.candidateAId);
         const b = await personOn(ctx, people, match.candidateBId);
         // A card whose person has been erased or hard-lost is not a card. This
@@ -100,11 +96,10 @@ export const board = query({
           checkDealbreakers: match.checkDealbreakers,
           algorithmVersion: match.algorithmVersion,
           lastScoredAt: match.lastScoredAt,
-          candidateAResponse: match.candidateAResponse,
-          candidateBResponse: match.candidateBResponse,
-          rejectedBy: match.rejectedBy,
-          rejectionReason: match.rejectionReason,
-          outcome: match.outcome,
+          closedAs: match.closedAs,
+          closedBy: match.closedBy,
+          closingNote: match.closingNote,
+          seenAt: match.seenAt,
         });
       }
     }
@@ -135,7 +130,6 @@ export const forCandidate = query({
     const { matchmaker } = await requireMatchmaker(ctx, args.matchmakerId);
     const candidate = await ctx.db.get("candidates", args.candidateId);
     assertSameTenant(candidate, matchmaker._id);
-    const now = Date.now();
     const people = new Map<Id<"candidates">, Doc<"candidates"> | null>();
 
     const rows = [
@@ -161,12 +155,6 @@ export const forCandidate = query({
       // belongs to one matchmaker — but a tenancy check that relies on that
       // is a tenancy check somebody can break by adding a second.
       if (match.matchmakerId !== matchmaker._id) continue;
-      if (
-        match.stage === "rejected" &&
-        !rejectedIsVisible(match.stageChangedAt, now)
-      ) {
-        continue;
-      }
       const a = await personOn(ctx, people, match.candidateAId);
       const b = await personOn(ctx, people, match.candidateBId);
       if (a === null || b === null) continue;
@@ -183,11 +171,10 @@ export const forCandidate = query({
         checkDealbreakers: match.checkDealbreakers,
         algorithmVersion: match.algorithmVersion,
         lastScoredAt: match.lastScoredAt,
-        candidateAResponse: match.candidateAResponse,
-        candidateBResponse: match.candidateBResponse,
-        rejectedBy: match.rejectedBy,
-        rejectionReason: match.rejectionReason,
-        outcome: match.outcome,
+        closedAs: match.closedAs,
+        closedBy: match.closedBy,
+        closingNote: match.closingNote,
+        seenAt: match.seenAt,
       });
     }
     return cards;

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
   ageOf,
-  bothSaidYes,
+  closingNeedsWho,
+  closingNoteError,
   coverageLabel,
   evaluatePair,
   hardBlockers,
@@ -11,8 +12,6 @@ import {
   MATCH_STAGES,
   type ProfileFacts,
   pairKey,
-  rejectedIsVisible,
-  rejectionReasonError,
   seekingTerms,
   stageChangeError,
   topSignals,
@@ -85,40 +84,43 @@ function scored(a: ProfileFacts, b: ProfileFacts) {
 }
 
 describe("the board's vocabulary", () => {
-  test("rejected is a lane, not a column", () => {
-    expect(MATCH_STAGES).toContain("rejected");
-    expect(MATCH_BOARD_STAGES).not.toContain("rejected");
+  test("closed is not a column", () => {
+    expect(MATCH_STAGES).toContain("closed");
+    expect(MATCH_BOARD_STAGES).not.toContain("closed");
     expect(MATCH_BOARD_STAGES).toHaveLength(MATCH_STAGES.length - 1);
   });
 
-  test("a card goes anywhere except nowhere, and into Rejected only with a reason", () => {
-    expect(stageChangeError("suggested", "connected")).toBeNull();
-    expect(stageChangeError("connected", "reviewing")).toBeNull();
-    expect(stageChangeError("rejected", "suggested")).toBeNull();
-    expect(stageChangeError("suggested", "suggested")).not.toBeNull();
-    expect(stageChangeError("reviewing", "rejected")).not.toBeNull();
+  test("three columns, each of them something that happened", () => {
+    expect(MATCH_BOARD_STAGES).toEqual(["proposed", "introduced", "connected"]);
   });
 
-  test("a rejection needs a why", () => {
-    expect(rejectionReasonError("")).not.toBeNull();
-    expect(rejectionReasonError("   ")).not.toBeNull();
+  test("a card goes anywhere except nowhere, and closes only through Close", () => {
+    expect(stageChangeError("proposed", "connected")).toBeNull();
+    expect(stageChangeError("connected", "introduced")).toBeNull();
+    // Back onto the board from closed is an ordinary move.
+    expect(stageChangeError("closed", "proposed")).toBeNull();
+    expect(stageChangeError("proposed", "proposed")).not.toBeNull();
+    expect(stageChangeError("introduced", "closed")).not.toBeNull();
+  });
+
+  test("a no needs a reason; a yes does not", () => {
+    expect(closingNoteError("didnt_work", "")).not.toBeNull();
+    expect(closingNoteError("didnt_work", "   ")).not.toBeNull();
     expect(
-      rejectionReasonError("x".repeat(MATCH_LIMITS.rejectionReason + 1)),
+      closingNoteError("didnt_work", "She's moving to Berlin."),
+    ).toBeNull();
+    // Making somebody write a sentence about good news is how good news
+    // stops getting recorded.
+    expect(closingNoteError("together", "")).toBeNull();
+    expect(closingNoteError("together", "Engaged in May.")).toBeNull();
+    expect(
+      closingNoteError("together", "x".repeat(MATCH_LIMITS.closingNote + 1)),
     ).not.toBeNull();
-    expect(rejectionReasonError("She's moving to Berlin.")).toBeNull();
   });
 
-  test("mutual interest is two yeses and nothing less", () => {
-    expect(bothSaidYes("yes", "yes")).toBe(true);
-    expect(bothSaidYes("yes", "pending")).toBe(false);
-    expect(bothSaidYes("yes", undefined)).toBe(false);
-    expect(bothSaidYes("no", "no")).toBe(false);
-  });
-
-  test("a rejected card ages out of the lane", () => {
-    const day = 86_400_000;
-    expect(rejectedIsVisible(NOW - day, NOW)).toBe(true);
-    expect(rejectedIsVisible(NOW - 31 * day, NOW)).toBe(false);
+  test("only a no has somebody who ended it", () => {
+    expect(closingNeedsWho("didnt_work")).toBe(true);
+    expect(closingNeedsWho("together")).toBe(false);
   });
 });
 

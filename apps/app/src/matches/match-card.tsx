@@ -1,13 +1,17 @@
 import {
+  closingNeedsWho,
+  closingNoteError,
   MATCH_BOARD_STAGES,
+  MATCH_CLOSED_BY_CHOICES,
+  MATCH_CLOSED_BY_LABELS,
   MATCH_LIMITS,
-  MATCH_REJECTED_BY_LABELS,
+  MATCH_OUTCOME_BADGES,
+  MATCH_OUTCOME_LABELS,
+  MATCH_OUTCOMES,
   MATCH_STAGE_LABELS,
-  type MatchRejectedBy,
-  type MatchResponse,
+  type MatchClosedBy,
+  type MatchOutcome,
   type MatchStage,
-  outcomeError,
-  rejectionReasonError,
 } from "@repo/api";
 import { Button, cn, Menu, MenuItem, Textarea } from "@repo/ui";
 import { type FormEvent, useState } from "react";
@@ -18,25 +22,30 @@ import {
   type BoardCard,
   cardReasons,
   cardTitle,
+  closingLine,
+  isSeen,
   personName,
-  RESPONSE_SIDES,
-  type ResponseSide,
-  rejectionLine,
-  responseLine,
-  responseOf,
   scoreLine,
   scoreTone,
-  sideOf,
 } from "./cards";
+
+/** How a match ends, as the close form hands it over. */
+export type Closing = {
+  outcome: MatchOutcome;
+  closedBy?: MatchClosedBy;
+  note: string;
+  /** Take both of them out of the book. Only offered when they're together. */
+  archiveBoth: boolean;
+};
 
 /** What a card can be asked to do. Every one of them is the board's to perform. */
 export type CardActions = {
   onMove: (stage: MatchStage) => void;
-  onReject: (rejectedBy: MatchRejectedBy, reason: string) => void;
-  onRespond: (side: ResponseSide, response: MatchResponse) => void;
-  onOutcome: (outcome: string) => void;
+  onClose: (closing: Closing) => void;
+  /** Called the first time the matchmaker opens a card they hadn't seen. */
+  onSeen: () => void;
   /** Where a candidate's conversation is, for the names on the card. */
-  conversationPath: (card: BoardCard, side: ResponseSide) => string;
+  conversationPath: (card: BoardCard, side: "a" | "b") => string;
 };
 
 /**
@@ -63,10 +72,16 @@ export function MatchCard({
   dimmed?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
+  const [closing, setClosing] = useState(false);
   const reasons = open ? allReasons(card) : cardReasons(card);
   const score = scoreLine(card);
   const tone = scoreTone(card.score);
+  const isNew = card.stage === "proposed" && !isSeen(card);
+
+  /** Reading a card is what makes it no longer new. */
+  function look() {
+    if (isNew) actions.onSeen();
+  }
 
   return (
     <article
@@ -79,13 +94,28 @@ export function MatchCard({
       data-match-id={card.matchId}
       data-stage={card.stage}
       data-score={card.score ?? ""}
+      data-new={isNew}
+      onPointerDown={look}
       className={cn(
-        "flex cursor-grab flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-opacity active:cursor-grabbing",
+        "flex cursor-grab flex-col gap-2 rounded-xl border bg-card p-3 text-left shadow-sm transition-opacity active:cursor-grabbing",
         dimmed && "opacity-60",
+        isNew ? "border-primary/40" : "border-border",
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="min-w-0 text-sm font-medium leading-snug">
+          {isNew && (
+            <>
+              {/* The dot is decoration; the words are what a screen reader
+                  gets, since "new" is not a colour. */}
+              <span
+                aria-hidden
+                data-testid="match-card-new"
+                className="mr-1.5 inline-block size-1.5 shrink-0 rounded-full bg-primary align-middle"
+              />
+              <span className="sr-only">Not looked at yet. </span>
+            </>
+          )}
           <Link
             to={actions.conversationPath(card, "a")}
             className="hover:underline"
@@ -105,7 +135,10 @@ export function MatchCard({
         <CardMenu
           card={card}
           actions={actions}
-          onReject={() => setRejecting(true)}
+          onClose={() => {
+            look();
+            setClosing(true);
+          }}
         />
       </div>
 
@@ -123,6 +156,20 @@ export function MatchCard({
             )}
           >
             {score}
+          </span>
+        )}
+        {card.stage === "closed" && card.closedAs !== undefined && (
+          <span
+            data-testid="match-card-outcome"
+            data-outcome={card.closedAs}
+            className={cn(
+              "rounded-md px-1.5 py-0.5 font-medium",
+              card.closedAs === "together"
+                ? "bg-primary/15 text-primary"
+                : "bg-muted text-muted-foreground",
+            )}
+          >
+            {MATCH_OUTCOME_BADGES[card.closedAs]}
           </span>
         )}
         {card.origin === "manual" && (
@@ -177,31 +224,22 @@ export function MatchCard({
         </p>
       )}
 
-      {card.stage === "introduced" && (
-        <Responses card={card} onRespond={actions.onRespond} />
-      )}
-
-      {card.stage === "rejected" && (
+      {card.stage === "closed" && closingLine(card) !== null && (
         <p
           className="text-xs text-muted-foreground"
-          data-testid="match-card-rejection"
+          data-testid="match-card-closing"
         >
-          {rejectionLine(card)}
+          {closingLine(card)}
         </p>
-      )}
-
-      {card.stage === "mutual_interest" && responseLine(card) !== null && (
-        <p className="text-xs text-muted-foreground">{responseLine(card)}</p>
-      )}
-
-      {card.stage === "connected" && (
-        <Outcome card={card} onOutcome={actions.onOutcome} />
       )}
 
       {(card.signals?.length ?? 0) > cardReasons(card).length && (
         <button
           type="button"
-          onClick={() => setOpen(!open)}
+          onClick={() => {
+            look();
+            setOpen(!open);
+          }}
           className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
           data-testid="match-card-expand"
           aria-expanded={open}
@@ -210,13 +248,13 @@ export function MatchCard({
         </button>
       )}
 
-      {rejecting && (
-        <RejectForm
+      {closing && (
+        <CloseForm
           card={card}
-          onCancel={() => setRejecting(false)}
-          onReject={(by, reason) => {
-            setRejecting(false);
-            actions.onReject(by, reason);
+          onCancel={() => setClosing(false)}
+          onClose={(record) => {
+            setClosing(false);
+            actions.onClose(record);
           }}
         />
       )}
@@ -228,11 +266,11 @@ export function MatchCard({
 function CardMenu({
   card,
   actions,
-  onReject,
+  onClose,
 }: {
   card: BoardCard;
   actions: CardActions;
-  onReject: () => void;
+  onClose: () => void;
 }) {
   return (
     <Menu
@@ -259,9 +297,9 @@ function CardMenu({
           </MenuItem>
         ),
       )}
-      {card.stage !== "rejected" && (
-        <MenuItem onClick={onReject} data-testid="match-reject">
-          Turn it down…
+      {card.stage !== "closed" && (
+        <MenuItem onClick={onClose} data-testid="match-close">
+          Close it…
         </MenuItem>
       )}
     </Menu>
@@ -269,128 +307,135 @@ function CardMenu({
 }
 
 /**
- * The two yeses (prd/phase-3.md §2). Recorded by the matchmaker, because
- * nothing in this phase asks a candidate anything — the introduction moment is
- * still undesigned (§6), and a set of buttons here would be the design.
+ * How a match ended, and what to do about it.
+ *
+ * One form for both endings, because they are one event (prd/phase-3.md §2).
+ * The outcome is picked first and the rest follows from it: a no asks whose it
+ * was, because that is the taste signal the board collects; a yes asks nothing
+ * except whether these two should come out of the book, which is the honest
+ * consequence of having found each other.
  */
-function Responses({
-  card,
-  onRespond,
-}: {
-  card: BoardCard;
-  onRespond: (side: ResponseSide, response: MatchResponse) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5" data-testid="match-card-responses">
-      {RESPONSE_SIDES.map((side) => {
-        const answer = responseOf(card, side);
-        return (
-          <div
-            key={side}
-            className="flex items-center justify-between gap-2 text-xs"
-          >
-            <span className="min-w-0 truncate text-muted-foreground">
-              {personName(sideOf(card, side))}
-            </span>
-            <div className="flex shrink-0 gap-1">
-              {(["yes", "no"] as const).map((response) => (
-                <button
-                  key={response}
-                  type="button"
-                  aria-pressed={answer === response}
-                  onClick={() =>
-                    onRespond(side, answer === response ? "pending" : response)
-                  }
-                  data-testid={`match-response-${side}-${response}`}
-                  className={cn(
-                    "rounded-md border px-2 py-0.5 capitalize transition-colors",
-                    answer === response
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-border text-muted-foreground hover:bg-accent",
-                  )}
-                >
-                  {response}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Who turned it down, and why. Both required: the why is the taste signal. */
-function RejectForm({
+function CloseForm({
   card,
   onCancel,
-  onReject,
+  onClose,
 }: {
   card: BoardCard;
   onCancel: () => void;
-  onReject: (rejectedBy: MatchRejectedBy, reason: string) => void;
+  onClose: (closing: Closing) => void;
 }) {
-  const [by, setBy] = useState<MatchRejectedBy>("matchmaker");
-  const [reason, setReason] = useState("");
+  const [outcome, setOutcome] = useState<MatchOutcome>("didnt_work");
+  const [by, setBy] = useState<MatchClosedBy>("matchmaker");
+  const [note, setNote] = useState("");
+  const [archiveBoth, setArchiveBoth] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // A person, never the nightly run: `system` is the run's own word for taking
-  // a suggestion back, and the server refuses it from anybody else.
-  const WHO: MatchRejectedBy[] = ["matchmaker", "candidateA", "candidateB"];
-  const label = (who: MatchRejectedBy) =>
+  const label = (who: MatchClosedBy) =>
     who === "candidateA"
       ? personName(card.a)
       : who === "candidateB"
         ? personName(card.b)
-        : MATCH_REJECTED_BY_LABELS.matchmaker;
+        : MATCH_CLOSED_BY_LABELS.matchmaker;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const bad = rejectionReasonError(reason);
+    const bad = closingNoteError(outcome, note);
     setError(bad);
     if (bad !== null) return;
-    onReject(by, reason);
-    setReason("");
+    onClose({
+      outcome,
+      closedBy: closingNeedsWho(outcome) ? by : undefined,
+      note,
+      archiveBoth: outcome === "together" && archiveBoth,
+    });
+    setNote("");
   }
 
   return (
     <form
       className="flex flex-col gap-2 rounded-lg border border-border bg-background p-2"
       onSubmit={submit}
-      data-testid="reject-form"
+      data-testid="close-form"
     >
-      <p className="text-xs font-medium">Who turned it down?</p>
+      <p className="text-xs font-medium">How did it end?</p>
       <div className="flex flex-wrap gap-1">
-        {WHO.map((who) => (
+        {MATCH_OUTCOMES.map((option) => (
           <button
-            key={who}
+            key={option}
             type="button"
-            aria-pressed={by === who}
-            onClick={() => setBy(who)}
-            data-testid={`reject-by-${who}`}
+            aria-pressed={outcome === option}
+            onClick={() => setOutcome(option)}
+            data-testid={`close-as-${option}`}
             className={cn(
               "rounded-md border px-2 py-1 text-xs transition-colors",
-              by === who
+              outcome === option
                 ? "border-primary bg-primary/15 text-primary"
                 : "border-border text-muted-foreground hover:bg-accent",
             )}
           >
-            {label(who)}
+            {MATCH_OUTCOME_LABELS[option]}
           </button>
         ))}
       </div>
+
+      {closingNeedsWho(outcome) && (
+        <>
+          <p className="text-xs font-medium">Who ended it?</p>
+          <div className="flex flex-wrap gap-1">
+            {MATCH_CLOSED_BY_CHOICES.map((who) => (
+              <button
+                key={who}
+                type="button"
+                aria-pressed={by === who}
+                onClick={() => setBy(who)}
+                data-testid={`close-by-${who}`}
+                className={cn(
+                  "rounded-md border px-2 py-1 text-xs transition-colors",
+                  by === who
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border text-muted-foreground hover:bg-accent",
+                )}
+              >
+                {label(who)}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       <Textarea
-        value={reason}
-        onChange={(event) => setReason(event.target.value)}
-        maxLength={MATCH_LIMITS.rejectionReason}
+        value={note}
+        onChange={(event) => setNote(event.target.value)}
+        maxLength={MATCH_LIMITS.closingNote}
         rows={3}
         className="min-h-16 text-sm"
-        placeholder="Why? Even a few words — it's what the board learns from."
-        aria-label="Why it was turned down"
-        data-testid="reject-reason"
+        placeholder={
+          outcome === "together"
+            ? "Anything worth remembering about it?"
+            : "Why? Even a few words — it's what the board learns from."
+        }
+        aria-label="What happened"
+        data-testid="close-note"
       />
+
+      {outcome === "together" && (
+        <label className="flex items-start gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={archiveBoth}
+            onChange={(event) => setArchiveBoth(event.target.checked)}
+            data-testid="close-archive-both"
+            className="mt-0.5"
+          />
+          <span>
+            Archive both of them — they're not looking any more. You can
+            reactivate either from your list.
+          </span>
+        </label>
+      )}
+
       {error !== null && (
-        <p className="text-xs text-destructive" data-testid="reject-error">
+        <p className="text-xs text-destructive" data-testid="close-error">
           {error}
         </p>
       )}
@@ -398,75 +443,8 @@ function RejectForm({
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" data-testid="reject-submit">
-          Turn it down
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-/** What came of a connected match, in the matchmaker's own words. */
-function Outcome({
-  card,
-  onOutcome,
-}: {
-  card: BoardCard;
-  onOutcome: (outcome: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(card.outcome ?? "");
-  const [error, setError] = useState<string | null>(null);
-
-  if (!editing) {
-    return (
-      <button
-        type="button"
-        onClick={() => setEditing(true)}
-        className="self-start text-left text-xs text-muted-foreground underline-offset-2 hover:underline"
-        data-testid="match-card-outcome"
-      >
-        {card.outcome ?? "What came of it?"}
-      </button>
-    );
-  }
-
-  return (
-    <form
-      className="flex flex-col gap-2"
-      data-testid="outcome-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const bad = outcomeError(text);
-        setError(bad);
-        if (bad !== null) return;
-        onOutcome(text);
-        setEditing(false);
-      }}
-    >
-      <Textarea
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        maxLength={MATCH_LIMITS.outcome}
-        rows={2}
-        aria-label="What came of it"
-        data-testid="outcome-text"
-      />
-      {error !== null && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setText(card.outcome ?? "");
-            setEditing(false);
-          }}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" size="sm" data-testid="outcome-save">
-          Save
+        <Button type="submit" size="sm" data-testid="close-submit">
+          Close it
         </Button>
       </div>
     </form>

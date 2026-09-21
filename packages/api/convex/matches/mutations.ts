@@ -23,11 +23,11 @@ import {
   type MutationCtx,
   mutation,
 } from "../_generated/server";
-import type { AuditActor } from "../audit/helpers";
+import { type AuditActor, recordAudit } from "../audit/helpers";
 import type { FieldChange } from "../audit/rules";
 import { candidateProfileFor } from "../candidateProfiles/helpers";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
-import { matchRejectedBy, matchResponse, matchStage } from "../schema";
+import { matchClosedBy, matchOutcome, matchStage } from "../schema";
 import {
   factsOf,
   insertMatch,
@@ -37,12 +37,11 @@ import {
   runMatchPass,
 } from "./helpers";
 import {
-  bothSaidYes,
+  closingNeedsWho,
+  closingNoteError,
   evaluatePair,
   MATCH_LIMITS,
-  outcomeError,
   type ProfileFacts,
-  rejectionReasonError,
   stageChangeError,
 } from "./rules";
 
@@ -180,12 +179,12 @@ export const create = mutation({
  * better than a state machine does (`stageChangeError`). Two exceptions, both
  * about not losing something:
  *
- *  - the Rejected lane is reached through `reject`, which takes who and why;
- *  - moving a card *out* of it clears that, because a card back on the board
- *    is no longer a rejection, and a stale reason is worse than none.
+ *  - closing is reached through `close`, which takes what happened;
+ *  - moving a card *out* of closed clears what closing recorded, because a
+ *    match back on the board is not one that ended, and a stale "she said no"
+ *    under a live card is worse than none.
  *
- * Arriving at `introduced` starts both sides as `pending`, which is what makes
- * the two-yeses sub-state visible on the card.
+ * Moving a card is also looking at it, so an unseen one stops being new.
  */
 export const moveStage = mutation({
   args: {
@@ -210,16 +209,14 @@ export const moveStage = mutation({
     const patch: MatchPatch = {
       stage: args.stage,
       stageChangedAt: now,
+      seenAt: match.seenAt ?? now,
       updatedAt: now,
     };
-    if (match.stage === "rejected") {
-      patch.rejectedBy = undefined;
-      patch.rejectionReason = undefined;
-      changes.push({ field: "rejectedBy", before: match.rejectedBy });
-    }
-    if (args.stage === "introduced") {
-      patch.candidateAResponse = match.candidateAResponse ?? "pending";
-      patch.candidateBResponse = match.candidateBResponse ?? "pending";
+    if (match.stage === "closed") {
+      patch.closedAs = undefined;
+      patch.closedBy = undefined;
+      patch.closingNote = undefined;
+      changes.push({ field: "closedAs", before: match.closedAs });
     }
     await ctx.db.patch("matches", match._id, patch);
     await auditAfter(ctx, match._id, {
@@ -232,18 +229,34 @@ export const moveStage = mutation({
 });
 
 /**
- * Turns a match down, from any stage (prd/phase-3.md §2).
+ * Ends a match, and takes it off the board (prd/phase-3.md §2).
  *
- * Who and why are both required, and the reason is free text on purpose: it is
- * the taste signal the board exists to collect, and a dropdown of five reasons
- * would collect five reasons.
+ * One mutation for both ways a match can end, because they are the same event:
+ * somebody saying this is over and saying what happened. A rejection is not a
+ * stage a card rests in and a wedding is not a column — both are a closing
+ * record on a card that has left.
+ *
+ * What it takes:
+ *
+ *  - **the outcome**, one of two, so a book can be counted: "three together
+ *    this year" is a sentence a matchmaker should be able to read off it;
+ *  - **who ended it**, where it didn't work. *Whose* no it was is the taste
+ *    signal the board exists to collect, and a match that ended with the two
+ *    of them together was not ended by anybody;
+ *  - **a note**, required for a no and optional for a yes (`closingNoteError`);
+ *  - **`archiveBoth`**, offered only when they're together: two people who
+ *    found each other are not in the book to be matched any more. It stays the
+ *    matchmaker's call — a couple can also break up — so it is a thing they
+ *    tick rather than a thing that happens to them.
  */
-export const reject = mutation({
+export const close = mutation({
   args: {
     matchmakerId: v.id("matchmakers"),
     matchId: v.id("matches"),
-    rejectedBy: matchRejectedBy,
-    reason: v.string(),
+    outcome: matchOutcome,
+    closedBy: v.optional(matchClosedBy),
+    note: v.string(),
+    archiveBoth: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -252,132 +265,72 @@ export const reject = mutation({
       args.matchmakerId,
       args.matchId,
     );
-    if (args.rejectedBy === "system") {
-      // The nightly run's own word for withdrawing a suggestion. A person
-      // turning a match down is one of the three who could have.
-      throw new ConvexError("Say who turned it down.");
+    if (match.stage === "closed") throw new ConvexError("It's already closed.");
+
+    const closedBy = closingNeedsWho(args.outcome) ? args.closedBy : undefined;
+    if (closingNeedsWho(args.outcome)) {
+      if (closedBy === undefined) throw new ConvexError("Say who ended it.");
+      if (closedBy === "system") {
+        // The nightly run's own word for taking a suggestion back. A person
+        // ending a match is one of the three who could have.
+        throw new ConvexError("Say who ended it.");
+      }
     }
-    const bad = rejectionReasonError(args.reason);
+    const bad = closingNoteError(args.outcome, args.note);
     if (bad) throw new ConvexError(bad);
-    if (match.stage === "rejected") {
-      throw new ConvexError("It's already been turned down.");
-    }
 
     const now = Date.now();
-    const reason = args.reason.trim();
+    const note = args.note.trim();
+    const actor = actorFor(user._id);
     await ctx.db.patch("matches", match._id, {
-      stage: "rejected",
+      stage: "closed",
       stageChangedAt: now,
-      rejectedBy: args.rejectedBy,
-      rejectionReason: reason,
+      closedAs: args.outcome,
+      closedBy,
+      closingNote: note === "" ? undefined : note,
+      seenAt: match.seenAt ?? now,
       updatedAt: now,
     });
     await auditAfter(ctx, match._id, {
-      action: "match.rejected",
-      actor: actorFor(user._id),
+      action: "match.closed",
+      actor,
       changes: [
-        { field: "stage", before: match.stage, after: "rejected" },
-        { field: "rejectedBy", after: args.rejectedBy },
+        { field: "stage", before: match.stage, after: "closed" },
+        { field: "closedAs", after: args.outcome },
+        ...(closedBy === undefined
+          ? []
+          : [{ field: "closedBy", after: closedBy }]),
       ],
-      reason,
+      reason: note === "" ? undefined : note,
     });
-    return null;
-  },
-});
 
-/**
- * Records what one side said to an introduction, as the matchmaker heard it.
- *
- * Nothing here asks the candidate anything: the introduction moment is still
- * undesigned (prd/phase-3.md §6), and until it is, the two yeses are something
- * a matchmaker writes down rather than something the product collects.
- *
- * Two yeses on an introduced card advance it to `mutual_interest` in the same
- * mutation — that transition *is* the two yeses (§2), so having to also drag
- * the card would be a second way of saying the same thing, and a way of being
- * wrong about it.
- */
-export const recordResponse = mutation({
-  args: {
-    matchmakerId: v.id("matchmakers"),
-    matchId: v.id("matches"),
-    side: v.union(v.literal("a"), v.literal("b")),
-    response: matchResponse,
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const { user, match } = await ownMatch(
-      ctx,
-      args.matchmakerId,
-      args.matchId,
-    );
-    const field =
-      args.side === "a" ? "candidateAResponse" : "candidateBResponse";
-    const before = match[field];
-    if (before === args.response) return null;
-
-    const now = Date.now();
-    const patch: MatchPatch =
-      args.side === "a"
-        ? { candidateAResponse: args.response, updatedAt: now }
-        : { candidateBResponse: args.response, updatedAt: now };
-    const changes: FieldChange[] = [{ field, before, after: args.response }];
-    const advances =
-      match.stage === "introduced" &&
-      bothSaidYes(
-        args.side === "a" ? args.response : match.candidateAResponse,
-        args.side === "b" ? args.response : match.candidateBResponse,
-      );
-    if (advances) {
-      patch.stage = "mutual_interest";
-      patch.stageChangedAt = now;
-      changes.push({
-        field: "stage",
-        before: match.stage,
-        after: "mutual_interest",
-      });
+    if (args.archiveBoth === true && args.outcome === "together") {
+      for (const candidateId of [match.candidateAId, match.candidateBId]) {
+        await archive(ctx, candidateId, actor, match._id);
+      }
     }
-    await ctx.db.patch("matches", match._id, patch);
-    await auditAfter(ctx, match._id, {
-      action: advances ? "match.stage_changed" : "match.response_recorded",
-      actor: actorFor(user._id),
-      changes,
-    });
     return null;
   },
 });
 
 /**
- * What came of a match. Free text, and only on a card that got somewhere:
- * "what outcomes do we record" is an open question (prd/phase-3.md §6), and
- * a list of options invented before it is answered would be the answer.
+ * Marks a card as looked at, which is the whole of what the Reviewing column
+ * used to say — without a card having to be dragged through a column to say it.
+ *
+ * Idempotent, and deliberately one-way: a matchmaker who has read a card has
+ * read it, and a way to mark it unread again would be a second kind of
+ * bookkeeping about cards rather than about people.
  */
-export const recordOutcome = mutation({
-  args: {
-    matchmakerId: v.id("matchmakers"),
-    matchId: v.id("matches"),
-    outcome: v.string(),
-  },
+export const markSeen = mutation({
+  args: { matchmakerId: v.id("matchmakers"), matchId: v.id("matches") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { user, match } = await ownMatch(
-      ctx,
-      args.matchmakerId,
-      args.matchId,
-    );
-    const bad = outcomeError(args.outcome);
-    if (bad) throw new ConvexError(bad);
-    const outcome = args.outcome.trim();
-    if (outcome === match.outcome) return null;
-    await ctx.db.patch("matches", match._id, {
-      outcome,
-      updatedAt: Date.now(),
-    });
-    await auditAfter(ctx, match._id, {
-      action: "match.outcome_recorded",
-      actor: actorFor(user._id),
-      changes: [{ field: "outcome", before: match.outcome, after: outcome }],
-    });
+    const { match } = await ownMatch(ctx, args.matchmakerId, args.matchId);
+    if (match.seenAt !== undefined) return null;
+    // Not audited: that somebody glanced at a card is not a change to the
+    // record of two people, and a trail full of glances buries the events that
+    // are.
+    await ctx.db.patch("matches", match._id, { seenAt: Date.now() });
     return null;
   },
 });
@@ -427,6 +380,33 @@ async function matchableCandidate(
     throw new ConvexError("They're archived. Reactivate them first.");
   }
   return candidate;
+}
+
+/**
+ * Takes a candidate out of the book's matching pool by archiving them, the way
+ * a matchmaker would from their own list — the same status, the same audit
+ * action, so there is one meaning of "archived" and not two. Already-archived
+ * and no-longer-joined records are left alone.
+ */
+async function archive(
+  ctx: MutationCtx,
+  candidateId: Id<"candidates">,
+  actor: AuditActor,
+  matchId: Id<"matches">,
+): Promise<void> {
+  const candidate = await ctx.db.get("candidates", candidateId);
+  if (candidate === null || candidate.status === "archived") return;
+  await ctx.db.patch("candidates", candidate._id, { status: "archived" });
+  await recordAudit(ctx, {
+    matchmakerId: candidate.matchmakerId,
+    candidateId: candidate._id,
+    actor,
+    action: "candidate.status_changed",
+    entity: { table: "candidates", id: candidate._id },
+    changes: [{ field: "status", before: candidate.status, after: "archived" }],
+    relatedEntityId: matchId,
+    reason: "They found somebody.",
+  });
 }
 
 async function factsFor(

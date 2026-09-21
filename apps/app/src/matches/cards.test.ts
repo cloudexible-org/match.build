@@ -5,8 +5,8 @@ import {
   cardReasons,
   cardsInStage,
   cardTitle,
-  rejectionLine,
-  responseLine,
+  closedSummary,
+  closingLine,
   runSummary,
   scoreLine,
   scoreTone,
@@ -24,7 +24,7 @@ function card(over: Partial<BoardCard> = {}): BoardCard {
     a: person("Sam"),
     b: person("Jordan"),
     origin: "algorithm",
-    stage: "suggested",
+    stage: "proposed",
     stageChangedAt: 1_000,
     score: 82,
     coverage: 0.72,
@@ -86,14 +86,16 @@ describe("the reasons on a card", () => {
 });
 
 describe("a column's order", () => {
-  test("Suggested is a shortlist: best first", () => {
+  test("Proposed leads with what you haven't read, then with the best", () => {
     const cards = [
-      card({ matchId: "low" as Id<"matches">, score: 55 }),
-      card({ matchId: "high" as Id<"matches">, score: 91 }),
+      card({ matchId: "seen-high" as Id<"matches">, score: 91, seenAt: 5 }),
+      card({ matchId: "new-low" as Id<"matches">, score: 55 }),
+      card({ matchId: "new-high" as Id<"matches">, score: 88 }),
     ];
-    expect(cardsInStage(cards, "suggested").map((one) => one.matchId)).toEqual([
-      "high",
-      "low",
+    expect(cardsInStage(cards, "proposed").map((one) => one.matchId)).toEqual([
+      "new-high",
+      "new-low",
+      "seen-high",
     ]);
   });
 
@@ -101,21 +103,20 @@ describe("a column's order", () => {
     const cards = [
       card({
         matchId: "old" as Id<"matches">,
-        stage: "reviewing",
+        stage: "introduced",
         stageChangedAt: 1,
         score: 99,
       }),
       card({
         matchId: "new" as Id<"matches">,
-        stage: "reviewing",
+        stage: "introduced",
         stageChangedAt: 9,
         score: 51,
       }),
     ];
-    expect(cardsInStage(cards, "reviewing").map((one) => one.matchId)).toEqual([
-      "new",
-      "old",
-    ]);
+    expect(cardsInStage(cards, "introduced").map((one) => one.matchId)).toEqual(
+      ["new", "old"],
+    );
   });
 
   test("a column only holds its own cards", () => {
@@ -123,58 +124,81 @@ describe("a column's order", () => {
   });
 });
 
-describe("the sub-states", () => {
-  test("an introduction says whose answer is missing", () => {
+describe("how a match ended", () => {
+  test("names the person who ended it, and why", () => {
     expect(
-      responseLine(
+      closingLine(
         card({
-          stage: "introduced",
-          candidateAResponse: "yes",
-          candidateBResponse: "pending",
-        }),
-      ),
-    ).toBe("Sam: Yes · Jordan: Waiting");
-  });
-
-  test("a card nobody has been introduced on says nothing", () => {
-    expect(responseLine(card())).toBeNull();
-  });
-
-  test("a rejection names the person who made it, and why", () => {
-    expect(
-      rejectionLine(
-        card({
-          stage: "rejected",
-          rejectedBy: "candidateA",
-          rejectionReason: "Too far away.",
+          stage: "closed",
+          closedAs: "didnt_work",
+          closedBy: "candidateA",
+          closingNote: "Too far away.",
         }),
       ),
     ).toBe("Sam: Too far away.");
     expect(
-      rejectionLine(
+      closingLine(
         card({
-          stage: "rejected",
-          rejectedBy: "matchmaker",
-          rejectionReason: "Bad timing.",
+          stage: "closed",
+          closedAs: "didnt_work",
+          closedBy: "matchmaker",
+          closingNote: "Bad timing.",
         }),
       ),
     ).toBe("You: Bad timing.");
   });
 
-  test("including the nightly run withdrawing its own suggestion", () => {
+  test("including the nightly run taking back its own suggestion", () => {
     expect(
-      rejectionLine(
+      closingLine(
         card({
-          stage: "rejected",
-          rejectedBy: "system",
-          rejectionReason: "The score fell to 41 on what's recorded now.",
+          stage: "closed",
+          closedAs: "didnt_work",
+          closedBy: "system",
+          closingNote: "The score fell to 41 on what's recorded now.",
         }),
       ),
     ).toContain("The nightly run");
   });
 
-  test("and nothing at all on a card still on the board", () => {
-    expect(rejectionLine(card())).toBeNull();
+  test("leads with the outcome when nobody ended it", () => {
+    expect(
+      closingLine(
+        card({
+          stage: "closed",
+          closedAs: "together",
+          closingNote: "Engaged in May.",
+        }),
+      ),
+    ).toBe("Together: Engaged in May.");
+    // Good news without a note still says the thing worth saying.
+    expect(closingLine(card({ stage: "closed", closedAs: "together" }))).toBe(
+      "Together",
+    );
+  });
+
+  test("and says nothing at all on a card still on the board", () => {
+    expect(closingLine(card())).toBeNull();
+  });
+});
+
+describe("the closed summary", () => {
+  test("counts them, and counts the good ending", () => {
+    const closed = (over: Partial<BoardCard>) =>
+      card({ stage: "closed", ...over });
+    expect(
+      closedSummary([
+        closed({ closedAs: "together" }),
+        closed({ closedAs: "didnt_work" }),
+        closed({ closedAs: "together" }),
+      ]),
+    ).toBe("3 closed · 2 together");
+  });
+
+  test("and leaves the second half off when there is none", () => {
+    expect(
+      closedSummary([card({ stage: "closed", closedAs: "didnt_work" })]),
+    ).toBe("1 closed");
   });
 });
 

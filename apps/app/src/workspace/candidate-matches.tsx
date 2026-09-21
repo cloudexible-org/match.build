@@ -1,17 +1,10 @@
-import {
-  api,
-  type Id,
-  MATCH_STAGE_LABELS,
-  type MatchRejectedBy,
-  type MatchResponse,
-  type MatchStage,
-} from "@repo/api";
+import { api, type Id, MATCH_STAGE_LABELS, type MatchStage } from "@repo/api";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { CarouselArrow, CarouselCounter } from "../components/carousel";
 import { currentIndex, stepId } from "../lib/carousel";
 import { serverErrorMessage } from "../lib/server-error";
-import type { BoardCard, ResponseSide } from "../matches/cards";
+import type { BoardCard } from "../matches/cards";
 import { type CardActions, MatchCard } from "../matches/match-card";
 import { useWorkspace } from "./workspace-layout";
 
@@ -21,9 +14,12 @@ import { useWorkspace } from "./workspace-layout";
  *
  * **The same card the board draws**, so a matchmaker reading a person's file
  * sees exactly what they would see on the board, and everything they can do
- * there they can do here: move it on, record a response, reject it with a
- * reason, write the outcome. A second, smaller rendering of a match would be a
- * second thing to keep true.
+ * there they can do here: move it on, or close it with what happened. A
+ * second, smaller rendering of a match would be a second thing to keep true.
+ *
+ * Closed matches are here as well as live ones, unlike the board — a person's
+ * file is a record of what has been tried for them, and "we tried her with him
+ * and it didn't work" is exactly the kind of thing it should say.
  *
  * One card at a time with arrows through the rest, because a person can be in
  * several and the panel is one column wide. The one thing this adds is the
@@ -41,9 +37,8 @@ export function CandidateMatches({
     candidateId,
   });
   const moveStage = useMutation(api.matches.mutations.moveStage);
-  const reject = useMutation(api.matches.mutations.reject);
-  const recordResponse = useMutation(api.matches.mutations.recordResponse);
-  const recordOutcome = useMutation(api.matches.mutations.recordOutcome);
+  const closeMatch = useMutation(api.matches.mutations.close);
+  const markSeen = useMutation(api.matches.mutations.markSeen);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,32 +81,22 @@ export function CandidateMatches({
           stage,
         }),
       ),
-    onReject: (rejectedBy: MatchRejectedBy, reason: string) =>
+    onClose: (closing) =>
       void attempt(() =>
-        reject({
+        closeMatch({
           matchmakerId: workspace.matchmakerId,
           matchId: which.matchId,
-          rejectedBy,
-          reason,
+          outcome: closing.outcome,
+          closedBy: closing.closedBy,
+          note: closing.note,
+          archiveBoth: closing.archiveBoth,
         }),
       ),
-    onRespond: (side: ResponseSide, response: MatchResponse) =>
-      void attempt(() =>
-        recordResponse({
-          matchmakerId: workspace.matchmakerId,
-          matchId: which.matchId,
-          side,
-          response,
-        }),
-      ),
-    onOutcome: (outcome: string) =>
-      void attempt(() =>
-        recordOutcome({
-          matchmakerId: workspace.matchmakerId,
-          matchId: which.matchId,
-          outcome,
-        }),
-      ),
+    onSeen: () =>
+      void markSeen({
+        matchmakerId: workspace.matchmakerId,
+        matchId: which.matchId,
+      }).catch(() => {}),
     conversationPath: (one, side) =>
       `/mm/${workspace.username}/c/${side === "a" ? one.a.candidateId : one.b.candidateId}`,
   });
