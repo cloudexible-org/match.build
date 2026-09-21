@@ -266,6 +266,44 @@ describe("the nightly run", () => {
     expect(rejected[0].actor).toMatchObject({ type: "system" });
   });
 
+  test("takes back a suggestion about somebody who has left the book", async () => {
+    const w = await world();
+    await w.run();
+    const before = (await w.cards())[0];
+
+    await w.t.run(async (ctx) => {
+      await ctx.db.patch("candidates", w.candidates.jordan, {
+        membership: "left",
+        membershipChangedAt: Date.now(),
+      });
+    });
+    expect(await w.run()).toMatchObject({ withdrawn: 1, created: 0 });
+
+    const card = (await w.cards())[0];
+    expect(card).toMatchObject({ stage: "rejected", rejectedBy: "system" });
+    expect(card.rejectionReason).toContain("no longer in your book");
+    // What it scored while they were both in it is not a thing to throw away.
+    expect(card.score).toBe(before.score);
+  });
+
+  test("but leaves a card the matchmaker moved, even then", async () => {
+    const w = await world();
+    await w.run();
+    const card = (await w.cards())[0];
+    await w.asOwner.mutation(api.matches.mutations.moveStage, {
+      matchmakerId: w.matchmakerId,
+      matchId: card._id,
+      stage: "connected",
+    });
+    await w.t.run(async (ctx) => {
+      await ctx.db.patch("candidates", w.candidates.jordan, {
+        status: "archived",
+      });
+    });
+    expect(await w.run()).toMatchObject({ withdrawn: 0 });
+    expect((await w.cards())[0].stage).toBe("connected");
+  });
+
   test("never reopens a card a person has touched", async () => {
     const w = await world();
     await w.run();

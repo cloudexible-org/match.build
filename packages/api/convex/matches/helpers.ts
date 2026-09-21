@@ -207,6 +207,8 @@ export async function runMatchPass(
 
   type Candidate = { a: BookMember; b: BookMember; verdict: PairVerdict };
   const newcomers: Candidate[] = [];
+  /** Pairs this run actually looked at, for the sweep below. */
+  const seen = new Set<string>();
 
   for (let i = 0; i < book.length; i += 1) {
     for (let j = i + 1; j < book.length; j += 1) {
@@ -215,6 +217,7 @@ export async function runMatchPass(
       report.pairs += 1;
       const verdict = evaluatePair(a.facts, b.facts, now);
       const key = pairKey(a.candidate._id, b.candidate._id);
+      seen.add(key);
       const current = byPair.get(key);
       if (current === undefined) {
         if (isSuggestable(verdict)) newcomers.push({ a, b, verdict });
@@ -228,6 +231,26 @@ export async function runMatchPass(
       if (revised === "withdrawn") report.withdrawn += 1;
       if (revised === "rescored") report.rescored += 1;
     }
+  }
+
+  // A suggestion whose pair this run never looked at is one where somebody has
+  // since left, been archived, or had their profile emptied. The board should
+  // not be offering an introduction that can no longer be made, so the run
+  // takes its own suggestion back — and only its own, untouched: a card the
+  // matchmaker has moved stays exactly where they put it, because what they
+  // did with two people is their record and not the run's to tidy.
+  for (const match of existing) {
+    if (match.stage !== "suggested" || match.origin !== "algorithm") continue;
+    if (seen.has(match.pairKey)) continue;
+    await withdraw(
+      ctx,
+      match,
+      {},
+      "One of them is no longer in your book.",
+      actor,
+      now,
+    );
+    report.withdrawn += 1;
   }
 
   // Best first, and — for two pairs on the same score — by the pair itself, so
@@ -356,7 +379,7 @@ async function reviseSuggestion(
     await withdraw(
       ctx,
       match,
-      verdict,
+      scoring(verdict, now),
       blockerSentence(verdict.blockers),
       actor,
       now,
@@ -365,7 +388,7 @@ async function reviseSuggestion(
   }
   if (!isSuggestable(verdict)) {
     const why = `The score fell to ${verdict.score} on what's recorded now.`;
-    await withdraw(ctx, match, verdict, why, actor, now);
+    await withdraw(ctx, match, scoring(verdict, now), why, actor, now);
     return "withdrawn";
   }
 
@@ -391,7 +414,12 @@ async function reviseSuggestion(
 async function withdraw(
   ctx: MutationCtx,
   match: Doc<"matches">,
-  verdict: PairVerdict,
+  /**
+   * The rescoring to write with it, where the withdrawal *is* a rescoring.
+   * Empty where it isn't: a card taken back because one of them has left the
+   * book still deserves to show what it scored while they were both in it.
+   */
+  rescored: ReturnType<typeof scoring> | Record<string, never>,
   why: string,
   actor: AuditActor,
   now: number,
@@ -401,7 +429,7 @@ async function withdraw(
     stageChangedAt: now,
     rejectedBy: "system",
     rejectionReason: why,
-    ...scoring(verdict, now),
+    ...rescored,
     updatedAt: now,
   });
   const withdrawn = await ctx.db.get("matches", match._id);
