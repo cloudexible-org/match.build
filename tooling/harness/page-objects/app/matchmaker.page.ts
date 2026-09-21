@@ -270,9 +270,9 @@ export class ConversationPage {
   }
 
   /**
-   * The header's "AI" toggle for drafted replies (prd/phase-2.md §4A), a
-   * pressed/unpressed two-state button. Absent where no agent is configured
-   * — which, on the e2e backend, is always.
+   * The header's "AI" switch for drafted replies (prd/phase-2.md §4A) —
+   * `role="switch"`, named "Drafted replies" by the label around it. Absent
+   * where no agent is configured, which on the e2e backend is always.
    */
   getSuggestionsToggle() {
     return this.page.getByTestId("toggle-suggestions");

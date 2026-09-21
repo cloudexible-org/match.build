@@ -28,6 +28,6 @@ export {
 } from "./components/menu";
 export { NativeSelect } from "./components/native-select";
 export { Popover, PopoverTitle } from "./components/popover";
+export { Switch, type SwitchProps } from "./components/switch";
 export { Textarea } from "./components/textarea";
-export { Toggle, type ToggleProps, toggleVariants } from "./components/toggle";
 export { cn } from "./lib/cn";
