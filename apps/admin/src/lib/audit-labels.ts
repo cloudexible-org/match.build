@@ -12,6 +12,7 @@ export const ACTION_LABELS: Record<AuditAction, string> = {
   "account.sign_in_code_issued": "Sign-in code issued by admin",
   "account.erased": "Personal data erased on request",
   "ai_agent.updated": "AI agent settings changed",
+  "ai_model_rate.updated": "Model rate changed",
   "matchmaker.created": "Matchmaker profile created",
   "matchmaker.updated": "Matchmaker profile updated",
   "candidate.created": "Candidate onboarded",

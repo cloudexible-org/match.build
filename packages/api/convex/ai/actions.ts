@@ -15,6 +15,7 @@ import { generateText } from "ai";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
+import { recordUsage } from "../aiUsage/helpers";
 import type { AgentSettings } from "./helpers";
 import { type AiAgentId, OFF_REASON_TEXT } from "./rules";
 
@@ -85,7 +86,7 @@ export const probe = internalAction({
     }
 
     try {
-      const { text } = await generateText({
+      const { text, usage } = await generateText({
         model: convexGateway(settings.model),
         maxOutputTokens: settings.maxOutputTokens,
         system: settings.systemPrompt,
@@ -93,6 +94,11 @@ export const probe = internalAction({
           prompt ??
           "Ignore your usual work for one message and reply with the single word READY, with no punctuation or explanation.",
       });
+      // A probe is a real generation and shows up on the usage page as one, with
+      // no matchmaker behind it — `ai:setup` runs it for every agent on every
+      // deployment, so a setup run that costs something should be visible rather
+      // than folded into somebody's book.
+      await recordUsage(ctx, { agent, model: settings.model, usage });
       return { ok: true, agent, model: settings.model, text };
     } catch (error) {
       // Returned rather than thrown: the caller wants to know *which* model was

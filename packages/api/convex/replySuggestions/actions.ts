@@ -24,6 +24,7 @@ import { convexGateway } from "@convex-dev/ai-sdk-provider";
 import { v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
+import { recordUsage } from "../aiUsage/helpers";
 import type { DraftContext } from "./queries";
 import {
   draftInstruction,
@@ -102,7 +103,7 @@ export const draft = internalAction({
           })
         ).threadId;
 
-      const { text } = await agent.generateText(
+      const { text, usage } = await agent.generateText(
         ctx,
         { threadId },
         {
@@ -110,6 +111,17 @@ export const draft = internalAction({
           maxOutputTokens: settings.maxOutputTokens,
         },
       );
+
+      // Before the text is even parsed: the tokens were spent whatever the model
+      // wrote back, and a generation we threw away is exactly the kind we want
+      // on the usage page. `recordUsage` never throws, so this cannot cost the
+      // matchmaker the drafts below it.
+      await recordUsage(ctx, {
+        agent: "conversation",
+        model: settings.model,
+        usage,
+        conversationId,
+      });
 
       // One generation, two halves (prd/phase-2.md §4A). A model that ignored
       // the headings has still written drafts: the whole text falls through to

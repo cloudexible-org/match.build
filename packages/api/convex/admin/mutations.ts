@@ -2,6 +2,8 @@ import { ConvexError, v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { agentSettings, storedAgentSettings } from "../ai/helpers";
 import { modelError, systemPromptError } from "../ai/rules";
+import { storedModelRate } from "../aiUsage/helpers";
+import { modelRateError, parseRate, rateError } from "../aiUsage/rules";
 import { recordAudit } from "../audit/helpers";
 import { diffFields } from "../audit/rules";
 import { anonymiseCandidateProfile } from "../candidateProfiles/helpers";
@@ -296,6 +298,101 @@ export const setAiAgent = mutation({
         { enabled, model: nextModel, systemPrompt: nextPrompt },
         ["enabled", "model", "systemPrompt"],
       ),
+    });
+    return null;
+  },
+});
+
+/**
+ * What a model costs, in US dollars per million tokens (`aiUsage/rules.ts`).
+ *
+ * A setting rather than a constant, for the reason an agent's model is one: a
+ * price changes without our releasing anything, and a deploy is the wrong
+ * ceremony for correcting one. **Clearing both rates leaves the model
+ * unpriced**, which is the honest state for a model nobody has looked up — its
+ * generations still record their tokens and report no cost, and the usage page
+ * says how many.
+ *
+ * Only new generations are priced at the new rate. Rows already written keep the
+ * cost they were written with (`aiUsage/mutations.ts`), so correcting a rate
+ * today cannot rewrite what last month is reported to have cost.
+ *
+ * Audited as `ai_model_rate.updated` in the same mutation, with the old rates in
+ * the event — the same way an agent's instruction has its history in the trail
+ * rather than in a versions table.
+ */
+export const setAiModelRate = mutation({
+  args: {
+    model: v.string(),
+    /** Empty means unpriced. Both or neither. */
+    inputUsdPerMillion: v.string(),
+    outputUsdPerMillion: v.string(),
+    cachedInputUsdPerMillion: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const admin = await requirePlatformAdmin(ctx);
+
+    const model = args.model.trim();
+    if (model === "") throw new ConvexError("Which model?");
+    const problem =
+      modelRateError(args.inputUsdPerMillion, args.outputUsdPerMillion) ??
+      // Optional on its own: absent means cached input is priced as input.
+      rateError(args.cachedInputUsdPerMillion ?? "");
+    if (problem !== null) throw new ConvexError(problem);
+
+    const input = parseRate(args.inputUsdPerMillion);
+    const output = parseRate(args.outputUsdPerMillion);
+    const cached = parseRate(args.cachedInputUsdPerMillion ?? "");
+    const existing = await storedModelRate(ctx, model);
+    const before = {
+      inputUsdPerMillion: existing?.inputUsdPerMillion,
+      outputUsdPerMillion: existing?.outputUsdPerMillion,
+      cachedInputUsdPerMillion: existing?.cachedInputUsdPerMillion,
+    };
+    const after = {
+      inputUsdPerMillion: input ?? undefined,
+      outputUsdPerMillion: output ?? undefined,
+      cachedInputUsdPerMillion: cached ?? undefined,
+    };
+
+    const changes = diffFields(before, after, [
+      "inputUsdPerMillion",
+      "outputUsdPerMillion",
+      "cachedInputUsdPerMillion",
+    ]);
+    // A save that changed nothing records nothing, as `setAiAgent` has it: an
+    // event per no-op makes the trail harder to read, not more complete.
+    if (changes.length === 0) return null;
+
+    if (input === null || output === null) {
+      // Unpriced. The row goes rather than being left holding zeroes, which
+      // would price every generation on this model as free.
+      if (existing !== null) await ctx.db.delete("aiModelRates", existing._id);
+    } else if (existing === null) {
+      await ctx.db.insert("aiModelRates", {
+        model,
+        inputUsdPerMillion: input,
+        outputUsdPerMillion: output,
+        cachedInputUsdPerMillion: cached ?? undefined,
+        updatedAt: Date.now(),
+        updatedByUserId: admin._id,
+      });
+    } else {
+      await ctx.db.patch("aiModelRates", existing._id, {
+        inputUsdPerMillion: input,
+        outputUsdPerMillion: output,
+        cachedInputUsdPerMillion: cached ?? undefined,
+        updatedAt: Date.now(),
+        updatedByUserId: admin._id,
+      });
+    }
+
+    await recordAudit(ctx, {
+      actor: { type: "user", userId: admin._id, role: "platform_admin" },
+      action: "ai_model_rate.updated",
+      entity: { table: "aiModelRates", id: model },
+      changes,
     });
     return null;
   },

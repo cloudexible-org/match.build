@@ -564,6 +564,81 @@ export default defineSchema({
     updatedByUserId: v.optional(v.id("users")), // absent when seeded
   }).index("by_agent", ["agent"]),
 
+  // One row per call that left this deployment for a model (prd/phase-2.md §6,
+  // "cost control"). Written by `aiUsage/mutations:record` from the `usage`
+  // block the gateway answered with, and read only by /admin/usage.
+  //
+  // **Tokens are measured; money is computed.** The gateway is an
+  // OpenAI-compatible endpoint and reports no price, so `costMicroUsd` is
+  // `aiUsage/rules.ts` doing arithmetic over the rate in `aiModelRates` at the
+  // moment of the call. It is **absent** when the model had no rate — not zero,
+  // which would report an unpriced bill as a paid-off one — and it is priced at
+  // write time rather than at read time so that a later rate change does not
+  // silently rewrite last month's spend.
+  //
+  // Not audited, and not audit-shaped: this is telemetry about our own costs,
+  // not a change to anything a matchmaker owns. It carries `matchmakerId` so
+  // the per-matchmaker budget prd/phase-2.md §9.2 still owes can be built on
+  // rows that already exist, and `candidateId` so an expensive conversation can
+  // be found — but no prompt, no completion and nothing either person wrote.
+  //
+  // **Nothing prunes this table yet**, and one row per generation grows without
+  // bound. It holds no personal data, so an erasure has no reason to reach it,
+  // and at phase-2 volumes a year is a rows-per-day question rather than a
+  // storage one. When it stops being: roll days older than the longest window
+  // (`MAX_USAGE_WINDOW_DAYS`) into a per-day total and delete the rows behind
+  // them. Recorded here rather than built, because a rollup table nobody needs
+  // yet is a second copy of this data to keep true.
+  aiGenerations: defineTable({
+    agent: aiAgentId,
+    model: v.string(), // as the gateway names it: "<provider>/<model>"
+    // The UTC day, as `YYYY-MM-DD`. Denormalised from `_creationTime` (which is
+    // the instant) so a window is one index range rather than a scan: a
+    // local-day bucket would make a row's day depend on where the reader was
+    // standing.
+    day: v.string(),
+    inputTokens: v.number(), // the whole prompt, cached part included
+    outputTokens: v.number(),
+    totalTokens: v.number(),
+    // Absent means the provider did not report it, which is a different answer
+    // from zero. `cachedInputTokens` and `cacheWriteTokens` are subsets of
+    // `inputTokens`; `reasoningTokens` is a subset of `outputTokens`.
+    cachedInputTokens: v.optional(v.number()),
+    cacheWriteTokens: v.optional(v.number()),
+    reasoningTokens: v.optional(v.number()),
+    costMicroUsd: v.optional(v.number()), // absent when the model had no rate
+    // Who the generation was for. Absent on a call with no tenant behind it —
+    // `ai/actions:probe`, which is a platform admin checking the gateway.
+    matchmakerId: v.optional(v.id("matchmakers")),
+    candidateId: v.optional(v.id("candidates")),
+  })
+    // The usage page: one window, newest day first.
+    .index("by_day", ["day"])
+    // One matchmaker's spend over a window, which is what a budget will read.
+    .index("by_matchmakerId_and_day", ["matchmakerId", "day"]),
+
+  // What a model costs, in US dollars per million tokens — the unit providers
+  // publish, so an admin copies the number rather than converting it.
+  //
+  // A table rather than a constant, for the reason `aiAgentSettings` is one: a
+  // price is not a fact about our code, it changes without our releasing
+  // anything, and a deploy is the wrong ceremony for correcting one. There is
+  // deliberately **no seed and no default** — an unpriced model records its
+  // tokens and reports no cost, and the page says which models those are. Every
+  // edit is audited as `ai_model_rate.updated`, which is where a rate's history
+  // lives.
+  aiModelRates: defineTable({
+    model: v.string(),
+    inputUsdPerMillion: v.number(),
+    outputUsdPerMillion: v.number(),
+    // What a cached input token costs instead. Absent means cached input is
+    // priced as ordinary input, which over-states a bill rather than
+    // under-stating it.
+    cachedInputUsdPerMillion: v.optional(v.number()),
+    updatedAt: v.number(),
+    updatedByUserId: v.optional(v.id("users")),
+  }).index("by_model", ["model"]),
+
   // One row per (conversation, recipient, channel) notification attempt.
   notifications: defineTable({
     userId: v.id("users"),

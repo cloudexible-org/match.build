@@ -26,6 +26,7 @@ import { convexGateway } from "@convex-dev/ai-sdk-provider";
 import { v } from "convex/values";
 import { components, internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
+import { recordUsage } from "../aiUsage/helpers";
 import { parseVoice, voiceInstruction } from "./rules";
 
 /**
@@ -66,7 +67,7 @@ export const distil = internalAction({
         title: `Voice · ${context.matchmakerName}`,
       });
       try {
-        const { text } = await agent.generateText(
+        const { text, usage } = await agent.generateText(
           ctx,
           { threadId },
           {
@@ -78,6 +79,17 @@ export const distil = internalAction({
             maxOutputTokens: settings.maxOutputTokens,
           },
         );
+
+        // Attributed by matchmaker rather than by conversation: this run reads
+        // their whole book and belongs to no one thread. Recorded before the
+        // parse, because a voice this run could not read out of the text cost
+        // the same as one it could. `recordUsage` never throws.
+        await recordUsage(ctx, {
+          agent: "voice_profile",
+          model: settings.model,
+          usage,
+          matchmakerId,
+        });
 
         const voice = parseVoice(text);
         if (voice === null) return null;

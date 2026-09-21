@@ -68,6 +68,13 @@ export const AUDIT_ACTIONS = [
   // product behaves for every tenant, which is exactly why it is recorded.
   "ai_agent.updated",
 
+  // What a model costs, changed by a platform admin (`aiUsage/rules.ts`).
+  // Platform-level like the one above, and recorded for the same reason: the
+  // gateway reports tokens and no price, so every figure on the usage page is
+  // arithmetic over a number somebody typed, and the trail is where that
+  // number's history lives.
+  "ai_model_rate.updated",
+
   // The candidate's profile (prd/phase-2.md §3). One vocabulary covers every
   // field: which entry moved is `changes[].field`, written as
   // `facts.wantsKids` or `notes.idealWeekend`.
@@ -111,6 +118,7 @@ export const AUDIT_ENTITY_TABLES = [
   "candidateProfiles",
   "matchmakerProfiles",
   "aiAgentSettings",
+  "aiModelRates",
   "matches",
   "notes", // historical; the table is gone, its events are not
 ] as const;
@@ -233,6 +241,9 @@ const FIELD_LABELS: Record<string, string> = {
   closingNote: "what happened",
   expiresAt: "expiry",
   voice: "voice",
+  inputUsdPerMillion: "input rate ($/M tokens)",
+  outputUsdPerMillion: "output rate ($/M tokens)",
+  cachedInputUsdPerMillion: "cached input rate ($/M tokens)",
 };
 
 /** Sentences for the events that speak for themselves, without a diff. */
@@ -272,6 +283,7 @@ const PLAIN_SENTENCES: Partial<Record<AuditAction, string>> = {
   "candidate.anonymised":
     "Anonymised them at their request — the conversation, notes and history are unchanged",
   "ai_agent.updated": "Changed an AI agent's settings",
+  "ai_model_rate.updated": "Changed what a model costs",
   "match.suggested": "The nightly run suggested a match",
   "match.created": "Paired them with someone by hand",
   "match.stage_changed": "Moved a match",
