@@ -28,6 +28,8 @@ export default function App() {
         <Route path="/invite/:token" element={<InvitePage />} />
         <Route path="/invitations/:candidateId" element={<InvitePage />} />
         <Route path="/c" element={<CandidatePage />} />
+        {/* Not linked from anywhere in v1: joining is by invitation only
+            (prd/phase-1.md §3.2). The route is phase 3's landing place. */}
         <Route path="/c/mm/discover" element={<DiscoverPage />} />
         {/* Links already out in the world — notification emails, bookmarks —
             still name the matchmaker in the path. */}

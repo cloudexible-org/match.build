@@ -2,14 +2,20 @@ import { expect, test } from "@playwright/test";
 import { CandidateShellPage } from "../../page-objects/app/candidate.page";
 import { HomePage } from "../../page-objects/app/home.page";
 import { InvitePage } from "../../page-objects/app/invite.page";
+import { WorkspacePage } from "../../page-objects/app/matchmaker.page";
 import { type Scenario, seedScenario } from "../../scenario";
 import { signInAs } from "../../session";
 
 /**
- * The home page (prd/phase-1.md §2): invitations, the account's own
- * matchmaker profiles, and the matchmakers it has joined. Only an account
- * that owns a profile sees it — everyone else is sent to their own shell at
- * `/app/c`, which is asserted here too.
+ * Where `/app/` sends an account (prd/phase-1.md §2, §4.2). The picker only
+ * renders when there is something to pick between — two matchmaker profiles
+ * — and every other account goes straight to its one destination:
+ *
+ * - no profile → `/app/c`, its own chat.
+ * - one profile → that workspace.
+ *
+ * The UI allows one profile per account, so the two-profile case is seeded
+ * here rather than created through it.
  *
  * One scenario for the file (see `scenario.ts`), with a separate account per
  * situation, so a test that answers an invitation can't change what another
@@ -21,7 +27,8 @@ let world: Scenario;
 test.beforeAll(async () => {
   world = await seedScenario({
     users: [
-      { key: "full" }, // owns a profile, joined one, invited by another
+      { key: "full" }, // owns two profiles, joined one, invited by another
+      { key: "single" }, // owns exactly one
       { key: "empty" }, // nothing at all
       { key: "invitee" }, // one open invitation
       { key: "owner" },
@@ -29,6 +36,8 @@ test.beforeAll(async () => {
     ],
     matchmakers: [
       { key: "own", ownerKey: "full", displayName: "Full's Own Book" },
+      { key: "own2", ownerKey: "full", displayName: "Full's Second Book" },
+      { key: "solo", ownerKey: "single", displayName: "Single's Only Book" },
       { key: "joined", ownerKey: "owner", displayName: "Joined Book" },
       { key: "inviting", ownerKey: "inviter", displayName: "Inviting Book" },
     ],
@@ -49,7 +58,7 @@ test.beforeAll(async () => {
   });
 });
 
-test("shows an account's invitations, own profiles and matchmakers", async ({
+test("two profiles is the one case that still gets the picker", async ({
   page,
 }) => {
   await signInAs(page, world.email("full"));
@@ -64,10 +73,23 @@ test("shows an account's invitations, own profiles and matchmakers", async ({
     home.getRow("matchmakerProfiles", world.displayName("own")),
   ).toContainText(`@${world.username("own")}`);
   await expect(
+    home.getRow("matchmakerProfiles", world.displayName("own2")),
+  ).toBeVisible();
+  await expect(
     home
       .getRow("candidateProfiles", world.displayName("joined"))
       .getByRole("link"),
   ).toHaveAttribute("href", `/app/c#${world.username("joined")}`);
+});
+
+test("one profile opens straight into its workspace", async ({ page }) => {
+  await signInAs(page, world.email("single"));
+  await new HomePage(page).goto();
+
+  await expect(page).toHaveURL(`/app/mm/${world.username("solo")}`);
+  await expect(new WorkspacePage(page).getName()).toHaveText(
+    world.displayName("solo"),
+  );
 });
 
 test("an account with no profile of its own never sees home", async ({
@@ -92,7 +114,7 @@ test("an invitation opens the accept screen", async ({ page }) => {
   await signInAs(page, world.email("invitee"));
   const shell = new CandidateShellPage(page);
   await shell.goto();
-  await shell.getWaitingRow(world.displayName("inviting")).click();
+  await shell.getInvitation(world.displayName("inviting")).click();
 
   const invite = new InvitePage(page);
   await expect(invite.getTitle()).toHaveText(

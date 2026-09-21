@@ -38,23 +38,25 @@ export class CandidateShellPage {
       .filter({ hasText: text });
   }
 
-  /** Invitations (and, from phase 3, applications) awaiting an answer. */
-  getWaitingSection() {
-    return this.page.getByTestId("candidate-waiting");
+  /** The invitation cards above the list, each with its "Invited" badge. */
+  getInvitationsSection() {
+    return this.page.getByTestId("candidate-invitations");
   }
 
-  getWaitingRow(text: string) {
-    return this.getWaitingSection()
-      .getByRole("listitem")
+  getInvitation(text: string) {
+    return this.page
+      .getByTestId("candidate-invitation")
       .filter({ hasText: text });
   }
 
-  getJoinAnotherLink() {
-    return this.page.getByTestId("candidate-join-another");
-  }
-
+  /** Shown only to an account with no matchmaker profile of its own. */
   getCreateMatchmakerLink() {
     return this.page.getByTestId("candidate-create-matchmaker");
+  }
+
+  /** Shown instead, to an account that owns one. */
+  getOwnWorkspaceLink() {
+    return this.page.getByTestId("candidate-own-workspace");
   }
 
   /** The centre column when this account has no conversation to open. */
@@ -164,9 +166,9 @@ export class CandidateChatPage {
 }
 
 /**
- * `/app/c/mm/discover`: where a candidate finds another matchmaker. A stub
- * until phase 3 opens the directory. Rendered by
- * `apps/app/src/pages/discover.tsx`.
+ * `/app/c/mm/discover`: a shell for phase 3's directory. Nothing in the UI
+ * links here in v1 — joining is by invitation only — so it is only reached
+ * by typing it. Rendered by `apps/app/src/pages/discover.tsx`.
  */
 export class DiscoverPage {
   constructor(public readonly page: Page) {}

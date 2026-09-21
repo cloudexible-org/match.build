@@ -58,7 +58,7 @@ test("an invited person accepts from their own shell and joins", async ({
   await signInAs(page, world.email("jane"));
   const shell = new CandidateShellPage(page);
   await shell.goto();
-  await shell.getWaitingRow(world.displayName("book")).click();
+  await shell.getInvitation(world.displayName("book")).click();
 
   const invite = new InvitePage(page);
   await expect(invite.getTitle()).toHaveText(
@@ -76,7 +76,7 @@ test("an invited person accepts from their own shell and joins", async ({
 
   // The invitation is gone from the first column, and the matchmaker is
   // listed there instead.
-  await expect(shell.getWaitingSection()).toBeHidden();
+  await expect(shell.getInvitationsSection()).toBeHidden();
   await expect(shell.getMatchmakerRow(world.displayName("book"))).toBeVisible();
 });
 

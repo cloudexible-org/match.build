@@ -7,17 +7,21 @@ import { AppHeader } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
 
 /**
- * Home (prd/phase-1.md §2): everything this account can open — invitations,
- * its own matchmaker profiles, and the matchmakers it has joined.
+ * Home (prd/phase-1.md §2): the picker, for the one account that has
+ * something to pick between.
  *
- * Only an account that owns a matchmaker profile has two sides to choose
- * between, so only it sees this. Everyone else goes straight to their own
- * chat at `/c`, which lists their matchmakers and invitations itself — a
- * candidate has nothing to pick from here.
+ * It only renders for an account that owns **more than one** matchmaker
+ * profile. Anything else has an obvious destination and goes straight
+ * there:
  *
- * Creating a profile is offered on the candidate shell instead, which is
- * where an account without one now lands. An invitation opens the same
- * accept screen as its link.
+ * - no profile → `/c`, their own chat, which lists their matchmakers and
+ *   invitations itself and offers "Become a matchmaker".
+ * - one profile → that workspace.
+ *
+ * The UI allows one profile per account (prd/phase-1.md §1), so today
+ * nobody reaches this page. It stays because the limit is a UI rule rather
+ * than a schema one, and an account that somehow owns two must be able to
+ * open both.
  */
 export function HomePage() {
   const me = useQuery(api.users.queries.me);
@@ -27,7 +31,12 @@ export function HomePage() {
     return <FullPageStatus>Loading…</FullPageStatus>;
   }
   if (me === null || home === null) return null; // RequireAuth handles this
-  if (home.matchmakerProfiles.length === 0) return <Navigate to="/c" replace />;
+
+  const profiles = home.matchmakerProfiles;
+  if (profiles.length === 0) return <Navigate to="/c" replace />;
+  if (profiles.length === 1) {
+    return <Navigate to={`/mm/${profiles[0].username}`} replace />;
+  }
 
   return (
     <div className="min-h-dvh">
@@ -60,7 +69,7 @@ export function HomePage() {
           title="Your matchmaker profiles"
           testId="home-matchmaker-profiles"
         >
-          {home.matchmakerProfiles.map((profile) => (
+          {profiles.map((profile) => (
             <RowLink key={profile.matchmakerId} to={`/mm/${profile.username}`}>
               <span className="font-medium">{profile.displayName}</span>
               <span className="text-sm text-muted-foreground">

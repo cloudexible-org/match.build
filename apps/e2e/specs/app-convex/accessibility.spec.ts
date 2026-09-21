@@ -3,9 +3,8 @@ import { expectNoA11yViolations } from "../../a11y";
 import { AccountSettingsPage } from "../../page-objects/app/account-settings.page";
 import {
   CandidateChatPage,
-  DiscoverPage,
+  CandidateShellPage,
 } from "../../page-objects/app/candidate.page";
-import { HomePage } from "../../page-objects/app/home.page";
 import { InvitePage } from "../../page-objects/app/invite.page";
 import {
   ConversationPage,
@@ -71,13 +70,14 @@ test("the sign-in screens", async ({ page }) => {
   await expectNoA11yViolations(page);
 });
 
-test("the home page", async ({ page }) => {
-  // Home is only for an account that owns a matchmaker profile; a candidate
-  // is redirected to the shell, which the chat test below scans.
-  await signInAs(page, world.email("maya"));
-  const home = new HomePage(page);
-  await home.goto();
-  await expect(home.getWelcomeHeading()).toBeVisible();
+test("the candidate shell", async ({ page }) => {
+  // `/app/` no longer renders anything of its own for these accounts: a
+  // candidate goes to the shell, an owner to their workspace (scanned
+  // below). The picker needs two profiles, which the UI can't make.
+  await signInAs(page, world.email("jane"));
+  const shell = new CandidateShellPage(page);
+  await shell.goto();
+  await expect(shell.getMatchmakerList()).toBeVisible();
   await expectNoA11yViolations(page);
 });
 
@@ -160,11 +160,6 @@ test("the accept screen and a candidate's chat", async ({ page }) => {
   await page.goto(`/app/c#${world.username("book")}`);
   // Wait for the thread: scanning an empty chat misses everything in it.
   await expect(new CandidateChatPage(page).getMessages().first()).toBeVisible();
-  await expectNoA11yViolations(page);
-
-  // Discover, where "Join another matchmaker" leads.
-  await new DiscoverPage(page).goto();
-  await expect(new DiscoverPage(page).getEmptyState()).toBeVisible();
   await expectNoA11yViolations(page);
 });
 

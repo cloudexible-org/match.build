@@ -77,13 +77,10 @@ test("a new account creates a profile, with the server's username rules", async 
   await expect(workspace.getName()).toHaveText("Maya Matches");
   await expect(workspace.getCandidates()).toContainText("No candidates yet");
 
-  // The UI allows one profile per account: owning one turns home back into
-  // the picker, and the create page sends them to the workspace they have.
+  // The UI allows one profile per account: home now resolves straight to
+  // the workspace they own, and so does the create page.
   await home.goto();
-  await expect(home.getWelcomeHeading()).toBeVisible();
-  await expect(home.getRow("matchmakerProfiles", "Maya Matches")).toContainText(
-    `@${username}`,
-  );
+  await expect(page).toHaveURL(new RegExp(`/app/mm/${username}$`));
   await create.goto();
   await expect(page).toHaveURL(new RegExp(`/app/mm/${username}$`));
 });

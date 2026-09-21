@@ -79,12 +79,13 @@ test("a candidate lands straight on a conversation, with everything they have be
   );
   await expect(chat.getMessages().first()).toBeVisible();
 
-  // Both matchmakers are in the first column, and so is the open invitation.
+  // Both matchmakers are in the first column, and the open invitation sits
+  // above them as a badged card.
   await expect(shell.getMatchmakerRow("Maya Matches")).toBeVisible();
   await expect(shell.getMatchmakerRow("Rose's Book")).toBeVisible();
-  await expect(shell.getWaitingRow("Ida's Book")).toContainText(
-    "Invited you to join",
-  );
+  const invitation = shell.getInvitation("Ida's Book");
+  await expect(invitation).toContainText("Invited");
+  await expect(invitation).toContainText("Accept or decline");
 });
 
 test("switching matchmakers only swaps the hash and the thread", async ({
@@ -131,7 +132,7 @@ test("the third column says who the matchmaker is and what can be done about it"
   await expect(chat.getComposer()).toBeVisible();
 });
 
-test("an account with no matchmakers still lands here, and is offered both ways on", async ({
+test("an account with no matchmakers still lands here, and waits for an invitation", async ({
   page,
 }) => {
   await signInAs(page, world.email("nora"));
@@ -140,16 +141,23 @@ test("an account with no matchmakers still lands here, and is offered both ways 
   const shell = new CandidateShellPage(page);
   await expect(page).toHaveURL(/\/app\/c$/);
   await expect(shell.getNoConversations()).toBeVisible();
-  await expect(shell.getWaitingSection()).toBeHidden();
+  await expect(shell.getInvitationsSection()).toBeHidden();
 
+  // Becoming a matchmaker is the only thing on offer: in v1 nothing in the
+  // UI invites you into someone else's book but that matchmaker.
   await expect(shell.getCreateMatchmakerLink()).toHaveAttribute(
     "href",
     "/app/mm/new",
   );
-  await shell.getJoinAnotherLink().click();
+  await expect(shell.getOwnWorkspaceLink()).toBeHidden();
+  await expect(page.getByRole("link", { name: /discover/i })).toHaveCount(0);
+});
 
+test("Discover is a shell nothing links to yet", async ({ page }) => {
+  await signInAs(page, world.email("nora"));
   const discover = new DiscoverPage(page);
-  await expect(page).toHaveURL("/app/c/mm/discover");
+  await discover.goto();
+
   await expect(discover.getTitle()).toBeVisible();
   await expect(discover.getEmptyState()).toContainText(
     "The directory isn't open yet.",
@@ -189,7 +197,7 @@ test("an invitation in the first column opens the accept screen", async ({
   const shell = new CandidateShellPage(page);
   await shell.goto();
 
-  await shell.getWaitingRow("Ida's Book").click();
+  await shell.getInvitation("Ida's Book").click();
   await expect(page).toHaveURL(
     `/app/invitations/${world.candidateId("samInvite")}`,
   );

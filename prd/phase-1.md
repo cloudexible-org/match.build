@@ -54,13 +54,23 @@ Extend the list rather than blocking substrings: a substring rule would reject l
 
 ## 2. Home page
 
-Shown after sign-in at the app's root (`www.match.build/app/`). Sections:
+The app's root (`www.match.build/app/`) is a junction, not a destination. It only renders a picker when the account genuinely has two sides to choose between; otherwise it sends them where they were going:
+
+| The account owns | `/app/` |
+|---|---|
+| no matchmaker profile | → `/app/c`, its own chat (§4.2) |
+| one matchmaker profile | → that workspace (§4.1) |
+| two or more | the picker below |
+
+The UI allows one profile per account (§1), so in practice nobody sees the picker; it stays because that limit is a UI rule rather than a schema one, and an account that owns two must be able to open both.
+
+The picker's sections:
 
 1. **Invitations** — pending invites for this account's verified email. Hidden when empty.
-2. **Your matchmaker profiles** — with a **Create matchmaker profile** button, hidden once one exists.
-3. **Your matchmakers** — candidate profiles with `membership: "joined"`, one per matchmaker, with unread indicators.
+2. **Your matchmaker profiles.**
+3. **Your matchmakers** — candidate profiles with `membership: "joined"`, one per matchmaker, each opening `/app/c#<username>`.
 
-Empty state for a new account: a prompt to create a matchmaker profile, plus a line for candidates: "Waiting for an invitation? Ask your matchmaker for your invite link."
+Creating a profile is offered from §4.2, which is where an account without one lands.
 
 ---
 
@@ -188,7 +198,9 @@ Three columns, the mirror of §4.1 from the candidate's side, at `/c`. The match
 
 An account that owns no matchmaker profile lands here from `/` — including one with no matchmakers at all, which gets the empty state rather than a chooser. An account that owns a profile still gets the home page in §2 and chooses a side.
 
-**Left — matchmakers.** Everyone this account has joined, then **Waiting on you**: open invitations, and the pending applications Discover adds in phase 3. **Join another matchmaker** leads to `/c/mm/discover`; an account without a profile of its own is also offered one here.
+**Left — matchmakers.** Open invitations first, each a card with an **Invited** badge — an invitation is something to answer and it expires, so it doesn't read as a row to browse. Then everyone this account has joined. At the foot, the other side of this account: **Your matchmaker workspace** when it owns a profile, **Become a matchmaker** when it doesn't (the only route to `/mm/new` for an account that never sees §2).
+
+There is no way to find a matchmaker from here in v1: an invitation from that matchmaker is the only way into their book (§3.2). `/c/mm/discover` exists as the shell phase 3's directory lands in, and nothing links to it.
 
 **Centre — conversation.** One thread with the selected matchmaker, headed by their display name. Only `visibility: "everyone"` messages: the query can't return the matchmaker's private ones. Composer.
 

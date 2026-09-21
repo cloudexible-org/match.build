@@ -1,5 +1,5 @@
 import { api, type Id } from "@repo/api";
-import { buttonVariants } from "@repo/ui";
+import { buttonVariants, cn } from "@repo/ui";
 import { useQuery } from "convex/react";
 import {
   Link,
@@ -42,6 +42,9 @@ export function WorkspaceLayout() {
   const location = useLocation();
   const me = useQuery(api.users.queries.me);
   const workspace = useQuery(api.matchmakers.queries.workspace, { username });
+  // Home now resolves straight to this workspace, so it is no longer the
+  // bridge to the owner's own candidate side; this nav is.
+  const home = useQuery(api.users.queries.home);
 
   if (me === undefined || workspace === undefined) {
     return <FullPageStatus>Loading…</FullPageStatus>;
@@ -86,6 +89,20 @@ export function WorkspaceLayout() {
             >
               Settings
             </Link>
+            {home !== undefined &&
+              home !== null &&
+              home.candidateProfiles.length > 0 && (
+                <Link
+                  to="/c"
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "sm" }),
+                    "hidden sm:inline-flex",
+                  )}
+                  data-testid="workspace-my-matchmakers"
+                >
+                  Your matchmakers
+                </Link>
+              )}
           </nav>
         }
       />

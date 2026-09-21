@@ -45,9 +45,8 @@ test("a new account signs up with an emailed code and names itself", async ({
   await expect(shell.getMatchmakerList()).toContainText(
     "You haven't joined a matchmaker yet.",
   );
-  await expect(shell.getWaitingSection()).toBeHidden();
+  await expect(shell.getInvitationsSection()).toBeHidden();
   await expect(shell.getNoConversations()).toBeVisible();
-  await expect(shell.getJoinAnotherLink()).toBeVisible();
   await expect(shell.getCreateMatchmakerLink()).toBeVisible();
 
   // The session survives a reload: this re-reads from the backend rather than

@@ -67,7 +67,7 @@ export function CandidatePage() {
       <Shell
         matchmakers={home.candidateProfiles}
         invitations={home.invitations}
-        canCreateProfile={home.matchmakerProfiles.length === 0}
+        ownsProfile={home.matchmakerProfiles.length > 0}
       />
     </div>
   );
@@ -77,11 +77,11 @@ export function CandidatePage() {
 function Shell({
   matchmakers,
   invitations,
-  canCreateProfile,
+  ownsProfile,
 }: {
   matchmakers: JoinedMatchmaker[];
   invitations: Invitation[];
-  canCreateProfile: boolean;
+  ownsProfile: boolean;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -112,7 +112,7 @@ function Shell({
         matchmakers={matchmakers}
         invitations={invitations}
         selected={selected}
-        canCreateProfile={canCreateProfile}
+        ownsProfile={ownsProfile}
       />
       <section
         aria-label="Conversation"
@@ -147,7 +147,12 @@ function ChooseMatchmaker() {
   );
 }
 
-/** The centre column when this account has no matchmaker to open. */
+/**
+ * The centre column when this account has no matchmaker to open.
+ *
+ * There is nothing to offer but waiting: in v1 a matchmaker brings a
+ * candidate in by invitation, and nothing else does (prd/phase-1.md §3.2).
+ */
 function NoMatchmaker({ hasInvitations }: { hasInvitations: boolean }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-muted/40 p-6 text-center">
@@ -155,14 +160,8 @@ function NoMatchmaker({ hasInvitations }: { hasInvitations: boolean }) {
       <p className="max-w-sm text-sm text-muted-foreground">
         {hasInvitations
           ? "Accept an invitation to start talking to your matchmaker."
-          : "Once you join a matchmaker, your conversation with them lives here."}
+          : "Your matchmaker invites you here, and your conversation with them lives in this window."}
       </p>
-      <Link
-        to="/c/mm/discover"
-        className={buttonVariants({ variant: "outline", size: "sm" })}
-      >
-        Join another matchmaker
-      </Link>
     </div>
   );
 }
