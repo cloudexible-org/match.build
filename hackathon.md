@@ -1,6 +1,6 @@
 # Hackathon log
 
-- **Project:** matchmaker
+- **Project:** match.build
 - **Event:** Convex All Gas Hackathon
 - **What it does:** An operating system for independent human matchmakers: invite candidates from Instagram/WhatsApp into an in-app chat, with AI-drafted replies and an AI-enriched candidate profile planned for later phases.
 - **Live app:** https://www.match.build (app at /app/)
@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** none
 - **Started:** 2026-09-19T15:37:25Z
-- **Last updated:** 2026-09-20T00:28:45Z
+- **Last updated:** 2026-09-21T11:09:35Z
 
 ## Log
 
@@ -207,7 +207,7 @@ asserts the rendered colour and scans dark mode for contrast
 (`packages/ui/src/components/accordion.tsx`, `apps/app/src/theme/`,
 `packages/ui/src/styles/theme.css`).
 
-### 2026-09-20 - 6fd115f
+### 2026-09-20 - 96f8fcd
 Phase 1 step 7: leaving and account deletion. A candidate can leave from their
 chat menu with an optional reason, and nothing is removed from the matchmaker —
 the thread, notes and trail stay readable, the banner and the closed composer
@@ -227,3 +227,48 @@ existing scan of the chat had been passing by racing the thread's render. Convex
 features: mutations, internal actions, scheduled functions, indexes
 (`packages/api/convex/users/`, `packages/api/convex/candidates/mutations.ts`,
 `apps/app/src/pages/account-settings.tsx`).
+
+### 2026-09-20 - 2d0f09c
+Phase 1 step 8, and the last step of phase 1: notifications. A message you
+don't open reaches you by push after ~30 seconds and by email after ~5 minutes;
+one you do open reaches you not at all. Nothing is sent when a message is
+written — a job is scheduled, and when it fires it re-reads the conversation and
+asks whether the read marker has passed the message. One row per (conversation,
+recipient, channel), so a burst can only have one job pending per channel and a
+later message rides on it. Notifications say who wrote and link to the thread,
+never what they wrote: they are read on lock screens. Web push is RFC 8291
+encryption and an RFC 8292 VAPID JWT written directly on Web Crypto rather than
+the web-push package, so sending stays in Convex's own runtime instead of a
+"use node" action; the RFC's published worked example is replayed byte for byte
+in the tests, which is the only way to catch a bad payload, since a push service
+accepts it and the browser silently drops it. The app also became installable —
+manifest, icons, and a service worker that caches nothing on purpose. Convex
+features: scheduled functions, mutations, internal actions, indexes
+(`packages/api/convex/notifications/`, `apps/app/src/notifications/`).
+
+### 2026-09-21 - 4d72d10
+Renamed the product from Matchmaker to match.build across the apps, the specs
+and the marketing copy, and with it the dev hostname and the Doppler project.
+"Matchmaker" stays where it means the *role* — the schema, the access helpers
+and the UI all still talk about a matchmaker and their candidates — so this
+touched the product name only.
+
+### 2026-09-21 - 360b65b
+Erasure requests (`/admin/erasure`), resolving the one place where the "nothing
+is deleted" rule and a right-to-erasure request genuinely conflict: it erases
+the **person**, not the record. A person's name, address and handles go
+everywhere they appear — their account, every matchmaker's record of them, and
+the values inside the audit trail — while every conversation, message, note and
+audit event stays. Each matchmaker keeps a full history of the work they did,
+attached to a candidate nobody can be identified from, and a `candidate.anonymised`
+entry in their trail explains the change. The append-only guarantee on the audit
+trail is narrowed rather than broken: an erasure redacts the personal values
+inside an event and never removes, reorders or rewrites one, so workflow values
+like "status: active → paused" still read. It runs in one transaction with
+ceilings, because a half-erased person is worse than a refusal that says so.
+Message and note *text* is deliberately out of scope — that is the matchmaker's
+call as data controller, not the platform's. The test asserts the database holds
+no trace of the person afterwards *and* that each matchmaker can still open the
+thread, the notes and the history through their own queries. Convex features:
+mutations, indexes, queries (`packages/api/convex/admin/mutations.ts`,
+`packages/api/convex/users/helpers.ts`, `apps/admin/src/pages/erasure.tsx`).
