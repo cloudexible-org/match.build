@@ -24,6 +24,7 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useId, useState } from "react";
 import { serverErrorMessage } from "../lib/server-error";
+import { PanelHeader } from "../shell/panel-header";
 import { CandidateHistory } from "./candidate-history";
 import { type Membership, membershipMarker } from "./candidate-labels";
 import { useWorkspace } from "./workspace-layout";
@@ -60,19 +61,11 @@ export function CandidatePanel({
       className="flex h-full min-h-0 w-full flex-col"
       data-testid="candidate-panel"
     >
-      <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4 lg:hidden">
-        <span className="truncate font-medium">
-          About {candidate.name ?? candidate.email}
-        </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          data-testid="close-candidate-panel"
-        >
-          Close
-        </Button>
-      </div>
+      <PanelHeader
+        title={`About ${candidate.name ?? candidate.email}`}
+        onClose={onClose}
+        closeTestId="close-candidate-panel"
+      />
       {/* Sections rather than tabs: a matchmaker reading a thread wants the
           details and their notes at once, not one at a time. */}
       <Accordion defaultValue={["details"]} className="overflow-y-auto">

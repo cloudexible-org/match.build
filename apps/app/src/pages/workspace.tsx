@@ -3,6 +3,7 @@ import { buttonVariants, cn, Input } from "@repo/ui";
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { Link, Outlet, useParams } from "react-router";
+import { ChatShell } from "../shell/chat-shell";
 import {
   candidateDisplayName,
   membershipMarker,
@@ -18,38 +19,28 @@ const STATUSES: { value: Status; label: string }[] = [
 ];
 
 /**
- * The matchmaker workspace (prd/phase-1.md §4.1), mobile-first: the
- * candidate list beside the conversation, which the child route fills.
- *
- * On a phone only one column shows: the list, until a conversation is open
- * (`/mm/:username/c/:candidateId`); then the conversation, with a way back.
- * The candidate panel on the right arrives with step 6.
+ * The matchmaker workspace (prd/phase-1.md §4.1): the candidate list beside
+ * the conversation, which the child route fills. `ChatShell` owns the
+ * columns and what they do on a phone — the candidate shell (§4.2) is the
+ * same shape from the other side.
  */
 export function WorkspacePage() {
   const workspace = useWorkspace();
   const { candidateId } = useParams();
-  const open = candidateId !== undefined;
   return (
-    <main className="flex min-h-0 flex-1" data-testid="workspace">
-      <CandidateList
-        className={cn(
-          "w-full md:flex md:w-80 md:shrink-0 md:border-r",
-          open ? "hidden" : "flex",
-        )}
-        base={`/mm/${workspace.username}`}
-        openId={candidateId}
-      />
-      <section
-        aria-label="Conversation"
-        className={cn(
-          "min-w-0 flex-1 flex-col md:flex",
-          open ? "flex" : "hidden",
-        )}
-        data-testid="workspace-conversation"
-      >
-        <Outlet context={workspace} />
-      </section>
-    </main>
+    <ChatShell
+      testId="workspace"
+      open={candidateId !== undefined}
+      list={(className) => (
+        <CandidateList
+          className={className}
+          base={`/mm/${workspace.username}`}
+          openId={candidateId}
+        />
+      )}
+    >
+      <Outlet context={workspace} />
+    </ChatShell>
   );
 }
 

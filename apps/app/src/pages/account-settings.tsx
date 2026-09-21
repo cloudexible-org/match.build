@@ -24,10 +24,10 @@ import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
 import { markAccountDeleted } from "../auth/account-deleted";
-import { AppHeader } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
 import { serverErrorMessage } from "../lib/server-error";
 import { NotificationSettings } from "../notifications/notification-settings";
+import { Page, PageHeader } from "../shell/page";
 
 /**
  * Account settings (prd/phase-1.md §4): the account's name, how it is
@@ -43,17 +43,17 @@ export function AccountSettingsPage() {
   if (me === null || home === null) return null; // RequireAuth handles this
 
   return (
-    <div className="min-h-dvh">
-      <AppHeader name={me.name ?? ""} />
-      <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8">
-        <h1 className="font-display text-3xl">Account settings</h1>
-        <NameForm name={me.name ?? ""} email={me.email ?? ""} />
-        <NotificationSettings />
-        <DeleteAccount
-          ownsMatchmakerProfile={home.matchmakerProfiles.length > 0}
-        />
-      </main>
-    </div>
+    <Page accountName={me.name ?? ""}>
+      <PageHeader
+        title="Account settings"
+        description="Your name, how we reach you, and closing your account."
+      />
+      <NameForm name={me.name ?? ""} email={me.email ?? ""} />
+      <NotificationSettings />
+      <DeleteAccount
+        ownsMatchmakerProfile={home.matchmakerProfiles.length > 0}
+      />
+    </Page>
   );
 }
 

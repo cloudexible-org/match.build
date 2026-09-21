@@ -55,7 +55,7 @@ export function SignInPage() {
     <main className="flex min-h-dvh flex-col items-center justify-start gap-4 px-4 py-12 sm:justify-center">
       {deleted && (
         <Card
-          className="w-full max-w-sm bg-accent/40 p-4 text-sm"
+          className="w-full max-w-md bg-accent/40 p-4 text-sm"
           data-testid="account-deleted-notice"
         >
           <p className="font-medium">Your account is deleted.</p>
@@ -65,7 +65,7 @@ export function SignInPage() {
           </p>
         </Card>
       )}
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-md">
         {step.kind === "email" ? (
           <EmailStep
             onSent={(email) => setStep({ kind: "code", email, sent: true })}

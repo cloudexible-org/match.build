@@ -11,27 +11,17 @@ import { ThemeToggle } from "./theme-toggle";
  * account). `nav` adds links after the brand (a workspace's name and its own
  * settings); the account name then gives way to them on narrow screens —
  * a workspace's owner can't delete their account anyway (prd §3.5), and
- * reaches account settings from home. `wide` spans the full width for the
- * workspace's columns instead of the reading width.
+ * reaches account settings from home.
+ *
+ * Full width on every page, whatever the page under it is: the header is
+ * the app's frame rather than part of the page, and a frame that changes
+ * width as you navigate reads as the page jumping.
  */
-export function AppHeader({
-  name,
-  nav,
-  wide = false,
-}: {
-  name: string;
-  nav?: ReactNode;
-  wide?: boolean;
-}) {
+export function AppHeader({ name, nav }: { name: string; nav?: ReactNode }) {
   const { signOut } = useAuthActions();
   return (
     <header className="border-b border-border bg-card">
-      <div
-        className={cn(
-          "mx-auto flex h-14 items-center justify-between gap-4 px-4",
-          !wide && "max-w-3xl",
-        )}
-      >
+      <div className="flex h-14 items-center justify-between gap-4 px-4">
         {/* The brand and workspace name give way; the controls on the right
             can't shrink, and at 380px something has to. */}
         <div className="flex min-w-0 flex-1 items-center gap-3">

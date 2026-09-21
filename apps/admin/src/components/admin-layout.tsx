@@ -10,14 +10,19 @@ const NAV = [
   { to: "/erasure", label: "Erasure" },
 ] as const;
 
-/** Top bar and page frame for every signed-in admin page. */
+/**
+ * Top bar and page frame for every signed-in admin page.
+ *
+ * Full width, header and page alike: this is an operator's tool that reads
+ * audit trails and tables, and a reading column would only make them scroll.
+ */
 export function AdminLayout() {
   const { signOut } = useAuthActions();
   const me = useQuery(api.admin.queries.me);
   return (
     <div className="min-h-dvh bg-background">
       <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
             <span className="shrink-0 font-display text-xl">
               match.build <span className="text-muted-foreground">Admin</span>
@@ -54,7 +59,7 @@ export function AdminLayout() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="px-4 py-6">
         <Outlet />
       </main>
     </div>

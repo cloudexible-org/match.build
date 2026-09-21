@@ -20,6 +20,7 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useState } from "react";
 import { serverErrorMessage } from "../lib/server-error";
+import { CardList, Page, PageHeader, PageSection } from "../shell/page";
 import { describeProfileEvent } from "../workspace/profile-history";
 import { useWorkspace } from "../workspace/workspace-layout";
 
@@ -30,11 +31,14 @@ import { useWorkspace } from "../workspace/workspace-layout";
 export function MatchmakerSettingsPage() {
   const workspace = useWorkspace();
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8">
-      <h1 className="font-display text-3xl">Profile settings</h1>
+    <Page>
+      <PageHeader
+        title="Profile settings"
+        description="How you appear to the candidates in your book."
+      />
       <ProfileForm key={workspace.matchmakerId} />
       <ProfileHistory />
-    </main>
+    </Page>
   );
 }
 
@@ -170,21 +174,11 @@ function ProfileHistory() {
   });
 
   return (
-    <section
-      aria-labelledby="profile-history-heading"
-      className="flex flex-col gap-3"
-      data-testid="profile-history"
-    >
-      <h2
-        id="profile-history-heading"
-        className="text-sm font-medium uppercase tracking-wide text-muted-foreground"
-      >
-        History
-      </h2>
+    <PageSection title="History" testId="profile-history">
       {history === undefined ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <ol className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+        <CardList ordered>
           {history.map((event) => (
             <li key={event._id} className="flex flex-col gap-0.5 px-4 py-3">
               {describeProfileEvent(event.action, event.changes).map((line) => (
@@ -200,8 +194,8 @@ function ProfileHistory() {
               </time>
             </li>
           ))}
-        </ol>
+        </CardList>
       )}
-    </section>
+    </PageSection>
   );
 }

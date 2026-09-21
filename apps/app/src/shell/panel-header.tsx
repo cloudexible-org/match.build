@@ -1,0 +1,30 @@
+import { Button } from "@repo/ui";
+
+/**
+ * The bar at the top of a side panel, below `lg`, where the panel covers the
+ * conversation and needs a way back to it. From `lg` up the panel sits
+ * alongside and this is hidden — there is nothing to close.
+ */
+export function PanelHeader({
+  title,
+  onClose,
+  closeTestId,
+}: {
+  title: string;
+  onClose: () => void;
+  closeTestId: string;
+}) {
+  return (
+    <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4 lg:hidden">
+      <span className="truncate font-medium">{title}</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onClose}
+        data-testid={closeTestId}
+      >
+        Close
+      </Button>
+    </div>
+  );
+}

@@ -36,7 +36,7 @@ export function ErasurePage() {
   const [done, setDone] = useState<Done | null>(null);
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-3xl">Erasure requests</h1>
         <p className="mt-1 text-sm text-muted-foreground">

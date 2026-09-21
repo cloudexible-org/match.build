@@ -3,6 +3,7 @@ import { Button } from "@repo/ui";
 import { useState } from "react";
 import { Link } from "react-router";
 import { LeaveMatchmaker } from "../chat/leave-matchmaker";
+import { PanelHeader } from "../shell/panel-header";
 
 export type SelectedMatchmaker = {
   candidateId: Id<"candidates">;
@@ -36,17 +37,11 @@ export function MatchmakerPanel({
       className="flex h-full min-h-0 w-full flex-col overflow-y-auto"
       data-testid="matchmaker-panel"
     >
-      <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4 lg:hidden">
-        <span className="truncate font-medium">About {name}</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          data-testid="close-matchmaker-panel"
-        >
-          Close
-        </Button>
-      </div>
+      <PanelHeader
+        title={`About ${name}`}
+        onClose={onClose}
+        closeTestId="close-matchmaker-panel"
+      />
 
       <div className="flex flex-col gap-4 p-4">
         <div className="flex flex-col gap-0.5">

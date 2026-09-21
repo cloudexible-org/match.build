@@ -47,7 +47,7 @@ export function CompleteProfilePage() {
 
   return (
     <main className="flex min-h-dvh items-start justify-center px-4 py-12 sm:items-center">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>What's your name?</CardTitle>
           <CardDescription>

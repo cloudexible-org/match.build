@@ -3,8 +3,8 @@ import { cn } from "@repo/ui";
 import { useQuery } from "convex/react";
 import type { ReactNode } from "react";
 import { Link, Navigate } from "react-router";
-import { AppHeader } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
+import { CardList, Page, PageHeader, PageSection } from "../shell/page";
 
 /**
  * Home (prd/phase-1.md §2): the picker, for the one account that has
@@ -39,15 +39,15 @@ export function HomePage() {
   }
 
   return (
-    <div className="min-h-dvh">
-      <AppHeader name={me.name ?? ""} />
-      <main className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-8">
-        <h1 className="font-display text-3xl">
-          Welcome, {me.name?.split(" ")[0]}
-        </h1>
+    <Page accountName={me.name ?? ""}>
+      <PageHeader
+        title={`Welcome, ${me.name?.split(" ")[0] ?? ""}`}
+        description="Open your own book, or a conversation with one of your matchmakers."
+      />
 
-        {home.invitations.length > 0 && (
-          <Section title="Invitations" testId="home-invitations">
+      {home.invitations.length > 0 && (
+        <PageSection title="Invitations" testId="home-invitations">
+          <CardList>
             {home.invitations.map((invite) => (
               <RowLink
                 key={invite.candidateId}
@@ -62,13 +62,15 @@ export function HomePage() {
                 <span className="text-sm font-medium text-primary">View</span>
               </RowLink>
             ))}
-          </Section>
-        )}
+          </CardList>
+        </PageSection>
+      )}
 
-        <Section
-          title="Your matchmaker profiles"
-          testId="home-matchmaker-profiles"
-        >
+      <PageSection
+        title="Your matchmaker profiles"
+        testId="home-matchmaker-profiles"
+      >
+        <CardList>
           {profiles.map((profile) => (
             <RowLink key={profile.matchmakerId} to={`/mm/${profile.username}`}>
               <span className="font-medium">{profile.displayName}</span>
@@ -77,9 +79,11 @@ export function HomePage() {
               </span>
             </RowLink>
           ))}
-        </Section>
+        </CardList>
+      </PageSection>
 
-        <Section title="Your matchmakers" testId="home-candidate-profiles">
+      <PageSection title="Your matchmakers" testId="home-candidate-profiles">
+        <CardList>
           {home.candidateProfiles.length === 0 ? (
             <Empty>You haven't joined a matchmaker yet.</Empty>
           ) : (
@@ -94,40 +98,9 @@ export function HomePage() {
               </RowLink>
             ))
           )}
-        </Section>
-      </main>
-    </div>
-  );
-}
-
-function Section({
-  title,
-  testId,
-  children,
-}: {
-  title: string;
-  testId: string;
-  children: ReactNode;
-}) {
-  const headingId = `${testId}-heading`;
-  return (
-    <section
-      aria-labelledby={headingId}
-      data-testid={testId}
-      className="flex flex-col gap-3"
-    >
-      <div className="flex min-h-8 items-center justify-between gap-3">
-        <h2
-          id={headingId}
-          className="text-sm font-medium uppercase tracking-wide text-muted-foreground"
-        >
-          {title}
-        </h2>
-      </div>
-      <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-        {children}
-      </ul>
-    </section>
+        </CardList>
+      </PageSection>
+    </Page>
   );
 }
 

@@ -70,7 +70,6 @@ export function WorkspaceLayout() {
     <div className="flex min-h-dvh flex-col">
       <AppHeader
         name={me.name ?? ""}
-        wide
         nav={
           <nav className="flex min-w-0 items-center gap-1 text-sm">
             <span aria-hidden className="text-muted-foreground">

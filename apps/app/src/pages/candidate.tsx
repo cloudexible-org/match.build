@@ -1,14 +1,7 @@
 import { api, type Id } from "@repo/api";
-import { Button, buttonVariants, cn } from "@repo/ui";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useCallback, useEffect, useState } from "react";
-import {
-  Link,
-  Navigate,
-  useLocation,
-  useNavigate,
-  useParams,
-} from "react-router";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import {
   type Invitation,
   type JoinedMatchmaker,
@@ -25,6 +18,8 @@ import { AppHeader } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
 import { useMediaQuery } from "../lib/use-media-query";
 import { PushNudge } from "../notifications/push-nudge";
+import { ChatShell } from "../shell/chat-shell";
+import { ConversationPanes } from "../shell/conversation-panes";
 
 const PAGE_SIZE = 30;
 
@@ -63,7 +58,7 @@ export function CandidatePage() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <AppHeader name={me.name ?? ""} wide />
+      <AppHeader name={me.name ?? ""} />
       <Shell
         matchmakers={home.candidateProfiles}
         invitations={home.invitations}
@@ -103,38 +98,31 @@ function Shell({
 
   const open = selected !== "";
   return (
-    <main className="flex min-h-0 flex-1" data-testid="candidate-shell">
-      <MatchmakerList
-        className={cn(
-          "w-full md:flex md:w-80 md:shrink-0 md:border-r",
-          open ? "hidden" : "flex",
-        )}
-        matchmakers={matchmakers}
-        invitations={invitations}
-        selected={selected}
-        ownsProfile={ownsProfile}
-      />
-      <section
-        aria-label="Conversation"
-        className={cn(
-          "min-w-0 flex-1 flex-col md:flex",
-          open ? "flex" : "hidden",
-        )}
-        data-testid="candidate-conversation"
-      >
-        {open ? (
-          // Keyed by matchmaker: opening another starts its paging fresh.
-          <Conversation key={selected} matchmakerUsername={selected} />
-        ) : matchmakers.length > 0 ? (
-          // A phone that hasn't picked yet, where this column is hidden
-          // behind the list — and the one frame before the effect above
-          // opens the first matchmaker anywhere else.
-          <ChooseMatchmaker />
-        ) : (
-          <NoMatchmaker hasInvitations={invitations.length > 0} />
-        )}
-      </section>
-    </main>
+    <ChatShell
+      testId="candidate-shell"
+      open={open}
+      list={(className) => (
+        <MatchmakerList
+          className={className}
+          matchmakers={matchmakers}
+          invitations={invitations}
+          selected={selected}
+          ownsProfile={ownsProfile}
+        />
+      )}
+    >
+      {open ? (
+        // Keyed by matchmaker: opening another starts its paging fresh.
+        <Conversation key={selected} matchmakerUsername={selected} />
+      ) : matchmakers.length > 0 ? (
+        // A phone that hasn't picked yet, where this column is hidden
+        // behind the list — and the one frame before the effect above
+        // opens the first matchmaker anywhere else.
+        <ChooseMatchmaker />
+      ) : (
+        <NoMatchmaker hasInvitations={invitations.length > 0} />
+      )}
+    </ChatShell>
   );
 }
 
@@ -171,7 +159,6 @@ function Conversation({ matchmakerUsername }: { matchmakerUsername: string }) {
   const membership = useQuery(api.candidates.queries.self, {
     matchmakerUsername,
   });
-  const [panelOpen, setPanelOpen] = useState(false);
 
   if (membership === undefined) {
     return (
@@ -194,62 +181,26 @@ function Conversation({ matchmakerUsername }: { matchmakerUsername: string }) {
   }
 
   const name = membership.matchmakerDisplayName;
-  // `min-w-0`: without it this flex row can grow past a phone's viewport and
-  // the whole page scrolls sideways.
   return (
-    <div className="flex min-h-0 min-w-0 flex-1" data-testid="candidate-chat">
-      <div
-        className={cn(
-          "min-w-0 flex-1 flex-col",
-          panelOpen ? "hidden lg:flex" : "flex",
-        )}
-      >
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
-          <Link
-            to="/c"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "md:hidden",
-            )}
-            aria-label="Back to matchmakers"
-          >
-            ←
-          </Link>
-          <h1
-            className="min-w-0 flex-1 truncate font-display text-xl"
-            data-testid="candidate-chat-matchmaker"
-          >
-            {name}
-          </h1>
-          <Button
-            variant="outline"
-            size="sm"
-            aria-expanded={panelOpen}
-            data-testid="toggle-matchmaker-panel"
-            onClick={() => setPanelOpen((panel) => !panel)}
-          >
-            Details
-          </Button>
-        </header>
-        <CandidateThread
-          candidateId={membership.candidateId}
-          matchmakerName={name}
-        />
-      </div>
-
-      <aside
-        aria-label={`About ${name}`}
-        className={cn(
-          "min-w-0 flex-1 border-border lg:flex lg:max-w-sm lg:border-l",
-          panelOpen ? "flex" : "hidden",
-        )}
-      >
+    <ConversationPanes
+      testId="candidate-chat"
+      back={{ to: "/c", label: "Back to matchmakers" }}
+      title={name}
+      titleTestId="candidate-chat-matchmaker"
+      panelLabel={`About ${name}`}
+      panelToggleTestId="toggle-matchmaker-panel"
+      panel={(close) => (
         <MatchmakerPanel
           matchmaker={membership satisfies SelectedMatchmaker}
-          onClose={() => setPanelOpen(false)}
+          onClose={close}
         />
-      </aside>
-    </div>
+      )}
+    >
+      <CandidateThread
+        candidateId={membership.candidateId}
+        matchmakerName={name}
+      />
+    </ConversationPanes>
   );
 }
 

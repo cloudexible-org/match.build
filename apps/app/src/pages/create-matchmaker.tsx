@@ -10,9 +10,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Field,
   FieldDescription,
   FieldError,
@@ -25,6 +22,7 @@ import { Navigate, useNavigate } from "react-router";
 import { AppHeader } from "../components/app-header";
 import { FullPageStatus } from "../components/full-page-status";
 import { serverErrorMessage } from "../lib/server-error";
+import { Page, PageHeader } from "../shell/page";
 
 type Errors = {
   username?: string;
@@ -103,15 +101,12 @@ export function CreateMatchmakerPage() {
   return (
     <div className="min-h-dvh">
       <AppHeader name={me.name ?? ""} />
-      <main className="flex justify-center px-4 py-8 sm:py-12">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Create your matchmaker profile</CardTitle>
-            <CardDescription>
-              Your workspace for onboarding candidates and running your
-              conversations with them.
-            </CardDescription>
-          </CardHeader>
+      <Page>
+        <PageHeader
+          title="Create your matchmaker profile"
+          description="Your workspace for onboarding candidates and running your conversations with them."
+        />
+        <Card>
           <CardContent>
             <form
               noValidate
@@ -186,7 +181,7 @@ export function CreateMatchmakerPage() {
             </form>
           </CardContent>
         </Card>
-      </main>
+      </Page>
     </div>
   );
 }

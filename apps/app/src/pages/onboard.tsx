@@ -15,9 +15,6 @@ import {
   buttonVariants,
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Field,
   FieldDescription,
   FieldError,
@@ -30,6 +27,7 @@ import { useMutation } from "convex/react";
 import { type FormEvent, useId, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { serverErrorMessage } from "../lib/server-error";
+import { Page, PageHeader } from "../shell/page";
 import { useWorkspace } from "../workspace/workspace-layout";
 
 type HandleRow = { key: string; platform: SocialPlatform; handle: string };
@@ -132,15 +130,12 @@ export function OnboardPage() {
   }
 
   return (
-    <main className="flex justify-center px-4 py-8">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>Onboard a candidate</CardTitle>
-          <CardDescription>
-            They'll get an invitation to join you on match.build. Until they
-            accept, only you can see anything here.
-          </CardDescription>
-        </CardHeader>
+    <Page>
+      <PageHeader
+        title="Onboard a candidate"
+        description="They'll get an invitation to join you on match.build. Until they accept, only you can see anything here."
+      />
+      <Card>
         <CardContent>
           <form
             noValidate
@@ -316,6 +311,6 @@ export function OnboardPage() {
           </form>
         </CardContent>
       </Card>
-    </main>
+    </Page>
   );
 }
