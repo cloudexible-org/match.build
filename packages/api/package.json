@@ -20,6 +20,7 @@
     "auth:setup": "node scripts/setup-auth.mjs",
     "invites:setup": "node scripts/setup-invites.mjs",
     "push:setup": "node scripts/setup-push.mjs",
+    "ai:setup": "node scripts/setup-ai.mjs",
     "seed:dev": "convex run --push seed/dev/mutations:apply",
     "seed:dev:code": "node scripts/sign-in-code.mjs"
   },
@@ -34,7 +35,10 @@
   },
   "dependencies": {
     "@auth/core": "^0.41.3",
+    "@convex-dev/agent": "^0.7.3",
+    "@convex-dev/ai-sdk-provider": "^0.1.0",
     "@convex-dev/auth": "^0.0.95",
-    "@convex-dev/static-hosting": "^0.2.1"
+    "@convex-dev/static-hosting": "^0.2.1",
+    "ai": "^7.0.107"
   }
 }

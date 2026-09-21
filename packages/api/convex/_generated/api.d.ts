@@ -12,6 +12,9 @@ import type * as admin_helpers from "../admin/helpers.js";
 import type * as admin_mutations from "../admin/mutations.js";
 import type * as admin_queries from "../admin/queries.js";
 import type * as admin_rules from "../admin/rules.js";
+import type * as ai_actions from "../ai/actions.js";
+import type * as ai_helpers from "../ai/helpers.js";
+import type * as ai_rules from "../ai/rules.js";
 import type * as audit_helpers from "../audit/helpers.js";
 import type * as audit_queries from "../audit/queries.js";
 import type * as audit_rules from "../audit/rules.js";
@@ -72,6 +75,9 @@ declare const fullApi: ApiFromModules<{
   "admin/mutations": typeof admin_mutations;
   "admin/queries": typeof admin_queries;
   "admin/rules": typeof admin_rules;
+  "ai/actions": typeof ai_actions;
+  "ai/helpers": typeof ai_helpers;
+  "ai/rules": typeof ai_rules;
   "audit/helpers": typeof audit_helpers;
   "audit/queries": typeof audit_queries;
   "audit/rules": typeof audit_rules;
@@ -152,4 +158,5 @@ export declare const components: {
   www: import("@convex-dev/static-hosting/_generated/component.js").ComponentApi<"www">;
   app: import("@convex-dev/static-hosting/_generated/component.js").ComponentApi<"app">;
   admin: import("@convex-dev/static-hosting/_generated/component.js").ComponentApi<"admin">;
+  agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
 };

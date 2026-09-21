@@ -1,3 +1,4 @@
+import agent from "@convex-dev/agent/convex.config";
 import staticHosting from "@convex-dev/static-hosting/convex.config";
 import { defineApp } from "convex/server";
 import { v } from "convex/values";
@@ -44,10 +45,26 @@ const app = defineApp({
     // expects these to be tuned with the first matchmaker.
     NOTIFICATION_PUSH_DELAY_SECONDS: v.optional(v.string()),
     NOTIFICATION_EMAIL_DELAY_SECONDS: v.optional(v.string()),
+    // Whether this deployment can reach the Convex AI gateway (ai/helpers.ts).
+    // The gateway needs a paid Convex Cloud deployment, so it is unset — and AI
+    // is off — on a local backend and on the e2e suite's anonymous one. There
+    // is no provider API key here: the gateway holds the credentials.
+    AI_ENABLED: v.optional(v.string()),
+    // Which model does which job (prd/phase-2.md §6, ai/rules.ts). Unset means
+    // the defaults in that file; an unparseable value is ignored rather than
+    // failing every generation.
+    AI_MODEL_REPLIES: v.optional(v.string()),
+    AI_MODEL_EXTRACTION: v.optional(v.string()),
   },
 });
 app.use(staticHosting, { name: "www" });
 app.use(staticHosting, { name: "app" });
 app.use(staticHosting, { name: "admin" });
+// Threads and messages for the AI side of phase 2 (prd/phase-2.md §4). The
+// component's tables are its own and hold a copy of what the model is shown, so
+// an erasure has to reach them through the component's API
+// (`components.agent.users.deleteAllForUserId`) — `ctx.db` cannot see them.
+// Nothing creates a thread yet; see #3 before anything does.
+app.use(agent);
 
 export default app;

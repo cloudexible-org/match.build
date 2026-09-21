@@ -1,7 +1,7 @@
 # Phase 2 — AI assistance
 
 **Status:** Draft. The design below is proposed, not agreed. §9 sorts what's left into what must be settled before any code, what ships as a setting and gets tuned with the pilot, and what is still an open product question.
-**Depends on:** [phase-1.md](phase-1.md) shipped *and used by a real matchmaker* — which is gated on the terms in [#1](https://github.com/cloudexible-org/match.build/issues/1), not on engineering. One item in §9 has to be decided **before** those terms are drafted; see §9.1.
+**Depends on:** [phase-1.md](phase-1.md) shipped *and used by a real matchmaker* — which is gated on the terms in [#1](https://github.com/cloudexible-org/match.build/issues/1), not on engineering. The AI plumbing itself is built (§4.3); §9.1 is what is left before a feature sits on top of it.
 **Data protection:** everything this phase adds is swept in [#3](https://github.com/cloudexible-org/match.build/issues/3) before v1 ships. Facts are the matchmaker's own records, like their notes (§7).
 **Goal:** make the matchmaker faster and sharper inside the conversation they already run in the app: suggested replies in their voice, and a candidate profile that builds itself from the conversation.
 
@@ -154,8 +154,26 @@ They communicate **through the database**, never by sharing context. Phase 3's m
 | `@convex-dev/workpool` | Every background job below. Gives §4C its "one job per candidate at a time" as configuration rather than as a lock invented in a `facts` row. |
 | `@convex-dev/persistent-text-streaming` | §4A's streamed replies. A mutation per token is a database write per token, which is what "streamed into a `replySuggestions` row" would otherwise mean. |
 | `@convex-dev/rate-limiter` | §6's per-matchmaker AI budget. |
+| `@convex-dev/agent` | Threads, message history, tool calls and usage tracking for the AI side. **Installed** (§4.3). |
 
-**Deliberately not `@convex-dev/agent`.** It is the obvious reach for "add an AI agent to a Convex app", and it is the wrong one here: it brings its own threads and messages tables, and this product already has `conversations` and `messages` that are tenanted, audited, read-markered, notification-driving and erasure-aware. Phase 1 spent five of its eight steps earning those properties. `@convex-dev/rag` is worth a look in phase 3 for cross-conversation retrieval, not here.
+**`@convex-dev/agent`, on one condition.** An earlier draft of this section ruled it out, on the grounds that it brings its own threads and messages tables while the product already has `conversations` and `messages` that are tenanted, audited, read-markered, notification-driving and erasure-aware. The first half of that is true and the conclusion was wrong: the component's thread is the *model's* record of a conversation, not the product's, and the two can coexist as long as one of them is unambiguously the source of truth.
+
+So: **`conversations` and `messages` stay the product's source of truth.** Nothing the UI renders, nothing a notification fires from, and nothing a matchmaker keeps comes out of a component table. An agent thread is the context the model is given, downstream of the real thread and rebuildable from it.
+
+The condition is the one that made the earlier draft nervous, and it is concrete rather than a matter of taste: **a component's tables are invisible to `ctx.db`**, so `admin.mutations.eraseAccount` cannot walk them the way it walks `candidates` and `auditEvents`. The component has its own door — `components.agent.users.deleteAllForUserId` — and an erasure has to knock on it. Nothing creates a thread until that is wired; see [#3](https://github.com/cloudexible-org/match.build/issues/3).
+
+`@convex-dev/rag` is worth a look in phase 3 for cross-conversation retrieval, not here.
+
+### 4.3 What is installed (built)
+
+The plumbing is in, with no product feature on top of it yet:
+
+- **`convex/ai/`** — `rules.ts` (which model does which job, and the ceilings), `helpers.ts` (is AI reachable, and which model), `actions.ts` (`"use node"`, actions only, the only place a call leaves Convex).
+- **No API key anywhere.** `convexGateway` from `@convex-dev/ai-sdk-provider` mints a short-lived deployment token per action; the **Convex AI gateway** holds the provider credentials. This changes §7 and §9.1: there is no separate provider contract to sign, and Convex is the sub-processor the DPA names.
+- **Two tiers, both proven against the dev deployment:** `anthropic/claude-opus-5` for drafting a reply a matchmaker sends under their own name, `anthropic/claude-haiku-4-5` for high-volume extraction. Both overridable per deployment (`AI_MODEL_REPLIES`, `AI_MODEL_EXTRACTION`); an unparseable override falls back to the default rather than failing every generation.
+- **`AI_ENABLED`, because off is a supported state.** The gateway needs a paid Convex Cloud deployment, so a local backend and the e2e suite's anonymous one cannot reach it. `pnpm --filter @repo/api ai:setup` sets the flag and then actually calls both models, since a flag reading "on" while the gateway refuses us is the one state worse than off.
+- **`ai/actions.ts:probe`** — one generation with nothing of the product in it: no candidate, no conversation, no thread. It answers the only question a unit test cannot, which is whether this deployment can reach a model at all.
+- **The `agent` component is registered and unused.** No thread is created anywhere yet, by the condition above.
 
 **A. Reply suggester** (foreground, latency-sensitive)
 - Trigger: a candidate message, **debounced** (~5 s after the last one, so a burst of messages produces one generation). Also once when a candidate accepts, for a welcome message.
@@ -226,7 +244,7 @@ The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invit
 
 ## 7. Privacy
 
-- **Use an LLM provider and API tier with no training on inputs and a documented retention period.** That provider is a **sub-processor**, so the DPA in [#1](https://github.com/cloudexible-org/match.build/issues/1) has to name it — which is why choosing it is §9.1's first item and has to happen before those terms are drafted rather than when this phase starts.
+- **Model calls go through the Convex AI gateway** (§4.3), which holds the provider credentials. There is no API key in this deployment and no provider contract of our own, so **Convex is the sub-processor** the DPA in [#1](https://github.com/cloudexible-org/match.build/issues/1) names — the same one it already names for the database. What remains is to confirm the gateway's own training and retention terms, and what it says about the providers behind it, rather than to negotiate with a provider ourselves.
 - **Facts are the matchmaker's records**, collected and maintained by them with the AI's help, like their notes. The matchmaker is the controller (prd/phase-1.md §9.3); an erasure anonymises facts and leaves them standing (§3).
 - **Candidates never see their facts.** That is a UI decision and not a legal one: facts are personal data about the candidate, so an access request reaches them whether or not a screen does. Whether *showing* them would improve the data enough to be worth it is still open (§9.3); whether they must be *disclosable* is not, and is part of [#3](https://github.com/cloudexible-org/match.build/issues/3).
 - **Candidate messages are untrusted input** (§4.1). Instructions inside them are content, never commands.
@@ -235,7 +253,7 @@ The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invit
 
 **Where it lands.** One new domain, `convex/facts/` (`rules.ts` carrying the key registry, plus mutations, queries and helpers per `CLAUDE.md`). Everything else extends a domain phase 1 already built: reply suggestions and the summariser go in `messages/`, the voice profile in `matchmakers/`, the welcome trigger in `invites/`, the agent actor and the new actions in `audit/`, and the erasure branch for `facts` in `admin/`.
 
-0. **Choose the LLM provider** (§9.1) — before [#1](https://github.com/cloudexible-org/match.build/issues/1)'s DPA is drafted, not before this step.
+0. *Done.* **AI plumbing** (§4.3): the `agent` component, the gateway, `convex/ai/`, the two model tiers and `ai:setup`. No product feature on it yet.
 1. Voice samples in settings + reply suggester (streaming, debounce, stale handling).
 2. Facts schema, key registry, manual facts in the Profile tab, audit integration — **and the `facts` branch of the erasure in the same change** (§3).
 3. Extractor + reconciler + auto-apply/suggest + undo.
@@ -251,7 +269,7 @@ The first draft listed eleven of these flat, which made a number that wants a we
 
 ### 9.1 Must be settled before any code
 
-- **LLM provider and models**, for the foreground and background jobs, with no training on inputs and a documented retention period. **⏰ This one is not on this phase's clock.** The provider is a sub-processor the DPA in [#1](https://github.com/cloudexible-org/match.build/issues/1) has to name, and amending a signed DPA means going back to every matchmaker who signed it. Decide it **before those terms are drafted**.
+- ~~**LLM provider and models.**~~ *Resolved by building it (§4.3).* Calls go through the Convex AI gateway, so there is no provider to choose, no key to hold and no second contract: Convex is the sub-processor, and the models are `anthropic/claude-opus-5` for drafting and `anthropic/claude-haiku-4-5` for extraction, both overridable per deployment. **What is left is a question for [#1](https://github.com/cloudexible-org/match.build/issues/1), not for this phase:** confirm the gateway's training and retention terms and what they say about the providers behind it. Still do that before the DPA is drafted — amending a signed DPA means going back to every matchmaker who signed it — but it is now a paragraph to verify rather than a vendor to pick.
 - **Prompt injection and leakage.** Not "is a system-prompt guardrail enough" — that framing invites a yes. Special-category data, plus an LLM drafting messages a human sends under their own name, is the one place in this product where a leak harms a real person. It needs a mechanism: what checks a suggestion before it can reach the Send button, and what a failed check does.
 - **Key registry contents, and who owns adding keys** (§3.1). Phase 3's hard filter runs on these keys, so changing one later is a migration rather than an edit.
 - **Eval data.** Where realistic but synthetic or consented conversations come from (§4.2). The reconciler cannot be built honestly without them, and it must never be raw candidate data.
