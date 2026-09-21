@@ -105,6 +105,44 @@ export const profileEntry = v.object({
   ),
 });
 
+/** The match board's columns and its Rejected lane (prd/phase-3.md §2). */
+export const matchStage = v.union(
+  v.literal("suggested"),
+  v.literal("reviewing"),
+  v.literal("introduced"),
+  v.literal("mutual_interest"),
+  v.literal("connected"),
+  v.literal("rejected"),
+);
+
+/** Each side's answer to an introduction, as the matchmaker heard it. */
+export const matchResponse = v.union(
+  v.literal("pending"),
+  v.literal("yes"),
+  v.literal("no"),
+);
+
+export const matchRejectedBy = v.union(
+  v.literal("matchmaker"),
+  v.literal("candidateA"),
+  v.literal("candidateB"),
+  // The nightly run withdrawing its own suggestion after a profile changed
+  // under it: the one rejection nobody chose.
+  v.literal("system"),
+);
+
+/**
+ * One reason a pair scored what it did (`matches/rules.ts`). The run stores
+ * what it saw — `detail` is a sentence about these two people, not a template —
+ * so a card still explains itself after the profiles behind it have moved on.
+ */
+export const matchSignal = v.object({
+  key: v.string(), // a key in MATCH_SIGNAL_LABELS
+  weight: v.number(),
+  earned: v.number(), // 0..1 of the weight
+  detail: v.string(),
+});
+
 export default defineSchema({
   // Convex Auth's sessions, accounts, verification codes, refresh tokens, …
   ...authTables,
@@ -346,6 +384,56 @@ export default defineSchema({
     .index("by_candidateId_and_status", ["candidateId", "status"])
     .index("by_conversationId_and_status", ["conversationId", "status"])
     .index("by_matchmakerId", ["matchmakerId"]),
+  // A pair of people in one matchmaker's book, and where the matchmaker has
+  // got to with them (prd/phase-3.md §2, §4).
+  //
+  // **A match is between two people, not from one to another.** The ids are
+  // stored in a fixed order and `pairKey` is the pair itself, unique across the
+  // table — which is what stops tonight's run suggesting the same two people
+  // last night's already did, and what makes "are they already on the board?"
+  // one indexed read.
+  //
+  // `score`, `coverage` and `signals` are the nightly run's arithmetic, kept so
+  // the card can say why (`matches/rules.ts`). Deliberately no AI: every number
+  // here came from the deterministic algorithm, and `algorithmVersion` says
+  // which version of it. A manual match carries them too, because a matchmaker
+  // who pairs two people by hand still deserves to be told what the facts say.
+  matches: defineTable({
+    matchmakerId: v.id("matchmakers"),
+    candidateAId: v.id("candidates"),
+    candidateBId: v.id("candidates"),
+    /** `"<lower id>:<higher id>"`, from `matches/rules.ts`. Unique. */
+    pairKey: v.string(),
+    origin: v.union(v.literal("algorithm"), v.literal("manual")),
+    stage: matchStage,
+    stageChangedAt: v.number(),
+    score: v.optional(v.number()), // 0..100
+    coverage: v.optional(v.number()), // 0..1, how much profile the score read
+    signals: v.optional(v.array(matchSignal)),
+    /** Either of them wrote a free-text dealbreaker, which no filter reads. */
+    checkDealbreakers: v.optional(v.boolean()),
+    algorithmVersion: v.optional(v.number()),
+    lastScoredAt: v.optional(v.number()),
+    // The two separate yeses behind `mutual_interest` (prd/phase-3.md §2),
+    // held as sub-state on the card rather than as two more columns. The
+    // matchmaker records them: nothing in this phase asks a candidate anything.
+    candidateAResponse: v.optional(matchResponse),
+    candidateBResponse: v.optional(matchResponse),
+    rejectedBy: v.optional(matchRejectedBy),
+    rejectionReason: v.optional(v.string()),
+    outcome: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    // The board: one query per column.
+    .index("by_matchmakerId_and_stage", ["matchmakerId", "stage"])
+    // Every card in a book, whatever stage — what the nightly run reads before
+    // it suggests anything.
+    .index("by_matchmakerId", ["matchmakerId"])
+    .index("by_pairKey", ["pairKey"])
+    // Both sides of every card one candidate is on, for their history and for
+    // an erasure to find them.
+    .index("by_candidateAId", ["candidateAId"])
+    .index("by_candidateBId", ["candidateBId"]),
 
   // Append-only audit trail (prd/phase-1.md §5). Written only through
   // `recordAudit` in `audit/helpers.ts`, in the same mutation as the change.

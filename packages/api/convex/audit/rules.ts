@@ -11,6 +11,11 @@ import {
   candidateEntryHoldsPersonalData,
   candidateProfileFieldLabel,
 } from "../candidateProfiles/rules";
+import {
+  MATCH_REJECTED_BY_LABELS,
+  MATCH_RESPONSE_LABELS,
+  MATCH_STAGE_LABELS,
+} from "../matches/rules";
 
 export const AUDIT_ACTIONS = [
   // The account itself. Account-level events have no matchmakerId; the
@@ -78,6 +83,17 @@ export const AUDIT_ACTIONS = [
   "matchmaker_profile.suggestion_accepted",
   "matchmaker_profile.suggestion_rejected",
 
+  // The match board (prd/phase-3.md §2). Every stage change is recorded on
+  // **both** candidates' trails, as two events: a matchmaker reading one
+  // person's history should see what was tried for them without having to know
+  // who else was on the card.
+  "match.suggested", // the nightly run found a pair
+  "match.created", // the matchmaker paired two people by hand
+  "match.stage_changed",
+  "match.rejected",
+  "match.response_recorded",
+  "match.outcome_recorded",
+
   // Historical: the `notes` table these replaced (prd/phase-2.md §3), which
   // no longer exists. The trail is append-only, so events recorded before the
   // change still have to render. Nothing writes these any more.
@@ -95,6 +111,7 @@ export const AUDIT_ENTITY_TABLES = [
   "candidateProfiles",
   "matchmakerProfiles",
   "aiAgentSettings",
+  "matches",
   "notes", // historical; the table is gone, its events are not
 ] as const;
 
@@ -146,6 +163,7 @@ export const AUDIT_FILTERS = {
   details: "Details",
   membership: "Invitations & membership",
   profile: "Profile",
+  matches: "Matches",
 } as const;
 
 export type AuditFilter = keyof typeof AUDIT_FILTERS;
@@ -181,6 +199,14 @@ const FILTER_ACTIONS: Record<Exclude<AuditFilter, "all">, AuditAction[]> = {
     "note.edited",
     "note.removed",
   ],
+  matches: [
+    "match.suggested",
+    "match.created",
+    "match.stage_changed",
+    "match.rejected",
+    "match.response_recorded",
+    "match.outcome_recorded",
+  ],
 };
 
 /** Whether an event belongs under a filter. `all` keeps everything. */
@@ -202,6 +228,13 @@ const FIELD_LABELS: Record<string, string> = {
   status: "status",
   membership: "membership",
   acceptedAs: "accepted as",
+  stage: "stage",
+  score: "score",
+  rejectedBy: "turned down by",
+  rejectionReason: "reason",
+  outcome: "outcome",
+  candidateAResponse: "the first candidate's answer",
+  candidateBResponse: "the second candidate's answer",
   expiresAt: "expiry",
   voice: "voice",
 };
@@ -243,6 +276,23 @@ const PLAIN_SENTENCES: Partial<Record<AuditAction, string>> = {
   "candidate.anonymised":
     "Anonymised them at their request — the conversation, notes and history are unchanged",
   "ai_agent.updated": "Changed an AI agent's settings",
+  "match.suggested": "The nightly run suggested a match",
+  "match.created": "Paired them with someone by hand",
+  "match.stage_changed": "Moved a match",
+  "match.rejected": "Turned a match down",
+  "match.response_recorded": "Recorded an answer to an introduction",
+  "match.outcome_recorded": "Recorded how a match turned out",
+};
+
+/*
+ * A stage stored as `mutual_interest` is a database value, not a sentence. The
+ * trail renders the label the board uses, so one vocabulary covers both.
+ */
+const VALUE_LABELS: Record<string, Record<string, string>> = {
+  stage: MATCH_STAGE_LABELS,
+  rejectedBy: MATCH_REJECTED_BY_LABELS,
+  candidateAResponse: MATCH_RESPONSE_LABELS,
+  candidateBResponse: MATCH_RESPONSE_LABELS,
 };
 
 /*
@@ -303,8 +353,11 @@ function describeChange(change: AuditChange): string {
     FIELD_LABELS[change.field] ??
     candidateProfileFieldLabel(change.field) ??
     change.field;
-  const before = decodeAuditValue(change.before);
-  const after = decodeAuditValue(change.after);
+  const values = VALUE_LABELS[change.field];
+  const labelled = (raw: string | undefined) =>
+    raw === undefined ? undefined : (values?.[raw] ?? raw);
+  const before = labelled(decodeAuditValue(change.before));
+  const after = labelled(decodeAuditValue(change.after));
   if (before === undefined && after !== undefined) {
     return `${sentenceCase(label)}: ${after}`;
   }
