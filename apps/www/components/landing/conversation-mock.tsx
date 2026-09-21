@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, EyeOff } from "lucide-react";
+import { Check, EyeOff, Sparkles } from "lucide-react";
 import { motion, type Variants } from "motion/react";
 import { EASE_OUT } from "@/components/landing/reveal";
 import { cn } from "@/lib/utils";
@@ -8,8 +8,12 @@ import { cn } from "@/lib/utils";
 /**
  * A still of the product's centre column: one candidate's conversation, opening
  * with the DM history the matchmaker pasted in at onboarding (private to them),
- * then the accepted invitation and the chat carrying on. The candidate panel's
- * History tab sits beside it.
+ * then the accepted invitation, the chat carrying on, and a drafted reply
+ * waiting above the composer. The candidate panel's History tab sits beside it.
+ *
+ * The draft is the last thing before the composer on purpose: that is where the
+ * app puts it (prd/phase-2.md §5), and a suggestion card that ever appeared in
+ * the message list would be readable as something the candidate said.
  *
  * It is an illustration, not UI — nothing in it is interactive, so it is
  * hidden from assistive technology and described once by the figcaption.
@@ -37,8 +41,9 @@ export function ConversationMock(): React.ReactNode {
         An example conversation in match.build: the Instagram DM history the
         matchmaker pasted in when onboarding a candidate, marked as visible only
         to the matchmaker, then the candidate accepting the invitation and the
-        chat carrying on in the app, with the candidate's history of changes
-        beside it.
+        chat carrying on in the app. Above the message box, a suggested reply in
+        the matchmaker's voice waits with Send, Edit and Dismiss, and the
+        candidate's history of changes sits beside it.
       </figcaption>
 
       <motion.div
@@ -111,7 +116,30 @@ export function ConversationMock(): React.ReactNode {
               taller, ideally.
             </Bubble>
 
-            <Bubble side="out">A reader! Fiction or non-fiction?</Bubble>
+            {/* A drafted reply: never a bubble, always above the composer. */}
+            <motion.div
+              data-testid="mock-suggestion"
+              variants={mockItem}
+              className="rounded-xl border border-primary/40 border-dashed bg-accent/60 p-3"
+            >
+              <p className="mb-1.5 flex items-center gap-1.5 font-medium text-[11px] text-primary uppercase tracking-wider">
+                <Sparkles className="h-3.5 w-3.5" />
+                Suggested reply
+              </p>
+              <p className="text-card-foreground text-xs leading-relaxed">
+                A reader! Fiction or non-fiction? And taller than 5'9" is very
+                doable — noted.
+              </p>
+              <p className="mt-2.5 flex items-center gap-1.5 text-[11px]">
+                <span className="rounded-full bg-primary px-2.5 py-1 font-medium text-primary-foreground">
+                  Send
+                </span>
+                <span className="rounded-full bg-card px-2.5 py-1 text-card-foreground ring-1 ring-border">
+                  Edit
+                </span>
+                <span className="px-1 text-muted-foreground">Dismiss</span>
+              </p>
+            </motion.div>
 
             {/* Composer */}
             <motion.div

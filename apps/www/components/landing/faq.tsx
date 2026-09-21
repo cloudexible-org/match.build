@@ -24,7 +24,11 @@ const QUESTIONS = [
   },
   {
     q: "Where does AI come in?",
-    a: "Next. The first version is a complete inbox with no AI in it. Suggested replies in your voice and a profile that builds itself as candidates talk come after that. Even then, nothing is sent until you choose to send it.",
+    a: "In the drafting. When a candidate writes, the assistant offers you one to three replies in your voice, and you send one, edit it first, or dismiss it — nothing reaches them until you press Send. You can switch it off per conversation, and everything else works with it off. The profile that fills itself from the conversation is the next piece.",
+  },
+  {
+    q: "Does an algorithm pick the matches?",
+    a: "It picks what you look at, not who you introduce. Every night your book is scored pair by pair on what you have recorded, and the card shows the arithmetic — which signals it counted, what each was worth, and the weakest one too. No model is involved, a blank field is never read as a no, and the same book scored twice gives the same answer twice. You decide who meets whom.",
   },
   {
     q: "What does it cost?",
@@ -32,7 +36,7 @@ const QUESTIONS = [
   },
   {
     q: "What's coming next?",
-    a: "AI help inside the conversation first. After that, a match board for the other half of the job: suggested pairs with the reasons behind them, the introduction, both candidates' answers, and how it went.",
+    a: "A profile that fills itself: the assistant proposes what it heard, with the quote it heard it in, and you accept or you don't. Then a second read over the board's shortlist, and the introduction itself — today the board records an introduction you made, it doesn't make one.",
   },
 ] as const;
 

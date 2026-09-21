@@ -4,10 +4,13 @@ import {
   Bell,
   ClipboardPaste,
   History,
+  LayoutGrid,
   MessagesSquare,
+  PenLine,
   Send,
   Smartphone,
   Sparkles,
+  UserSearch,
 } from "lucide-react";
 import { motion, useMotionTemplate, useMotionValue } from "motion/react";
 import { Reveal, revealGroup, revealItem } from "@/components/landing/reveal";
@@ -51,6 +54,24 @@ const FEATURES = [
     description:
       "You work between meetings, so every conversation works fully on a phone screen, and the app installs to your home screen.",
   },
+  {
+    icon: PenLine,
+    title: "Drafts in your voice",
+    description:
+      "A candidate writes, and seconds later one to three replies are waiting above the composer. Send one, edit it first, or dismiss it. A switch in the header turns them off for a conversation.",
+  },
+  {
+    icon: UserSearch,
+    title: "A profile, not a note dump",
+    description:
+      "What you learn about a candidate lands on a structured profile. Every value carries where it came from and the words they used, so you can see why it says what it says.",
+  },
+  {
+    icon: LayoutGrid,
+    title: "A match board with the reasons on it",
+    description:
+      "Proposed, Introduced, Connected. A nightly run scores every pair in your book and shows its arithmetic on the card — no model picked it, and the same book scored twice gives the same answer twice.",
+  },
 ] as const;
 
 export function Features(): React.ReactNode {
@@ -63,7 +84,7 @@ export function Features(): React.ReactNode {
         <SectionHeading
           eyebrow="What you get"
           title="Everything your DMs can't do."
-          lead="A complete inbox for your book from day one. Choosing and introducing people is still your job."
+          lead="An inbox, a record and a board for your book. Choosing and introducing people is still your job."
           className="mb-16"
         />
 
@@ -86,8 +107,10 @@ export function Features(): React.ReactNode {
 }
 
 /**
- * The AI features are planned, not shipped. Dashed and tinted, like the
- * suggestion cards they describe, so they never read as part of the list above.
+ * What is next, not what is here. Dashed and tinted, like the suggestion cards
+ * it describes, so it never reads as part of the list above. Move a line out of
+ * here and into `FEATURES` on the day it ships — a roadmap that quietly
+ * keeps claiming shipped work is how the rest of the page stops being believed.
  */
 function ComingNext(): React.ReactNode {
   return (
@@ -101,10 +124,13 @@ function ComingNext(): React.ReactNode {
           Coming next
         </span>
         <Typography variant="muted" className="text-[15px] leading-relaxed">
-          <span className="font-medium text-foreground">AI assistance.</span>{" "}
-          Replies suggested in your voice, and a candidate profile that builds
-          itself as they talk. Nothing is sent without you, and if the AI is
-          ever down, everything above keeps working.
+          <span className="font-medium text-foreground">
+            A profile that fills itself.
+          </span>{" "}
+          Today you type what you learn onto a candidate's profile. Next, the
+          assistant proposes it from the conversation with the quote it heard it
+          in, and you accept or you don't. After that, a second read over the
+          board's shortlist, and the introduction itself.
         </Typography>
       </div>
     </Reveal>
