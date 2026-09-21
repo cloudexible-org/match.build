@@ -22,6 +22,18 @@ export class MatchesPage {
     return this.page.getByTestId("match-board");
   }
 
+  /** The workspace's scrolling frame, which the board should exactly fill. */
+  getFrame() {
+    return this.page.getByTestId("workspace-frame");
+  }
+
+  /** How far the frame scrolls past what is in it. Should always be 0. */
+  async frameOverflow(): Promise<number> {
+    return await this.getFrame().evaluate(
+      (el) => el.scrollHeight - el.clientHeight,
+    );
+  }
+
   getColumn(stage: MatchStage) {
     return this.page.locator(
       `[data-testid="match-column"][data-stage="${stage}"]`,
@@ -137,6 +149,19 @@ export class MatchesPage {
   /** The dot on a card nobody has looked at yet. */
   getNewDot(card: Locator) {
     return card.getByTestId("match-card-new");
+  }
+
+  /** The button that takes the dot off — explicit, never a side effect. */
+  getMarkSeen(card: Locator) {
+    return card.getByTestId("match-card-mark-seen");
+  }
+
+  async markSeen(card: Locator) {
+    await this.getMarkSeen(card).click();
+  }
+
+  getExpand(card: Locator) {
+    return card.getByTestId("match-card-expand");
   }
 
   async findMatches() {

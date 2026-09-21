@@ -22,6 +22,7 @@
     "push:setup": "node scripts/setup-push.mjs",
     "ai:setup": "node scripts/setup-ai.mjs",
     "seed:dev": "convex run --push seed/dev/mutations:apply",
+    "seed:dev:reset": "convex run --push seed/dev/mutations:resetBoard",
     "seed:dev:code": "node scripts/sign-in-code.mjs"
   },
   "devDependencies": {
