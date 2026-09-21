@@ -9,7 +9,7 @@
  */
 
 import { ConvexError, v } from "convex/values";
-import { internal } from "../_generated/api";
+import { components, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   internalMutation,
@@ -63,15 +63,18 @@ export async function staleDrafts(
  * window slide rather than fire on the first message of a burst. Cancelling a
  * job that has already run is a no-op, so the race is harmless.
  *
- * Called from `messages/mutations.ts` on every send. It schedules
- * unconditionally and the action decides whether there is anything to do —
- * a mutation cannot see whether the AI is on without reading deployment env,
- * and a scheduled job that returns immediately is cheaper than the coupling.
+ * Called from `messages/mutations.ts` on every send. Whether the *agent* is on
+ * is the action's question — a mutation cannot see the deployment env, and a
+ * scheduled job that returns immediately is cheaper than the coupling. Whether
+ * this *conversation* is on is right here, because it is a row we already hold
+ * and a matchmaker who switched it off should not be paying for a job that
+ * wakes up to discover so.
  */
 export async function scheduleDraft(
   ctx: MutationCtx,
   conversation: Doc<"conversations">,
 ): Promise<void> {
+  if (conversation.aiOff === true) return;
   if (conversation.draftJobId !== undefined) {
     await ctx.scheduler.cancel(conversation.draftJobId);
   }
@@ -147,6 +150,63 @@ export const clearJob = internalMutation({
     const conversation = await ctx.db.get("conversations", args.conversationId);
     if (conversation === null) return null;
     await ctx.db.patch("conversations", conversation._id, {
+      draftJobId: undefined,
+    });
+    return null;
+  },
+});
+
+/**
+ * The matchmaker's switch for this one conversation (prd/phase-2.md §4A).
+ *
+ * **Off means off.** The drafts on offer are retired, the job already pending
+ * is cancelled, and the agent's thread is deleted — a switch that left three
+ * cards sitting over the composer would not have done what it says, and a
+ * thread nobody will ever send to again is a copy of a candidate's
+ * conversation held for no reason.
+ *
+ * **On starts again from nothing.** Deleting the thread is what makes the next
+ * run a first run: it re-briefs from the last `AI_REPLY_LIVE_WINDOW` messages
+ * and the profile as it stands now. Somebody who switched it off, had a
+ * fortnight of conversation, and switched it back on should not get an agent
+ * carrying on a sentence from a fortnight ago.
+ */
+export const setEnabled = mutation({
+  args: {
+    matchmakerId: v.id("matchmakers"),
+    candidateId: v.id("candidates"),
+    enabled: v.boolean(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { matchmaker } = await requireMatchmaker(ctx, args.matchmakerId);
+    const candidate = await ctx.db.get("candidates", args.candidateId);
+    assertSameTenant(candidate, matchmaker._id);
+    const conversation = await conversationFor(ctx, candidate._id);
+
+    const now = Date.now();
+    if (conversation.draftJobId !== undefined) {
+      await ctx.scheduler.cancel(conversation.draftJobId);
+    }
+    await staleDrafts(ctx, conversation._id, now);
+    if (conversation.agentThreadId !== undefined) {
+      // Through the component's own API: its tables are its own and `ctx.db`
+      // cannot see them. Async — it deletes the thread's messages in batches
+      // in the background, which is what keeps a long thread from blowing the
+      // limits of the mutation that asked.
+      await ctx.runMutation(
+        components.agent.threads.deleteAllForThreadIdAsync,
+        { threadId: conversation.agentThreadId },
+      );
+    }
+
+    await ctx.db.patch("conversations", conversation._id, {
+      // Absent means on, so the switch stores only the exception.
+      aiOff: args.enabled ? undefined : true,
+      agentThreadId: undefined,
+      agentBriefedSeq: undefined,
+      agentBriefedVoiceAt: undefined,
+      agentBriefedProfileAt: undefined,
       draftJobId: undefined,
     });
     return null;

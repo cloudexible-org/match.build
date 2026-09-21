@@ -50,9 +50,12 @@ export type Brief = {
   voice: string;
   facts: BriefEntry[];
   notes: BriefEntry[];
-  /** Older messages, where the thread has outgrown the live window. */
-  summary?: string;
-  /** Oldest first, already cut to the live window. */
+  /**
+   * Oldest first, already cut to the live window — and there is nothing
+   * behind them. There is no summariser in v1 (prd/phase-2.md §2), so a
+   * thread longer than the window is simply read from where the window
+   * starts, and the standing instruction tells the agent as much.
+   */
   messages: BriefMessage[];
 };
 
@@ -119,9 +122,6 @@ export function openingBrief(brief: Brief): string {
     parts.push(
       `${brief.matchmakerName.toUpperCase()}'S OWN NOTES — to draft from, never to repeat back\n${entryLines(brief.notes)}`,
     );
-  }
-  if (brief.summary !== undefined && brief.summary !== "") {
-    parts.push(`EARLIER IN THE CONVERSATION\n${brief.summary}`);
   }
 
   parts.push(
@@ -252,8 +252,11 @@ export const REPLY_DEFAULTS = {
   count: 3,
   /** Seconds after the last message before drafting, so a burst is one call. */
   debounceSeconds: 5,
-  /** Messages sent verbatim; older ones are the summary's job. */
-  liveWindow: 20,
+  /**
+   * Messages sent verbatim, and the whole of what the agent sees: there is no
+   * summariser in v1, so nothing older reaches it (prd/phase-2.md §2, §9.2).
+   */
+  liveWindow: 50,
 } as const;
 
 /** A number from a deployment setting, or the default when it is unusable. */

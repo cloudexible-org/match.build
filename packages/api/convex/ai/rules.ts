@@ -30,7 +30,7 @@ export const AI_AGENT_LABELS: Record<
 > = {
   conversation: {
     label: "Conversation",
-    does: "Drafts replies, notices facts, and keeps the thread summary.",
+    does: "Drafts replies in the matchmaker's voice, and notices facts.",
   },
   candidate_profile: {
     label: "Candidate profile",

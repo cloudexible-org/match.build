@@ -66,9 +66,9 @@ const app = defineApp({
     AI_REPLY_DEBOUNCE_SECONDS: v.optional(v.string()),
     // How many drafts to offer. Three may be choice paralysis on a phone.
     AI_REPLY_COUNT: v.optional(v.string()),
-    // How many messages go to the agent verbatim. Older ones are the
-    // summariser's job, which is not built yet — until it is, a long thread
-    // simply starts here.
+    // How many messages go to the agent verbatim, and the whole of what it
+    // sees: there is no summariser in v1 (prd/phase-2.md §2), so a longer
+    // thread is simply read from where this window starts.
     AI_REPLY_LIVE_WINDOW: v.optional(v.string()),
   },
 });

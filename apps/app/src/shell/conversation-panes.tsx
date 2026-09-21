@@ -21,6 +21,7 @@ export function ConversationPanes({
   subtitle,
   panelLabel,
   panelToggleTestId,
+  headerAction,
   panel,
   children,
 }: {
@@ -34,6 +35,8 @@ export function ConversationPanes({
   /** Names the panel for a screen reader, e.g. "About Jane Member". */
   panelLabel: string;
   panelToggleTestId: string;
+  /** A control in the header, before the Details button. */
+  headerAction?: ReactNode;
   /** Rendered with the way to close it again below `lg`. */
   panel: (close: () => void) => ReactNode;
   /** The conversation itself, under the header. */
@@ -73,6 +76,7 @@ export function ConversationPanes({
             </h2>
             {subtitle}
           </div>
+          {headerAction}
           <Button
             variant="outline"
             size="sm"

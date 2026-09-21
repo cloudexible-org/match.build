@@ -6,6 +6,7 @@ import {
   NEVER_BRIEFED,
   openingBrief,
   parseDrafts,
+  REPLY_DEFAULTS,
   settingNumber,
   updateBrief,
   voiceUpdate,
@@ -246,6 +247,14 @@ describe("parseDrafts", () => {
     expect(parseDrafts("NOTHING", 3)).toEqual([]);
     expect(parseDrafts("  ", 3)).toEqual([]);
     expect(parseDrafts("1. NOTHING", 3)).toEqual([]);
+  });
+});
+
+describe("the live window", () => {
+  it("is 50, because there is no summariser behind it", () => {
+    // prd/phase-2.md §2 dropped the summariser from v1, so this number is the
+    // whole of what the agent ever sees.
+    expect(REPLY_DEFAULTS.liveWindow).toBe(50);
   });
 });
 

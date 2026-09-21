@@ -59,6 +59,40 @@ export const forCandidate = query({
 });
 
 /**
+ * Whether drafting is on for one conversation, and whether it could be.
+ *
+ * Two different noes, and the switch has to tell them apart: a matchmaker who
+ * turned it off should see an off switch, and one whose deployment has no
+ * agent configured should be told that rather than handed a switch that does
+ * nothing.
+ */
+export const enabledFor = query({
+  args: {
+    matchmakerId: v.id("matchmakers"),
+    candidateId: v.id("candidates"),
+  },
+  returns: v.object({
+    /** This conversation's own switch. */
+    enabled: v.boolean(),
+    /** Whether an agent would run at all if it were on. */
+    available: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const { matchmaker } = await requireMatchmaker(ctx, args.matchmakerId);
+    const candidate = await ctx.db.get("candidates", args.candidateId);
+    assertSameTenant(candidate, matchmaker._id);
+    const conversation = await ctx.db
+      .query("conversations")
+      .withIndex("by_candidateId", (q) => q.eq("candidateId", candidate._id))
+      .unique();
+    return {
+      enabled: conversation?.aiOff !== true,
+      available: (await activeAgent(ctx, "conversation")) !== null,
+    };
+  },
+});
+
+/**
  * Everything one drafting run needs, or `null` when there is nothing to do.
  *
  * Annotated rather than inferred: the action that calls this is reached
@@ -120,7 +154,6 @@ const briefShape = v.object({
   voice: v.string(),
   facts: v.array(briefEntry),
   notes: v.array(briefEntry),
-  summary: v.optional(v.string()),
   messages: v.array(
     v.object({
       seq: v.number(),
@@ -162,6 +195,10 @@ export const draftContext = internalQuery({
   handler: async (ctx, args): Promise<DraftContext | null> => {
     const conversation = await ctx.db.get("conversations", args.conversationId);
     if (conversation === null) return null;
+    // The matchmaker switched this conversation off. Checked again here as
+    // well as in `scheduleDraft`, because a job scheduled before they did is
+    // still out there and must not draft when it lands.
+    if (conversation.aiOff === true) return null;
 
     // Off is a supported state, not a failure: an unconfigured agent, a
     // switched-off one, or a deployment with no gateway all end here, and the

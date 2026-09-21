@@ -268,6 +268,14 @@ export class ConversationPage {
     return this.page.getByRole("button", { name: "Load older messages" });
   }
 
+  /**
+   * The header switch for drafted replies (prd/phase-2.md §4A). Absent where
+   * no agent is configured — which, on the e2e backend, is always.
+   */
+  getSuggestionsToggle() {
+    return this.page.getByTestId("toggle-suggestions");
+  }
+
   getComposer() {
     return this.page.getByTestId("composer");
   }

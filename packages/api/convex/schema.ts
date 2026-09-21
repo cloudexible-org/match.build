@@ -259,6 +259,15 @@ export default defineSchema({
 
     // ─── The drafting agent's side of this conversation (prd/phase-2.md §4A)
     //
+    // The matchmaker's own switch for this one conversation. **Absent means
+    // on**, so only the exception is stored and there is nothing to backfill —
+    // and turning it off is a deliberate act that leaves a record, while
+    // leaving it on is the state of every conversation nobody has thought
+    // about. The deployment's `AI_ENABLED` and the agent's own switch at
+    // /admin/ai are still above this: it is how a matchmaker opts one
+    // conversation out, not how the feature is turned on.
+    aiOff: v.optional(v.boolean()),
+    //
     // The agent is briefed once and then kept up to date, so what matters here
     // is how much of the world it has already been told about. The thread is
     // the component's (`@convex-dev/agent`), not ours: `ctx.db` cannot see it,

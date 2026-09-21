@@ -15,8 +15,15 @@
 2. **Candidate profiles (§3, built):** a structured record per candidate — registry-typed facts and free-text notes — with a per-field rule about who may write it, provenance on every value, and an agent's proposal sitting beside a value rather than replacing it. What is left is the extraction that feeds it.
 3. **Profile section (built)** in the candidate panel: filled fields grouped by the registry, their source and quote, manual add/edit/clear, and suggestions above the record.
 4. **Voice (§3, built)** in matchmaker settings, one `suggest` field the voice-profile agent may draft but never change under them.
-5. **Thread summaries** for long conversations.
-6. **Eval harness** for reconciliation.
+5. **Eval harness** for reconciliation.
+
+**Thread summaries are not in v1.** A long thread is simply read from its last
+50 messages and no further back. The summariser was the answer to "what happens
+to message 51", and the honest v1 answer is that nothing does: a matchmaker
+drafting a reply is working from the last few exchanges, and a derived artefact
+that has to be kept correct, kept fresh and kept honest is a large thing to
+build on a guess about how much older context is worth. It comes back when a
+real thread is long enough to show what is missing.
 
 Every profile change and voice change is written to the phase-1 audit trail, with the agent as the actor where it made the change.
 
@@ -92,8 +99,15 @@ auditEvents.actor: add
 messages.source: add v.literal("ai_suggestion")  // a sent AI suggestion, edited or not
 
 conversations: {
-  summary: v.optional(v.string()),
-  summarisedThroughSeq: v.optional(v.number()),
+  // The matchmaker's own switch for this conversation (§4A). Absent means on;
+  // only the exception is stored, so there is nothing to backfill.
+  aiOff: v.optional(v.boolean()),
+  // The agent's thread, and how much of the world it has been told about.
+  agentThreadId: v.optional(v.string()),
+  agentBriefedSeq: v.optional(v.number()),
+  agentBriefedVoiceAt: v.optional(v.number()),
+  agentBriefedProfileAt: v.optional(v.number()),
+  draftJobId: v.optional(v.id("_scheduled_functions")),
 }
 ```
 
@@ -178,15 +192,15 @@ The condition is the one that made the earlier draft nervous, and it is concrete
 
 ### 4.1 Three agents, and what each one owns
 
-An earlier draft listed five jobs (A reply suggester, B fact extractor, C fact reconciler, D voice-profile job, E summariser). They collapse into **three agents**, which is the better cut: it separates *reading* a conversation and proposing from *owning the write path* to a record. The five-job split had two agents on the read side and left the write path as a step rather than an owner.
+An earlier draft listed five jobs (A reply suggester, B fact extractor, C fact reconciler, D voice-profile job, E summariser — since dropped from v1). The rest collapse into **three agents**, which is the better cut: it separates *reading* a conversation and proposing from *owning the write path* to a record. The five-job split had two agents on the read side and left the write path as a step rather than an owner.
 
 | Agent | Owns | Absorbed |
 |---|---|---|
-| `conversation` | Reading one thread: drafting a reply, noticing facts, keeping the summary. Proposes; writes nothing to a record. | A + B + E |
+| `conversation` | Reading one thread: drafting a reply, noticing facts. Proposes; writes nothing to a record. | A + B |
 | `candidate_profile` | The write path to a candidate's facts. | C |
 | `voice_profile` | The write path to the matchmaker's voice profile — and to everything the product learns about the matchmaker. | D |
 
-**The summariser is not its own agent.** It reads the same thread to write another derived artefact, on a different trigger (thread length rather than a new message). One agent, three outputs.
+**There is no summariser in v1.** It would have read the same thread to write another derived artefact on a different trigger, and it is the piece v1 does without: the live window is the whole of what the agent sees.
 
 **What the product learns about the *matchmaker* lands in their voice.** `candidateProfiles` stays keyed to a candidate, and `matchmakerProfiles` is where the other half goes. So `voice` is wider than its name suggests: not only how they write, but how they work and what they care about in a match. Take this paragraph as its definition, and `convex/matchmakerProfiles/rules.ts` as where it is written down.
 
@@ -194,9 +208,9 @@ An earlier draft listed five jobs (A reply suggester, B fact extractor, C fact r
 
 **A. `conversation`** (foreground for the draft, background for the rest)
 - Trigger: a candidate message, **debounced** (~5 s after the last one, so a burst produces one generation). Also once when a candidate accepts, for a welcome message — triggered from `convex/invites/`, which owns accepting.
-- Input: the standing prompt + voice profile + active facts for this candidate + conversation summary + last N messages (including the private imported history).
-- Output: 1–3 replies streamed through `persistent-text-streaming`; candidate facts, each with a verbatim source quote; and the rolling summary.
-- Live window: last **20** messages verbatim. Older messages roll into `conversations.summary` when the thread crosses a threshold, tracked by `summarisedThroughSeq` so it is incremental. The summary is for conversational continuity — rapport, tone, key events, sensitivities — not fact retention.
+- Input: the standing prompt + voice profile + the candidate's whole profile, facts *and* the matchmaker's own notes + last N messages (including the private imported history and the matchmaker's private notes to themselves).
+- Output: 1–3 replies; and candidate facts, each with a verbatim source quote.
+- Live window: last **50** messages verbatim, and nothing older. With no summariser (§2), message 51 is simply not seen — which is the v1 trade, and the reason the window is 50 rather than 20.
 - Earlier `ready` suggestions become `stale` when a new message arrives or the matchmaker replies manually.
 - Never receives another candidate's data.
 
@@ -220,7 +234,6 @@ Facts are never appended into message history. They're read live at prompt time:
 [system prompt: role, guardrails, output format]
 [matchmaker voice profile]
 [candidate profile: the filled entries, grouped by the registry, as a compact list]
-[conversation summary: if the thread exceeds the live window]
 [last N messages verbatim]
 ```
 
@@ -243,7 +256,7 @@ Each agent's **switch, model and standing instruction live in the database** (`a
 - **Empty means off.** Clearing the model or the instruction turns an agent off, so there is no magic value to remember and no way to have a model without an instruction.
 - **The starting values are seed data** (`convex/seed/ai/fixture.ts`, applied by `seed/ai/mutations:apply` via `ai:setup`), not defaults. Seeding is idempotent and never overwrites an admin's work; `--force` puts an agent back to where it started. Unlike `seed/dev` and `seed/e2e` this seed wipes nothing and is safe against prod — it is how a production deployment gets its agents at all.
 - **The guardrails are part of each seeded instruction, not prepended in code**, so everything an agent is told is visible and editable on one page. The cost is that an admin can edit them away; the page therefore says to carry them over, and a test asserts the seeded instructions contain both. *If that trade turns out wrong, moving them back into code is a small change — but it makes the page no longer the whole truth.*
-- **The stored instruction is the agent's standing instruction, not its task.** The conversation agent drafts, extracts and summarises; one prompt describing all three would serve none of them. The instruction is the persona and the rules that hold on every call; the task for a given call is added by the code that makes it.
+- **The stored instruction is the agent's standing instruction, not its task.** The conversation agent drafts and extracts; one prompt describing both would serve neither. The instruction is the persona and the rules that hold on every call; the task for a given call is added by the code that makes it.
 - **Every change is audited as `ai_agent.updated`, with the whole previous instruction in the event.** That is deliberately where an instruction's history lives: the audit trail is already append-only and already refuses to be rewritten, so a separate versions table would be a second, less trustworthy copy. To read an old instruction, read the trail. A platform-level event carries no `matchmakerId`, so it appears in the admin trail and in no matchmaker's candidate history — right, because it is our change to the product, not a change to their book.
 - **A save that changes nothing records nothing.** An event per no-op save makes the trail harder to read, not more complete.
 - **There is no "reset to default" button**, because there is no default to reset to. Re-seeding is a deliberate operation with a flag, run from a terminal.
@@ -287,15 +300,14 @@ The welcome suggestion on acceptance (§2, §4A) is triggered from `convex/invit
 
 ## 8. Build order
 
-**Where it lands.** Two new domains and a shared kernel (§3.5). Everything else extends a domain phase 1 already built: reply suggestions and the summariser go in `messages/`, the welcome trigger in `invites/`, the agent actor and the new actions in `audit/`, and the profile branch of the erasure in `admin/`.
+**Where it lands.** Two new domains and a shared kernel (§3.5). Everything else extends a domain phase 1 already built: reply suggestions get a domain of their own (`replySuggestions/`), the welcome trigger in `invites/`, the agent actor and the new actions in `audit/`, and the profile branch of the erasure in `admin/`.
 
 0. *Done.* **AI plumbing** (§4.5) and **the settings page** (§4.4): the `agent` component, the gateway, `convex/ai/`, the three agents seeded from `convex/seed/ai/`, `/admin/ai`, and `ai:setup`. No product feature on it yet.
 1. *Done.* **Profiles** (§3): the two tables, the registry, the write engine with its per-field policy, the three write paths, the Profile section, voice in settings, audit integration, the erasure branch, and the migration off `notes`. **No agent calls the write path yet** — the door is built, nobody has come through it.
 2. Reply suggester (streaming, debounce, stale handling), reading the voice.
 3. Extractor feeding `candidateProfiles.mutations:applyAgentEntries`, and the voice-profile agent feeding `matchmakerProfiles.mutations:applyAgentVoice`.
 4. Extraction from the imported history at onboarding.
-5. Summariser.
-6. Eval harness.
+5. Eval harness.
 *Also done:* the migration off `notes` and the removal of the table (§3).
 
 ---
@@ -321,7 +333,7 @@ None of these blocks a line of code: each ships as a deployment env var with the
 | Suggested replies shown | 3 | Three may be choice paralysis on a phone. |
 | Debounce window | ~5 s | Depends how people actually type in bursts. |
 | Voice samples required | 20 sent messages | Unknown whether fewer already stops sounding generic. |
-| Live window | 20 messages | Trades summariser cost against continuity. |
+| Live window | 50 messages | With no summariser, this is the whole of what the agent sees. Too low and a long thread loses its thread; too high and every call pays for context nobody reads. |
 | Per-matchmaker AI budget | — | Both the limit *and* what happens when it's hit: degrade to no suggestions, or tell them? |
 
 ### 9.3 Open product question

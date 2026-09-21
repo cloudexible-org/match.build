@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Composer } from "../chat/composer";
 import { ConversationSuggestions } from "../chat/conversation-suggestions";
+import { SuggestionsToggle } from "../chat/suggestions-toggle";
 import { Thread as MessageThread } from "../chat/thread";
 import { useMarkRead } from "../chat/use-mark-read";
 import { PushNudge } from "../notifications/push-nudge";
@@ -87,6 +88,7 @@ function Conversation({
       }
       panelLabel={`About ${name}`}
       panelToggleTestId="toggle-candidate-panel"
+      headerAction={<SuggestionsToggle candidateId={candidate.candidateId} />}
       panel={(close) => (
         <CandidatePanel candidate={candidate} onClose={close} />
       )}

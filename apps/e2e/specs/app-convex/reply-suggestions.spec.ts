@@ -195,6 +195,19 @@ test("a new message retires the drafts that answered the old one", async ({
   await expect(suggestions.getRow("reply")).toHaveCount(0);
 });
 
+test("the header switch is hidden where no agent could run", async ({
+  page,
+}) => {
+  await openConversation(page, "quiet");
+  const conversation = new ConversationPage(page);
+  // This backend has no gateway, so `enabledFor.available` is false and the
+  // switch is not rendered: a control that cannot work invites somebody to
+  // press it twice and wonder.
+  await expect(conversation.getSuggestionsToggle()).toHaveCount(0);
+  // The conversation is the phase-1 one, entirely unaffected.
+  await expect(conversation.getComposer()).toBeVisible();
+});
+
 test("no drafts, no row — and the AI being off is not an error", async ({
   page,
 }) => {

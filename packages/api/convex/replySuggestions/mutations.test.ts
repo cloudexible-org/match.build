@@ -1,7 +1,9 @@
 /// <reference types="vite/client" />
+import { createThread } from "@convex-dev/agent";
+import { register as registerAgent } from "@convex-dev/agent/test";
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { api, internal } from "../_generated/api";
+import { api, components, internal } from "../_generated/api";
 import schema from "../schema";
 
 // See waitlist/mutations.test.ts for why the glob is inline and root-anchored.
@@ -13,6 +15,9 @@ const modules = import.meta.glob([
 
 async function world() {
   const t = convexTest(schema, modules);
+  // The agent component's own tables, so the switch can really delete a
+  // thread rather than being tested against a stub of one.
+  registerAgent(t);
   const ids = await t.run(async (ctx) => {
     const owner = await ctx.db.insert("users", { email: "maya@example.test" });
     const stranger = await ctx.db.insert("users", {
@@ -70,10 +75,27 @@ async function world() {
     );
   }
 
+  /** A real thread in the component, as a first drafting run would leave. */
+  async function seedThread(briefedSeq: number) {
+    const threadId = await t.run(
+      async (ctx) => await createThread(ctx, components.agent, {}),
+    );
+    await t.run(async (ctx) => {
+      await ctx.db.patch("conversations", ids.conversationId, {
+        agentThreadId: threadId,
+        agentBriefedSeq: briefedSeq,
+        agentBriefedVoiceAt: 9,
+        agentBriefedProfileAt: 9,
+      });
+    });
+    return threadId;
+  }
+
   return {
     t,
     ...ids,
     seedDraft,
+    seedThread,
     asOwner: t.withIdentity({ subject: `${ids.owner}|s` }),
     asStranger: t.withIdentity({ subject: `${ids.stranger}|s` }),
     asMember: t.withIdentity({ subject: `${ids.member}|s` }),
@@ -367,6 +389,113 @@ describe("tenancy", () => {
       { matchmakerId: w.matchmakerId, candidateId: w.candidateId },
     );
     expect(open.map((draft) => draft.body)).toEqual(["Ready"]);
+  });
+});
+
+describe("the conversation's own switch", () => {
+  test("is on until somebody turns it off, and stores only the exception", async () => {
+    const w = await world();
+    expect((await w.conversation())?.aiOff).toBeUndefined();
+
+    const state = await w.asOwner.query(
+      api.replySuggestions.queries.enabledFor,
+      { matchmakerId: w.matchmakerId, candidateId: w.candidateId },
+    );
+    expect(state.enabled).toBe(true);
+    // No agent configured in this world, so nothing would run anyway — which
+    // is a different no, and the switch says so.
+    expect(state.available).toBe(false);
+  });
+
+  test("off retires the drafts, cancels the job and drops the thread", async () => {
+    const w = await world();
+    await w.seedDraft("On offer");
+    await w.seedThread(4);
+
+    await w.asOwner.mutation(api.replySuggestions.mutations.setEnabled, {
+      matchmakerId: w.matchmakerId,
+      candidateId: w.candidateId,
+      enabled: false,
+    });
+
+    // Off means off: nothing is left sitting over the composer.
+    expect((await w.drafts())[0]?.status).toBe("stale");
+    const conversation = await w.conversation();
+    expect(conversation?.aiOff).toBe(true);
+    expect(conversation?.agentThreadId).toBeUndefined();
+    expect(conversation?.agentBriefedSeq).toBeUndefined();
+  });
+
+  test("a message while it is off schedules nothing", async () => {
+    const w = await world();
+    await w.asOwner.mutation(api.replySuggestions.mutations.setEnabled, {
+      matchmakerId: w.matchmakerId,
+      candidateId: w.candidateId,
+      enabled: false,
+    });
+
+    await w.asMember.mutation(api.messages.mutations.sendAsCandidate, {
+      candidateId: w.candidateId,
+      body: "Still talking",
+    });
+
+    expect((await w.conversation())?.draftJobId).toBeUndefined();
+  });
+
+  test("a job already in flight refuses to draft once it is switched off", async () => {
+    const w = await world();
+    await w.asOwner.mutation(api.replySuggestions.mutations.setEnabled, {
+      matchmakerId: w.matchmakerId,
+      candidateId: w.candidateId,
+      enabled: false,
+    });
+    // The state a job scheduled a moment before the switch lands in.
+    await w.t.action(internal.replySuggestions.actions.draft, {
+      conversationId: w.conversationId,
+    });
+    expect(await w.drafts()).toHaveLength(0);
+  });
+
+  test("on again starts from nothing rather than resuming", async () => {
+    const w = await world();
+    await w.seedThread(12);
+    await w.t.run(async (ctx) => {
+      await ctx.db.patch("conversations", w.conversationId, { aiOff: true });
+    });
+
+    await w.asOwner.mutation(api.replySuggestions.mutations.setEnabled, {
+      matchmakerId: w.matchmakerId,
+      candidateId: w.candidateId,
+      enabled: true,
+    });
+
+    const conversation = await w.conversation();
+    expect(conversation?.aiOff).toBeUndefined();
+    // No thread and no marks, so the next run is a first run: it re-briefs
+    // from the live window rather than carrying on a fortnight-old sentence.
+    expect(conversation?.agentThreadId).toBeUndefined();
+    expect(conversation?.agentBriefedSeq).toBeUndefined();
+  });
+
+  test("another matchmaker's account cannot touch the switch", async () => {
+    const w = await world();
+    await expect(
+      w.asStranger.mutation(api.replySuggestions.mutations.setEnabled, {
+        matchmakerId: w.matchmakerId,
+        candidateId: w.candidateId,
+        enabled: false,
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("the candidate cannot read it, let alone set it", async () => {
+    const w = await world();
+    await expect(
+      w.asMember.query(api.replySuggestions.queries.enabledFor, {
+        matchmakerId: w.matchmakerId,
+        candidateId: w.candidateId,
+      }),
+    ).rejects.toThrow();
   });
 });
 
