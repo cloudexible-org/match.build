@@ -169,17 +169,16 @@ export type MatchRunReport = {
  * Three things can happen to a pair:
  *
  *  - **Nothing.** A pair that already has a card the matchmaker has touched —
- *    anything past `suggested`, anything rejected, anything made by hand — is
+ *    anything past `proposed`, anything closed, anything made by hand — is
  *    left exactly alone. The run never reopens a decision a person made, which
  *    is what makes it safe to run every night.
  *  - **A card.** A pair with no card, that passes the hard filters and clears
- *    both thresholds, becomes a `suggested` card. Highest score first, up to
+ *    both thresholds, becomes a `proposed` card. Highest score first, up to
  *    the nightly cap.
- *  - **A correction.** An untouched `suggested` card is rescored against the
+ *  - **A correction.** An untouched `proposed` card is rescored against the
  *    profiles as they are now: the score moves, or — if the pair has since
- *    become impossible, or fallen below the bar — the card is withdrawn into
- *    the Rejected lane, marked as the run's own doing rather than anyone's
- *    judgement.
+ *    become impossible, or fallen below the bar — the card is closed, marked
+ *    as the run's own doing rather than anyone's judgement.
  *
  * Idempotent: running it twice in a row changes nothing the second time.
  */
@@ -224,7 +223,7 @@ export async function runMatchPass(
         continue;
       }
       // Only the run's own untouched suggestions are its to revise.
-      if (current.stage !== "suggested" || current.origin !== "algorithm") {
+      if (current.stage !== "proposed" || current.origin !== "algorithm") {
         continue;
       }
       const revised = await reviseSuggestion(ctx, current, verdict, actor, now);
@@ -240,7 +239,7 @@ export async function runMatchPass(
   // matchmaker has moved stays exactly where they put it, because what they
   // did with two people is their record and not the run's to tidy.
   for (const match of existing) {
-    if (match.stage !== "suggested" || match.origin !== "algorithm") continue;
+    if (match.stage !== "proposed" || match.origin !== "algorithm") continue;
     if (seen.has(match.pairKey)) continue;
     await withdraw(
       ctx,
@@ -328,7 +327,7 @@ export async function insertMatch(
     candidateBId,
     pairKey: pairKey(candidateAId, candidateBId),
     origin: args.origin,
-    stage: "suggested",
+    stage: "proposed",
     stageChangedAt: args.now,
     ...scoring(args.verdict, args.now),
     updatedAt: args.now,
@@ -339,7 +338,7 @@ export async function insertMatch(
     match,
     action: args.action,
     actor: args.actor,
-    changes: [{ field: "stage", after: "suggested" }],
+    changes: [{ field: "stage", after: "proposed" }],
     reason: args.verdict.ok
       ? undefined
       : `Paired by hand against the filters: ${blockerSentence(args.verdict.blockers)}`,
@@ -407,9 +406,10 @@ async function reviseSuggestion(
 }
 
 /**
- * Takes a suggestion back off the board, into the Rejected lane, marked as the
- * run's own doing. Audited, unlike a rescoring: the board visibly changes, and a
- * matchmaker who saw a card yesterday is owed the reason it has gone.
+ * Takes a suggestion back off the board — closed, as the run's own doing and
+ * not anybody's judgement. Audited, unlike a rescoring: the board visibly
+ * changes, and a matchmaker who saw a card yesterday is owed the reason it has
+ * gone.
  */
 async function withdraw(
   ctx: MutationCtx,
@@ -425,10 +425,11 @@ async function withdraw(
   now: number,
 ): Promise<void> {
   await ctx.db.patch("matches", match._id, {
-    stage: "rejected",
+    stage: "closed",
     stageChangedAt: now,
-    rejectedBy: "system",
-    rejectionReason: why,
+    closedAs: "didnt_work",
+    closedBy: "system",
+    closingNote: why,
     ...rescored,
     updatedAt: now,
   });
@@ -436,11 +437,12 @@ async function withdraw(
   if (withdrawn === null) return;
   await recordMatchAudit(ctx, {
     match: withdrawn,
-    action: "match.rejected",
+    action: "match.closed",
     actor,
     changes: [
-      { field: "stage", before: "suggested", after: "rejected" },
-      { field: "rejectedBy", after: "system" },
+      { field: "stage", before: "proposed", after: "closed" },
+      { field: "closedAs", after: "didnt_work" },
+      { field: "closedBy", after: "system" },
     ],
     reason: why,
   });

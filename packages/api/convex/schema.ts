@@ -105,29 +105,26 @@ export const profileEntry = v.object({
   ),
 });
 
-/** The match board's columns and its Rejected lane (prd/phase-3.md §2). */
+/** The match board's three columns, and the closed state off it. */
 export const matchStage = v.union(
-  v.literal("suggested"),
-  v.literal("reviewing"),
+  v.literal("proposed"),
   v.literal("introduced"),
-  v.literal("mutual_interest"),
   v.literal("connected"),
-  v.literal("rejected"),
+  v.literal("closed"),
 );
 
-/** Each side's answer to an introduction, as the matchmaker heard it. */
-export const matchResponse = v.union(
-  v.literal("pending"),
-  v.literal("yes"),
-  v.literal("no"),
+/** How a match ended (prd/phase-3.md §2). */
+export const matchOutcome = v.union(
+  v.literal("together"),
+  v.literal("didnt_work"),
 );
 
-export const matchRejectedBy = v.union(
+export const matchClosedBy = v.union(
   v.literal("matchmaker"),
   v.literal("candidateA"),
   v.literal("candidateB"),
-  // The nightly run withdrawing its own suggestion after a profile changed
-  // under it: the one rejection nobody chose.
+  // The nightly run taking back its own suggestion after a profile changed
+  // under it: the one ending nobody chose.
   v.literal("system"),
 );
 
@@ -423,14 +420,16 @@ export default defineSchema({
     checkDealbreakers: v.optional(v.boolean()),
     algorithmVersion: v.optional(v.number()),
     lastScoredAt: v.optional(v.number()),
-    // The two separate yeses behind `mutual_interest` (prd/phase-3.md §2),
-    // held as sub-state on the card rather than as two more columns. The
-    // matchmaker records them: nothing in this phase asks a candidate anything.
-    candidateAResponse: v.optional(matchResponse),
-    candidateBResponse: v.optional(matchResponse),
-    rejectedBy: v.optional(matchRejectedBy),
-    rejectionReason: v.optional(v.string()),
-    outcome: v.optional(v.string()),
+    // What closing recorded. Present only while `stage` is "closed": a match
+    // moved back onto the board is not one that ended, so these are cleared
+    // with it rather than left to be read as current.
+    closedAs: v.optional(matchOutcome),
+    closedBy: v.optional(matchClosedBy), // absent when they're together
+    closingNote: v.optional(v.string()),
+    // When the matchmaker first looked at this card. Absent means new, which
+    // is the whole of what the "Reviewing" column used to say — and says it
+    // without a card having to be dragged through a column to say it.
+    seenAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     // The board: one query per column.

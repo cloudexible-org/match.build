@@ -148,7 +148,7 @@ describe("the nightly run", () => {
     expect(cards[0]).toMatchObject({
       matchmakerId: w.matchmakerId,
       origin: "algorithm",
-      stage: "suggested",
+      stage: "proposed",
       algorithmVersion: 1,
     });
     expect(cards[0].score ?? 0).toBeGreaterThan(80);
@@ -257,13 +257,17 @@ describe("the nightly run", () => {
     expect(await w.run()).toMatchObject({ withdrawn: 1 });
 
     const card = (await w.cards())[0];
-    expect(card).toMatchObject({ stage: "rejected", rejectedBy: "system" });
-    expect(card.rejectionReason).toContain("looking for");
-    const rejected = (await w.events()).filter(
-      (event) => event.action === "match.rejected",
+    expect(card).toMatchObject({
+      stage: "closed",
+      closedAs: "didnt_work",
+      closedBy: "system",
+    });
+    expect(card.closingNote).toContain("looking for");
+    const closed = (await w.events()).filter(
+      (event) => event.action === "match.closed",
     );
-    expect(rejected).toHaveLength(2);
-    expect(rejected[0].actor).toMatchObject({ type: "system" });
+    expect(closed).toHaveLength(2);
+    expect(closed[0].actor).toMatchObject({ type: "system" });
   });
 
   test("takes back a suggestion about somebody who has left the book", async () => {
@@ -280,8 +284,12 @@ describe("the nightly run", () => {
     expect(await w.run()).toMatchObject({ withdrawn: 1, created: 0 });
 
     const card = (await w.cards())[0];
-    expect(card).toMatchObject({ stage: "rejected", rejectedBy: "system" });
-    expect(card.rejectionReason).toContain("no longer in your book");
+    expect(card).toMatchObject({
+      stage: "closed",
+      closedAs: "didnt_work",
+      closedBy: "system",
+    });
+    expect(card.closingNote).toContain("no longer in your book");
     // What it scored while they were both in it is not a thing to throw away.
     expect(card.score).toBe(before.score);
   });
@@ -327,11 +335,12 @@ describe("the nightly run", () => {
     const w = await world();
     await w.run();
     const card = (await w.cards())[0];
-    await w.asOwner.mutation(api.matches.mutations.reject, {
+    await w.asOwner.mutation(api.matches.mutations.close, {
       matchmakerId: w.matchmakerId,
       matchId: card._id,
-      rejectedBy: "candidateA",
-      reason: "Not his type.",
+      outcome: "didnt_work",
+      closedBy: "candidateA",
+      note: "Not his type.",
     });
     expect(await w.run()).toMatchObject({ created: 0 });
     expect(await w.cards()).toHaveLength(1);
@@ -423,7 +432,7 @@ describe("the matchmaker's own hands", () => {
       candidateBId: w.candidates.jordan,
     });
     const card = (await w.cards())[0];
-    expect(card).toMatchObject({ origin: "manual", stage: "suggested" });
+    expect(card).toMatchObject({ origin: "manual", stage: "proposed" });
     expect(card.score ?? 0).toBeGreaterThan(80);
     expect(
       (await w.events()).filter((event) => event.action === "match.created"),
@@ -488,125 +497,204 @@ describe("moving a card", () => {
     await w.asOwner.mutation(api.matches.mutations.moveStage, {
       matchmakerId: w.matchmakerId,
       matchId,
-      stage: "reviewing",
+      stage: "introduced",
     });
     const moved = (await w.events()).filter(
       (event) => event.action === "match.stage_changed",
     );
     expect(moved).toHaveLength(2);
     expect(moved[0].changes).toEqual([
-      { field: "stage", before: '"suggested"', after: '"reviewing"' },
+      { field: "stage", before: '"proposed"', after: '"introduced"' },
     ]);
-    expect((await w.cards())[0].stage).toBe("reviewing");
+    expect((await w.cards())[0].stage).toBe("introduced");
   });
 
-  test("the Rejected lane is only reachable through Reject", async () => {
+  test("closing is only reachable through Close", async () => {
     const { w, matchId } = await carded();
     await expect(
       w.asOwner.mutation(api.matches.mutations.moveStage, {
         matchmakerId: w.matchmakerId,
         matchId,
-        stage: "rejected",
+        stage: "closed",
       }),
-    ).rejects.toThrow("use Reject");
+    ).rejects.toThrow("use Close");
   });
 
-  test("a rejection needs somebody who made it", async () => {
+  test("a match that didn't work records who ended it and why", async () => {
     const { w, matchId } = await carded();
     await expect(
-      w.asOwner.mutation(api.matches.mutations.reject, {
+      w.asOwner.mutation(api.matches.mutations.close, {
         matchmakerId: w.matchmakerId,
         matchId,
-        rejectedBy: "system",
-        reason: "Pretending to be the cron.",
+        outcome: "didnt_work",
+        note: "No reason given.",
       }),
-    ).rejects.toThrow("who turned it down");
+    ).rejects.toThrow("who ended it");
     await expect(
-      w.asOwner.mutation(api.matches.mutations.reject, {
+      w.asOwner.mutation(api.matches.mutations.close, {
         matchmakerId: w.matchmakerId,
         matchId,
-        rejectedBy: "matchmaker",
-        reason: "  ",
+        outcome: "didnt_work",
+        closedBy: "matchmaker",
+        note: "  ",
       }),
     ).rejects.toThrow("Say why");
-  });
+    // `system` is the nightly run's own word, not a person's.
+    await expect(
+      w.asOwner.mutation(api.matches.mutations.close, {
+        matchmakerId: w.matchmakerId,
+        matchId,
+        outcome: "didnt_work",
+        closedBy: "system",
+        note: "Pretending to be the cron.",
+      }),
+    ).rejects.toThrow("who ended it");
 
-  test("moving a card back onto the board clears the rejection", async () => {
-    const { w, matchId } = await carded();
-    await w.asOwner.mutation(api.matches.mutations.reject, {
+    await w.asOwner.mutation(api.matches.mutations.close, {
       matchmakerId: w.matchmakerId,
       matchId,
-      rejectedBy: "matchmaker",
-      reason: "Bad timing.",
+      outcome: "didnt_work",
+      closedBy: "candidateB",
+      note: "She's moving to Berlin.",
+    });
+    expect((await w.cards())[0]).toMatchObject({
+      stage: "closed",
+      closedAs: "didnt_work",
+      closedBy: "candidateB",
+      closingNote: "She's moving to Berlin.",
+    });
+    const closed = (await w.events()).filter(
+      (event) => event.action === "match.closed",
+    );
+    expect(closed).toHaveLength(2);
+    expect(closed[0].changes).toEqual([
+      { field: "stage", before: '"proposed"', after: '"closed"' },
+      { field: "closedAs", after: '"didnt_work"' },
+      { field: "closedBy", after: '"candidateB"' },
+    ]);
+  });
+
+  test("a match that worked needs no reason, and nobody ended it", async () => {
+    const { w, matchId } = await carded();
+    await w.asOwner.mutation(api.matches.mutations.close, {
+      matchmakerId: w.matchmakerId,
+      matchId,
+      outcome: "together",
+      note: "",
+    });
+    const card = (await w.cards())[0];
+    expect(card).toMatchObject({ stage: "closed", closedAs: "together" });
+    expect(card.closedBy).toBeUndefined();
+    expect(card.closingNote).toBeUndefined();
+  });
+
+  test("closing as together can take both of them out of the book", async () => {
+    const { w, matchId } = await carded();
+    await w.asOwner.mutation(api.matches.mutations.close, {
+      matchmakerId: w.matchmakerId,
+      matchId,
+      outcome: "together",
+      note: "Engaged in May.",
+      archiveBoth: true,
+    });
+    const people = await w.t.run(async (ctx) => [
+      await ctx.db.get("candidates", w.candidates.sam),
+      await ctx.db.get("candidates", w.candidates.jordan),
+    ]);
+    expect(people.map((person) => person?.status)).toEqual([
+      "archived",
+      "archived",
+    ]);
+    // Archived through the same door a matchmaker would use, so there is one
+    // meaning of "archived" and one audit action for it.
+    const archived = (await w.events()).filter(
+      (event) => event.action === "candidate.status_changed",
+    );
+    expect(archived).toHaveLength(2);
+    expect(archived[0].changes).toEqual([
+      { field: "status", before: '"active"', after: '"archived"' },
+    ]);
+  });
+
+  test("and leaves them alone when it isn't asked to", async () => {
+    const { w, matchId } = await carded();
+    await w.asOwner.mutation(api.matches.mutations.close, {
+      matchmakerId: w.matchmakerId,
+      matchId,
+      outcome: "together",
+      note: "",
+    });
+    const person = await w.t.run((ctx) =>
+      ctx.db.get("candidates", w.candidates.sam),
+    );
+    expect(person?.status).toBe("active");
+  });
+
+  test("a card can't be closed twice", async () => {
+    const { w, matchId } = await carded();
+    const close = () =>
+      w.asOwner.mutation(api.matches.mutations.close, {
+        matchmakerId: w.matchmakerId,
+        matchId,
+        outcome: "didnt_work",
+        closedBy: "matchmaker",
+        note: "Bad timing.",
+      });
+    await close();
+    await expect(close()).rejects.toThrow("already closed");
+  });
+
+  test("moving a card back onto the board clears what closing recorded", async () => {
+    const { w, matchId } = await carded();
+    await w.asOwner.mutation(api.matches.mutations.close, {
+      matchmakerId: w.matchmakerId,
+      matchId,
+      outcome: "didnt_work",
+      closedBy: "matchmaker",
+      note: "Bad timing.",
     });
     await w.asOwner.mutation(api.matches.mutations.moveStage, {
       matchmakerId: w.matchmakerId,
       matchId,
-      stage: "reviewing",
+      stage: "introduced",
     });
     const card = (await w.cards())[0];
-    expect(card.rejectedBy).toBeUndefined();
-    expect(card.rejectionReason).toBeUndefined();
+    expect(card.closedAs).toBeUndefined();
+    expect(card.closedBy).toBeUndefined();
+    expect(card.closingNote).toBeUndefined();
   });
 
-  test("arriving at Introduced opens both answers", async () => {
+  test("a card is new until somebody looks at it", async () => {
+    const { w, matchId } = await carded();
+    expect((await w.cards())[0].seenAt).toBeUndefined();
+
+    await w.asOwner.mutation(api.matches.mutations.markSeen, {
+      matchmakerId: w.matchmakerId,
+      matchId,
+    });
+    const seenAt = (await w.cards())[0].seenAt;
+    expect(seenAt).toBeDefined();
+
+    // Idempotent: looking again doesn't move the timestamp.
+    await w.asOwner.mutation(api.matches.mutations.markSeen, {
+      matchmakerId: w.matchmakerId,
+      matchId,
+    });
+    expect((await w.cards())[0].seenAt).toBe(seenAt);
+    // And a glance is not a change to the record of two people.
+    expect(
+      (await w.events()).filter((event) => event.action !== "match.suggested"),
+    ).toHaveLength(0);
+  });
+
+  test("moving a card is looking at it", async () => {
     const { w, matchId } = await carded();
     await w.asOwner.mutation(api.matches.mutations.moveStage, {
       matchmakerId: w.matchmakerId,
       matchId,
       stage: "introduced",
     });
-    expect((await w.cards())[0]).toMatchObject({
-      candidateAResponse: "pending",
-      candidateBResponse: "pending",
-    });
-  });
-
-  test("two yeses are what mutual interest means", async () => {
-    const { w, matchId } = await carded();
-    const move = (stage: "introduced") =>
-      w.asOwner.mutation(api.matches.mutations.moveStage, {
-        matchmakerId: w.matchmakerId,
-        matchId,
-        stage,
-      });
-    const answer = (side: "a" | "b", response: "yes" | "no") =>
-      w.asOwner.mutation(api.matches.mutations.recordResponse, {
-        matchmakerId: w.matchmakerId,
-        matchId,
-        side,
-        response,
-      });
-
-    await move("introduced");
-    await answer("a", "yes");
-    expect((await w.cards())[0].stage).toBe("introduced");
-    await answer("b", "yes");
-    expect((await w.cards())[0].stage).toBe("mutual_interest");
-    expect(
-      (await w.events()).filter(
-        (event) => event.action === "match.stage_changed",
-      ),
-    ).toHaveLength(4); // the move in, and the advance out
-  });
-
-  test("an outcome is recorded once it's said", async () => {
-    const { w, matchId } = await carded();
-    await w.asOwner.mutation(api.matches.mutations.recordOutcome, {
-      matchmakerId: w.matchmakerId,
-      matchId,
-      outcome: "Engaged, eighteen months later.",
-    });
-    expect((await w.cards())[0].outcome).toBe(
-      "Engaged, eighteen months later.",
-    );
-    await expect(
-      w.asOwner.mutation(api.matches.mutations.recordOutcome, {
-        matchmakerId: w.matchmakerId,
-        matchId,
-        outcome: " ",
-      }),
-    ).rejects.toThrow("what came of it");
+    expect((await w.cards())[0].seenAt).toBeDefined();
   });
 
   test("another tenant's card is not found, not forbidden", async () => {
@@ -615,7 +703,7 @@ describe("moving a card", () => {
       w.asStranger.mutation(api.matches.mutations.moveStage, {
         matchmakerId: w.matchmakerId,
         matchId,
-        stage: "reviewing",
+        stage: "introduced",
       }),
     ).rejects.toThrow("not found");
   });
@@ -634,34 +722,24 @@ describe("the board", () => {
     expect(cards[0].signals?.length ?? 0).toBeGreaterThan(5);
   });
 
-  test("hides a rejection once it has aged out", async () => {
+  test("carries a closed card too, so the board can count it", async () => {
     const w = await world();
     await w.run();
     const card = (await w.cards())[0];
-    await w.asOwner.mutation(api.matches.mutations.reject, {
+    await w.asOwner.mutation(api.matches.mutations.close, {
       matchmakerId: w.matchmakerId,
       matchId: card._id,
-      rejectedBy: "matchmaker",
-      reason: "Bad timing.",
+      outcome: "together",
+      note: "Engaged in May.",
     });
-    expect(
-      await w.asOwner.query(api.matches.queries.board, {
-        matchmakerId: w.matchmakerId,
-      }),
-    ).toHaveLength(1);
 
-    await w.t.run(async (ctx) => {
-      await ctx.db.patch("matches", card._id, {
-        stageChangedAt: Date.now() - 60 * 86_400_000,
-      });
+    const cards = await w.asOwner.query(api.matches.queries.board, {
+      matchmakerId: w.matchmakerId,
     });
-    expect(
-      await w.asOwner.query(api.matches.queries.board, {
-        matchmakerId: w.matchmakerId,
-      }),
-    ).toHaveLength(0);
-    // Out of the view, not out of the table: the reason is the taste signal.
-    expect(await w.cards()).toHaveLength(1);
+    // Off the board's columns, not out of its answer: nothing ages out, and
+    // what a match ended as is the one thing worth keeping of it.
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ stage: "closed", closedAs: "together" });
   });
 
   test("offers only people a match can actually be made with", async () => {
@@ -723,23 +801,26 @@ describe("one candidate's matches", () => {
     ).rejects.toThrow();
   });
 
-  test("a rejection older than the window is not carried", async () => {
+  test("carries a closed match, because a file is a record of what was tried", async () => {
     const w = await world();
     await w.run();
     const [card] = await w.cards();
     if (card === undefined) throw new Error("no card");
-    await w.t.run(async (ctx) => {
-      await ctx.db.patch("matches", card._id, {
-        stage: "rejected",
-        // Older than `rejectedVisibleDays`, so it has aged out of the view.
-        stageChangedAt: Date.now() - 60 * 24 * 60 * 60 * 1000,
-      });
+    await w.asOwner.mutation(api.matches.mutations.close, {
+      matchmakerId: w.matchmakerId,
+      matchId: card._id,
+      outcome: "didnt_work",
+      closedBy: "matchmaker",
+      note: "Bad timing.",
     });
 
     const mine = await w.asOwner.query(api.matches.queries.forCandidate, {
       matchmakerId: w.matchmakerId,
       candidateId: w.candidates.sam,
     });
-    expect(mine.find((one) => one.matchId === card._id)).toBeUndefined();
+    expect(mine.find((one) => one.matchId === card._id)).toMatchObject({
+      stage: "closed",
+      closingNote: "Bad timing.",
+    });
   });
 });

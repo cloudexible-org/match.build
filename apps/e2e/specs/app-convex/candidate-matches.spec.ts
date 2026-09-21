@@ -8,7 +8,7 @@ import { signInAs } from "../../session";
  * The Matches section of the candidate panel (prd/phase-3.md §2): the same
  * card the board draws, one at a time, with the stage it is sitting at.
  *
- * The card's own behaviour — the reasons, the menu, responses, rejection — is
+ * The card's own behaviour — the reasons, the menu, closing — is
  * `matches.spec.ts`, which drives it on the board. What is covered here is
  * what this surface adds: that it is the same card, that it says the stage the
  * board says by column, and that the carousel walks the matches one person is
@@ -37,7 +37,7 @@ test.beforeAll(async () => {
         matchmakerKey: "book",
         aKey: "sam",
         bKey: "jordan",
-        stage: "suggested",
+        stage: "proposed",
         score: 82,
       },
       {
@@ -84,7 +84,7 @@ test("shows the board's own card, plus the stage it is sitting at", async ({
 
   // The one thing the panel adds: the board says this by which column the
   // card is in, and a panel has no columns to say it with.
-  await expect(panel.getMatchStage()).toHaveText("Suggested");
+  await expect(panel.getMatchStage()).toHaveText("Proposed");
 });
 
 test("the carousel walks both sides of the pairs someone is in", async ({
@@ -108,7 +108,7 @@ test("the carousel walks both sides of the pairs someone is in", async ({
   const both = `${first} ${second}`;
   expect(both).toContain("Jordan Member");
   expect(both).toContain("Alex Member");
-  expect([firstStage, secondStage].sort()).toEqual(["Introduced", "Suggested"]);
+  expect([firstStage, secondStage].sort()).toEqual(["Introduced", "Proposed"]);
 
   await panel.previousMatch();
   await expect(panel.getMatchCounter()).toHaveText("1/2");

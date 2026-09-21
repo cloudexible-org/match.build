@@ -3,8 +3,6 @@ import {
   MATCH_BOARD_STAGES,
   MATCH_STAGE_DESCRIPTIONS,
   MATCH_STAGE_LABELS,
-  type MatchRejectedBy,
-  type MatchResponse,
   type MatchStage,
 } from "@repo/api";
 import { Button, cn } from "@repo/ui";
@@ -15,7 +13,7 @@ import { useWorkspace } from "../workspace/workspace-layout";
 import {
   type BoardCard,
   cardsInStage,
-  type ResponseSide,
+  closedSummary,
   type RunReport,
   runSummary,
 } from "./cards";
@@ -43,15 +41,15 @@ export function MatchBoard() {
     matchmakerId: workspace.matchmakerId,
   });
   const moveStage = useMutation(api.matches.mutations.moveStage);
-  const reject = useMutation(api.matches.mutations.reject);
-  const recordResponse = useMutation(api.matches.mutations.recordResponse);
-  const recordOutcome = useMutation(api.matches.mutations.recordOutcome);
+  const closeMatch = useMutation(api.matches.mutations.close);
+  const markSeen = useMutation(api.matches.mutations.markSeen);
   const refresh = useMutation(api.matches.mutations.refresh);
 
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<RunReport | null>(null);
   const [running, setRunning] = useState(false);
   const [pairing, setPairing] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
   const [over, setOver] = useState<MatchStage | null>(null);
 
   /** Every write goes through here, so one failed move can't be silent. */
@@ -73,32 +71,24 @@ export function MatchBoard() {
           stage,
         }),
       ),
-    onReject: (rejectedBy: MatchRejectedBy, reason: string) =>
+    onClose: (closing) =>
       void attempt(() =>
-        reject({
+        closeMatch({
           matchmakerId: workspace.matchmakerId,
           matchId: card.matchId,
-          rejectedBy,
-          reason,
+          outcome: closing.outcome,
+          closedBy: closing.closedBy,
+          note: closing.note,
+          archiveBoth: closing.archiveBoth,
         }),
       ),
-    onRespond: (side: ResponseSide, response: MatchResponse) =>
-      void attempt(() =>
-        recordResponse({
-          matchmakerId: workspace.matchmakerId,
-          matchId: card.matchId,
-          side,
-          response,
-        }),
-      ),
-    onOutcome: (outcome: string) =>
-      void attempt(() =>
-        recordOutcome({
-          matchmakerId: workspace.matchmakerId,
-          matchId: card.matchId,
-          outcome,
-        }),
-      ),
+    // Quietly: a card stopping being new is not something to interrupt
+    // somebody about if it fails, and the next look will try again.
+    onSeen: () =>
+      void markSeen({
+        matchmakerId: workspace.matchmakerId,
+        matchId: card.matchId,
+      }).catch(() => {}),
     conversationPath: (which, side) =>
       `/mm/${workspace.username}/c/${side === "a" ? which.a.candidateId : which.b.candidateId}`,
   });
@@ -132,7 +122,7 @@ export function MatchBoard() {
     }
   }
 
-  const rejected = cards === undefined ? [] : cardsInStage(cards, "rejected");
+  const closed = cards === undefined ? [] : cardsInStage(cards, "closed");
 
   return (
     <main
@@ -221,7 +211,12 @@ export function MatchBoard() {
             ))}
           </div>
 
-          <RejectedLane cards={rejected} actions={actions} />
+          <ClosedSection
+            cards={closed}
+            actions={actions}
+            open={showClosed}
+            onOpenChange={setShowClosed}
+          />
         </>
       )}
     </main>
@@ -284,8 +279,8 @@ function Column({
         ))}
         {cards.length === 0 && (
           <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-            {stage === "suggested"
-              ? "Nothing suggested yet."
+            {stage === "proposed"
+              ? "Nothing proposed yet."
               : "Drop a card here."}
           </p>
         )}
@@ -295,41 +290,56 @@ function Column({
 }
 
 /**
- * A lane, not a column (prd/phase-3.md §2). It lies across the bottom of the
- * board because a card reaches it from any of the five above, and it empties
- * itself: a rejection ages out of the view after a month, while the reason it
- * was rejected stays in the record for good.
+ * What is over, under the board (prd/phase-3.md §2).
+ *
+ * Not a column and not a lane: a match that has ended — well or badly — is not
+ * at a stage any more, and a board whose last column fills up for ever is a
+ * board that gets worse the better you are at your job. So it collapses to one
+ * line that counts them, and opens when somebody wants it.
+ *
+ * Nothing ages out. What a match ended as, and why, is the one thing worth
+ * keeping of it.
  */
-function RejectedLane({
+function ClosedSection({
   cards,
   actions,
+  open,
+  onOpenChange,
 }: {
   cards: BoardCard[];
   actions: (card: BoardCard) => CardActions;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   if (cards.length === 0) return null;
   return (
     <section
-      aria-labelledby="match-lane-rejected"
-      data-testid="match-lane"
-      data-stage="rejected"
-      className="flex max-h-[45%] shrink-0 flex-col gap-2 rounded-xl border border-border bg-muted/40 p-3"
+      aria-labelledby="match-closed-heading"
+      data-testid="match-closed"
+      data-open={open}
+      className="flex shrink-0 flex-col gap-2"
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 id="match-lane-rejected" className="text-sm font-medium">
-          {MATCH_STAGE_LABELS.rejected}
-        </h2>
-        <span className="text-xs text-muted-foreground">
-          {MATCH_STAGE_DESCRIPTIONS.rejected}
+      <button
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        aria-expanded={open}
+        data-testid="match-closed-toggle"
+        className="flex items-center gap-2 self-start rounded-md px-1 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <span aria-hidden className="text-xs">
+          {open ? "▾" : "▸"}
         </span>
-      </div>
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-        {cards.map((card) => (
-          <div key={card.matchId} className="w-72 shrink-0">
-            <MatchCard card={card} actions={actions(card)} />
-          </div>
-        ))}
-      </div>
+        <span id="match-closed-heading">{closedSummary(cards)}</span>
+      </button>
+      {open && (
+        <div className="-mx-1 flex max-h-[45%] gap-2 overflow-x-auto px-1 pb-1">
+          {cards.map((card) => (
+            <div key={card.matchId} className="w-72 shrink-0">
+              <MatchCard card={card} actions={actions(card)} />
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

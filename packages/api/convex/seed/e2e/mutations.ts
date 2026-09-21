@@ -29,8 +29,8 @@ import { orderedIds } from "../../matches/helpers";
 import { MATCH_ALGORITHM_VERSION, pairKey } from "../../matches/rules";
 import type { ProfileEntries } from "../../profiles/helpers";
 import {
-  matchRejectedBy,
-  matchResponse,
+  matchClosedBy,
+  matchOutcome,
   matchSignal,
   matchStage,
 } from "../../schema";
@@ -440,11 +440,10 @@ export const scenario = internalMutation({
           coverage: v.optional(v.number()),
           signals: v.optional(v.array(matchSignal)),
           checkDealbreakers: v.optional(v.boolean()),
-          candidateAResponse: v.optional(matchResponse),
-          candidateBResponse: v.optional(matchResponse),
-          rejectedBy: v.optional(matchRejectedBy),
-          rejectionReason: v.optional(v.string()),
-          outcome: v.optional(v.string()),
+          closedAs: v.optional(matchOutcome),
+          closedBy: v.optional(matchClosedBy),
+          closingNote: v.optional(v.string()),
+          seen: v.optional(v.boolean()),
           stageChangedDaysAgo: v.optional(v.number()),
         }),
       ),
@@ -809,7 +808,7 @@ export const scenario = internalMutation({
         candidateBId,
         pairKey: pairKey(candidateAId, candidateBId),
         origin: spec.origin ?? "algorithm",
-        stage: spec.stage ?? "suggested",
+        stage: spec.stage ?? "proposed",
         stageChangedAt,
         score: spec.score,
         coverage: spec.coverage,
@@ -818,11 +817,16 @@ export const scenario = internalMutation({
         algorithmVersion:
           spec.score === undefined ? undefined : MATCH_ALGORITHM_VERSION,
         lastScoredAt: spec.score === undefined ? undefined : now,
-        candidateAResponse: spec.candidateAResponse,
-        candidateBResponse: spec.candidateBResponse,
-        rejectedBy: spec.rejectedBy,
-        rejectionReason: spec.rejectionReason,
-        outcome: spec.outcome,
+        closedAs: spec.closedAs,
+        closedBy: spec.closedBy,
+        closingNote: spec.closingNote,
+        // A card is new until somebody looks at it, and a card sitting
+        // anywhere but Proposed is one a matchmaker could only have put there
+        // by looking.
+        seenAt:
+          (spec.seen ?? (spec.stage ?? "proposed") !== "proposed")
+            ? stageChangedAt
+            : undefined,
         updatedAt: stageChangedAt,
       });
       matches[spec.key] = { id };

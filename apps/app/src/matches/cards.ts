@@ -1,10 +1,10 @@
 import {
   coverageLabel,
   type Id,
-  MATCH_REJECTED_BY_LABELS,
-  MATCH_RESPONSE_LABELS,
-  type MatchRejectedBy,
-  type MatchResponse,
+  MATCH_CLOSED_BY_LABELS,
+  MATCH_OUTCOME_BADGES,
+  type MatchClosedBy,
+  type MatchOutcome,
   type MatchStage,
   matchSignalLabel,
   topSignals,
@@ -47,11 +47,10 @@ export type BoardCard = {
   checkDealbreakers?: boolean;
   algorithmVersion?: number;
   lastScoredAt?: number;
-  candidateAResponse?: MatchResponse;
-  candidateBResponse?: MatchResponse;
-  rejectedBy?: MatchRejectedBy;
-  rejectionReason?: string;
-  outcome?: string;
+  closedAs?: MatchOutcome;
+  closedBy?: MatchClosedBy;
+  closingNote?: string;
+  seenAt?: number;
 };
 
 export function personName(person: BoardPerson): string {
@@ -76,14 +75,24 @@ export function cardsInStage(
   stage: MatchStage,
 ): BoardCard[] {
   const mine = cards.filter((card) => card.stage === stage);
-  if (stage === "suggested") {
+  if (stage === "proposed") {
+    // Unseen first, then by score. What the Reviewing column used to say — I
+    // have been through these — a card can say for itself, and a shortlist
+    // whose top is the best thing you have *not* read is more useful than one
+    // whose top is the best thing you already decided about.
     return mine.sort(
       (left, right) =>
+        Number(isSeen(left)) - Number(isSeen(right)) ||
         (right.score ?? -1) - (left.score ?? -1) ||
         right.stageChangedAt - left.stageChangedAt,
     );
   }
   return mine.sort((left, right) => right.stageChangedAt - left.stageChangedAt);
+}
+
+/** Whether the matchmaker has looked at this card. */
+export function isSeen(card: BoardCard): boolean {
+  return card.seenAt !== undefined;
 }
 
 /**
@@ -138,54 +147,45 @@ export function allReasons(card: BoardCard): CardReason[] {
 }
 
 /**
- * Where the two yeses stand, for an introduced card. Named people rather than
- * "A" and "B": the sub-state is only useful if you can see whose answer is
- * missing.
- */
-export function responseLine(card: BoardCard): string | null {
-  const a = card.candidateAResponse;
-  const b = card.candidateBResponse;
-  if (a === undefined && b === undefined) return null;
-  return `${personName(card.a)}: ${MATCH_RESPONSE_LABELS[a ?? "pending"]} · ${personName(card.b)}: ${MATCH_RESPONSE_LABELS[b ?? "pending"]}`;
-}
-
-/**
+ * How a match ended, for a closed card: "They're together — engaged in May" or
  * "Jordan: she's moving to Berlin."
  *
- * Named, where the rejection was one of theirs. `MATCH_REJECTED_BY_LABELS` has
- * to say "First candidate", because the audit trail renders those sentences
- * with no card in front of it — but a card has both people on it, and "second
+ * Named, where the ending was one of theirs. `MATCH_CLOSED_BY_LABELS` has to
+ * say "First candidate", because the audit trail renders those sentences with
+ * no card in front of it — but a card has both people on it, and "second
  * candidate" in front of two names is a small puzzle nobody should have to
  * solve.
  */
-export function rejectionLine(card: BoardCard): string | null {
-  if (card.stage !== "rejected") return null;
+export function closingLine(card: BoardCard): string | null {
+  if (card.stage !== "closed") return null;
   const who =
-    card.rejectedBy === undefined
+    card.closedBy === undefined
       ? null
-      : card.rejectedBy === "candidateA"
+      : card.closedBy === "candidateA"
         ? personName(card.a)
-        : card.rejectedBy === "candidateB"
+        : card.closedBy === "candidateB"
           ? personName(card.b)
-          : MATCH_REJECTED_BY_LABELS[card.rejectedBy];
-  const reason = card.rejectionReason;
-  if (who === null) return reason ?? null;
-  return reason === undefined ? `Turned down by ${who}` : `${who}: ${reason}`;
+          : MATCH_CLOSED_BY_LABELS[card.closedBy];
+  const outcome =
+    card.closedAs === undefined ? null : MATCH_OUTCOME_BADGES[card.closedAs];
+  // Who ended it is only recorded for a no, where it is the informative half;
+  // for a yes the outcome is.
+  const lead = who ?? outcome;
+  if (lead === null) return card.closingNote ?? null;
+  return card.closingNote === undefined ? lead : `${lead}: ${card.closingNote}`;
 }
 
-/** Which person a response belongs to, for the buttons on an introduced card. */
-export const RESPONSE_SIDES = ["a", "b"] as const;
-export type ResponseSide = (typeof RESPONSE_SIDES)[number];
-
-export function sideOf(card: BoardCard, side: ResponseSide): BoardPerson {
-  return side === "a" ? card.a : card.b;
-}
-
-export function responseOf(card: BoardCard, side: ResponseSide): MatchResponse {
-  return (
-    (side === "a" ? card.candidateAResponse : card.candidateBResponse) ??
-    "pending"
-  );
+/**
+ * "14 closed · 3 together" — the line the closed section collapses to.
+ *
+ * It counts the good ending as well as the total, because that number is the
+ * product's whole point and a matchmaker should be able to read it off their
+ * own board without doing arithmetic.
+ */
+export function closedSummary(cards: readonly BoardCard[]): string {
+  const together = cards.filter((card) => card.closedAs === "together").length;
+  const closed = `${cards.length} closed`;
+  return together === 0 ? closed : `${closed} · ${together} together`;
 }
 
 export type RunReport = {

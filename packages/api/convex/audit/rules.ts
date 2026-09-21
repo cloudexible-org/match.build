@@ -12,8 +12,8 @@ import {
   candidateProfileFieldLabel,
 } from "../candidateProfiles/rules";
 import {
-  MATCH_REJECTED_BY_LABELS,
-  MATCH_RESPONSE_LABELS,
+  MATCH_CLOSED_BY_LABELS,
+  MATCH_OUTCOME_LABELS,
   MATCH_STAGE_LABELS,
 } from "../matches/rules";
 
@@ -90,9 +90,9 @@ export const AUDIT_ACTIONS = [
   "match.suggested", // the nightly run found a pair
   "match.created", // the matchmaker paired two people by hand
   "match.stage_changed",
-  "match.rejected",
-  "match.response_recorded",
-  "match.outcome_recorded",
+  // A match ended, well or badly. One action for both, because they are one
+  // event; `changes` carries which, and who ended it.
+  "match.closed",
 
   // Historical: the `notes` table these replaced (prd/phase-2.md §3), which
   // no longer exists. The trail is append-only, so events recorded before the
@@ -203,9 +203,7 @@ const FILTER_ACTIONS: Record<Exclude<AuditFilter, "all">, AuditAction[]> = {
     "match.suggested",
     "match.created",
     "match.stage_changed",
-    "match.rejected",
-    "match.response_recorded",
-    "match.outcome_recorded",
+    "match.closed",
   ],
 };
 
@@ -230,11 +228,9 @@ const FIELD_LABELS: Record<string, string> = {
   acceptedAs: "accepted as",
   stage: "stage",
   score: "score",
-  rejectedBy: "turned down by",
-  rejectionReason: "reason",
-  outcome: "outcome",
-  candidateAResponse: "the first candidate's answer",
-  candidateBResponse: "the second candidate's answer",
+  closedAs: "outcome",
+  closedBy: "ended by",
+  closingNote: "what happened",
   expiresAt: "expiry",
   voice: "voice",
 };
@@ -279,9 +275,7 @@ const PLAIN_SENTENCES: Partial<Record<AuditAction, string>> = {
   "match.suggested": "The nightly run suggested a match",
   "match.created": "Paired them with someone by hand",
   "match.stage_changed": "Moved a match",
-  "match.rejected": "Turned a match down",
-  "match.response_recorded": "Recorded an answer to an introduction",
-  "match.outcome_recorded": "Recorded how a match turned out",
+  "match.closed": "Closed a match",
 };
 
 /*
@@ -290,9 +284,8 @@ const PLAIN_SENTENCES: Partial<Record<AuditAction, string>> = {
  */
 const VALUE_LABELS: Record<string, Record<string, string>> = {
   stage: MATCH_STAGE_LABELS,
-  rejectedBy: MATCH_REJECTED_BY_LABELS,
-  candidateAResponse: MATCH_RESPONSE_LABELS,
-  candidateBResponse: MATCH_RESPONSE_LABELS,
+  closedAs: MATCH_OUTCOME_LABELS,
+  closedBy: MATCH_CLOSED_BY_LABELS,
 };
 
 /*

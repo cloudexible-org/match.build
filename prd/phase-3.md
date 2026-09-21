@@ -31,10 +31,13 @@ What changed from the draft below, deliberately:
 | Draft | Built | Why |
 |---|---|---|
 | `origin: "ai"` | `origin: "algorithm"` | Nothing about a card came from a model. |
-| `reasoning: string` | `signals: {key, weight, earned, detail}[]` | The arithmetic the run did, rather than prose about it. A card shows the strongest few and the weakest one. |
-| `rejectedBy: matchmaker \| candidateA \| candidateB` | plus `system` | The nightly run withdrawing its own suggestion is the one rejection nobody chose, and worth telling apart from the three somebody did. |
+| `reasoning: string` | `signals: {key, weight, earned, detail}[]` | The arithmetic the run did, rather than prose about it. The draft's two response
+fields are gone with the column they fed. A card shows the strongest few and the weakest one. |
+| Five columns + a Rejected lane | Three columns + a `closed` state off the board | Two columns described the matchmaker, not the match; and a rejection and a wedding are one event (§2). |
+| `candidateAResponse` / `candidateBResponse` | gone | A no ends the match and is recorded on the closing record; a yes is implied by the matchmaker doing the next thing. |
+| `rejectedBy` + `rejectionReason` + `outcome` | `closedAs` + `closedBy` + `closingNote` | One closing record, because there is one way a match ends. `system` is the nightly run taking its own suggestion back. |
 | *Open:* one match per unordered pair | `pairKey`, unique | The ids are stored sorted; the pair is the key. It is what stops tonight's run re-suggesting last night's pair. |
-| *Open:* rejected lane ageing period | A month, **in the view only** | The row and its reason stay for good: the reason is the taste signal. |
+| *Open:* rejected lane ageing period | No lane, so nothing ages | Closed matches sit behind a summary line: out of the way rather than out of reach. |
 | `score`, no notion of confidence in the data behind it | plus `coverage` | Rule 3 above needs somewhere to live. |
 
 **Not built, and named here so it isn't mistaken for missing:** the AI second
@@ -64,11 +67,33 @@ Matches are always **within one matchmaker's book**. Facts from one matchmaker's
 
 A separate view, not a panel: reviewing matches is a different mode of work than chatting.
 
-Columns: `Suggested` → `Reviewing` → `Introduced` → `Mutual interest` → `Connected`.
+Columns: `Proposed` → `Introduced` → `Connected`. **Three, because each one is
+something that happened between two people.**
 
-- `Rejected` is a **lane**, not a terminal column — a card can drop into it from any stage. Capture who rejected and why on the way in; that is taste signal. Rejected cards age out of the board after a period.
-- Manual match creation lives on this board and produces an identical `matches` record with `origin: "manual"`.
-- The `Introduced → Mutual interest` transition depends on two separate yeses (`candidateAResponse`, `candidateBResponse`). Handle as sub-state on the card rather than adding columns.
+The draft had five. Two of them described the matchmaker rather than the match
+and are gone: `Reviewing` was a state of mind, and `Mutual interest` was a fact
+`Connected` already implies — nobody puts two people in touch before both have
+said yes. What `Reviewing` was really for, telling a card you have read from one
+you have not, is a property of a card and is now a dot on it.
+
+- `Introduced` means the matchmaker showed each of them the other, one at a
+  time. `Connected` means they put the two in touch with each other. Both are
+  things the matchmaker did and then recorded; the app sends nobody anything
+  (§6).
+- **A match that has ended leaves the board.** One `closed` state, carrying an
+  outcome — `together` or `didnt_work` — plus who ended it where somebody did,
+  and a note. A rejection and a wedding are the same event, so there is no
+  Rejected lane at one end of the board and no "married" column at the other;
+  there is a line under the board that counts what is closed, and opens it.
+  Nothing ages out, because nothing needs hiding.
+- **The note is required for a no and optional for a yes.** Why a match failed
+  is the taste signal the board exists to collect; making somebody write a
+  sentence about good news is how good news stops getting recorded.
+- Closing as `together` **offers to archive both candidates**, through the same
+  status a matchmaker sets by hand. It stays their call: a couple can also break
+  up.
+- Manual match creation lives on this board and produces an identical `matches`
+  record with `origin: "manual"`.
 - Every stage change is audited on both candidates' trails.
 
 ## 3. Discover page and applications
@@ -90,7 +115,7 @@ matches: defineTable({
   candidateBId: v.id("candidates"),
   pairKey: v.string(),                // "<lower id>:<higher id>", unique
   origin: v.union(v.literal("algorithm"), v.literal("manual")),
-  stage: matchStage,                  // suggested … connected, and rejected
+  stage: matchStage,                  // proposed | introduced | connected | closed
   stageChangedAt: v.number(),
   score: v.optional(v.number()),      // 0..100
   coverage: v.optional(v.number()),   // 0..1 — how much profile the score read
@@ -98,11 +123,12 @@ matches: defineTable({
   checkDealbreakers: v.optional(v.boolean()), // free text no filter reads
   algorithmVersion: v.optional(v.number()),
   lastScoredAt: v.optional(v.number()),
-  candidateAResponse: v.optional(matchResponse),  // pending | yes | no
-  candidateBResponse: v.optional(matchResponse),
-  rejectedBy: v.optional(matchRejectedBy),        // …| system
-  rejectionReason: v.optional(v.string()),
-  outcome: v.optional(v.string()),
+  // What closing recorded. Cleared if the card comes back onto the board.
+  closedAs: v.optional(matchOutcome),             // together | didnt_work
+  closedBy: v.optional(matchClosedBy),            // …| system
+  closingNote: v.optional(v.string()),
+  seenAt: v.optional(v.number()),   // absent means new — what `Reviewing`
+                                    // used to say with a whole column
   updatedAt: v.number(),
 })
   .index("by_matchmakerId_and_stage", ["matchmakerId", "stage"])  // the board
@@ -131,8 +157,10 @@ Reuse phase 2's "foreground emits signal → background worker processes it" mec
 
 - **The introduction moment.** What exactly gets shared with each party, how much of the other's profile, and does the introduction happen through the platform or hand back to the matchmaker's own channels? This is the product's payoff moment and needs design before phase 3 starts. **Still open, and the board is built around its being open:** moving a card to Introduced sends nobody anything, and the two yeses are what the matchmaker heard, written down.
 - **Discover page:** listing criteria, public profile content, spam/abuse controls on applications.
-- ~~**Rejected lane ageing period.**~~ A month, and in the view only — the row
-  and the reason it holds stay for good.
-- **Outcome capture:** what outcomes do we record, and when do we ask? The
-  field is there and a connected card can be given free text; the question of
-  what we should be *asking* for is still open, which is why nothing asks.
+- ~~**Rejected lane ageing period.**~~ There is no lane. A closed match sits
+  behind a summary line under the board, and stays there.
+- **Outcome capture:** *partly answered.* Closing a match records one of two
+  outcomes and a note, and the matchmaker is asked at the moment they close it.
+  Whether two is the right number — whether `engaged`, `married` and `stayed
+  friends` earn their place — is open, and wants a real matchmaker rather than
+  a guess.

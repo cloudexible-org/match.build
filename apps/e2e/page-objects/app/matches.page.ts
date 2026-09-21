@@ -1,12 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
-/** The five columns, left to right. The Rejected lane is addressed separately. */
-export type MatchStage =
-  | "suggested"
-  | "reviewing"
-  | "introduced"
-  | "mutual_interest"
-  | "connected";
+/** The three columns, left to right. Closed is off the board and below it. */
+export type MatchStage = "proposed" | "introduced" | "connected";
 
 /**
  * The match board (prd/phase-3.md §2), at `/mm/:username/matches`. Rendered by
@@ -38,8 +33,17 @@ export class MatchesPage {
     return this.getColumn(stage).getByTestId("match-column-count");
   }
 
-  getLane() {
-    return this.page.getByTestId("match-lane");
+  /** The collapsed line under the board, and what it opens. */
+  getClosed() {
+    return this.page.getByTestId("match-closed");
+  }
+
+  getClosedToggle() {
+    return this.page.getByTestId("match-closed-toggle");
+  }
+
+  async openClosed() {
+    await this.getClosedToggle().click();
   }
 
   getCards() {
@@ -57,7 +61,7 @@ export class MatchesPage {
     return this.page.locator(`[data-match-id="${matchId}"]`);
   }
 
-  getCardsIn(stage: MatchStage | "rejected") {
+  getCardsIn(stage: MatchStage | "closed") {
     return this.page.locator(
       `[data-testid="match-card"][data-stage="${stage}"]`,
     );
@@ -82,35 +86,57 @@ export class MatchesPage {
     await this.page.getByTestId("match-reject").click();
   }
 
+  async openCloseForm(card: Locator) {
+    await card.getByTestId("match-card-menu").click();
+    await this.page.getByTestId("match-close").click();
+  }
+
   /**
-   * The button for one person in the reject form, by the name on it.
+   * The button for one person in the close form, by the name on it.
    *
-   * By name rather than by `candidateA`/`candidateB`: a pair is stored with its
-   * ids in a fixed order, so which of the two is "A" is not the order a spec
-   * seeded them in — and a test that picked the button by position would pass
-   * or fail on how two ids happened to sort.
+   * By name rather than by `candidateA`/`candidateB`: a pair is stored with
+   * its ids in a fixed order, so which of the two is "A" is not the order a
+   * spec seeded them in — and a test that picked the button by position would
+   * pass or fail on how two ids happened to sort.
    */
-  getRejectBy(card: Locator, name: string) {
+  getClosedBy(card: Locator, name: string) {
     return card
-      .getByTestId("reject-form")
+      .getByTestId("close-form")
       .getByRole("button", { name, exact: true });
   }
 
-  /** Turns a card down: who (by name, or "You"), why, submit. */
-  async reject(card: Locator, who: string, reason: string) {
-    await this.openRejectForm(card);
-    await this.getRejectBy(card, who).click();
-    await card.getByTestId("reject-reason").fill(reason);
-    await card.getByTestId("reject-submit").click();
+  /** Closes a card: how it ended, who ended it (by name), why. */
+  async close(
+    card: Locator,
+    outcome: "together" | "didnt_work",
+    options: { who?: string; note?: string; archiveBoth?: boolean } = {},
+  ) {
+    await this.openCloseForm(card);
+    await card.getByTestId(`close-as-${outcome}`).click();
+    if (options.who !== undefined) {
+      await this.getClosedBy(card, options.who).click();
+    }
+    if (options.note !== undefined) {
+      await card.getByTestId("close-note").fill(options.note);
+    }
+    if (options.archiveBoth === false) {
+      await card.getByTestId("close-archive-both").uncheck();
+    }
+    await card.getByTestId("close-submit").click();
   }
 
-  getRejection(card: Locator) {
-    return card.getByTestId("match-card-rejection");
+  /** The line on a closed card saying how it ended. */
+  getClosingLine(card: Locator) {
+    return card.getByTestId("match-card-closing");
   }
 
-  /** Records one side's answer to an introduction. */
-  async respond(card: Locator, side: "a" | "b", response: "yes" | "no") {
-    await card.getByTestId(`match-response-${side}-${response}`).click();
+  getOutcomeBadge(card: Locator) {
+    return card.getByTestId("match-card-outcome");
+  }
+
+  /** The dot on a card nobody has looked at yet. */
+  getNewDot(card: Locator) {
+    return card.getByTestId("match-card-new");
   }
 
   async findMatches() {

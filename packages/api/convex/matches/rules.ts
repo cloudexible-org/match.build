@@ -38,84 +38,114 @@ import { ageFromDateOfBirth, displayValue } from "../profiles/rules";
  */
 
 export const MATCH_STAGES = [
-  "suggested",
-  "reviewing",
+  "proposed",
   "introduced",
-  "mutual_interest",
   "connected",
-  "rejected",
+  "closed",
 ] as const;
 
 export type MatchStage = (typeof MATCH_STAGES)[number];
 
 /**
- * The five columns, left to right. `rejected` is deliberately not among them:
- * it is a lane a card drops into from any stage (prd/phase-3.md §2), rendered
- * under the columns rather than at the end of them.
+ * The three columns, left to right.
+ *
+ * Each one is something that *happened between two people*, which is why
+ * there are three of them and not six. A column for "I am thinking about it"
+ * and a column for "they both said yes" describe the matchmaker's state of
+ * mind and a fact already implied by the next column; a card had to be dragged
+ * through both of them to say nothing anyone could act on.
+ *
+ * `closed` is not a column. A match that has ended — well or badly — leaves
+ * the board (prd/phase-3.md §2).
  */
 export const MATCH_BOARD_STAGES: readonly MatchStage[] = [
-  "suggested",
-  "reviewing",
+  "proposed",
   "introduced",
-  "mutual_interest",
   "connected",
 ];
 
 export const MATCH_STAGE_LABELS: Record<MatchStage, string> = {
-  suggested: "Suggested",
-  reviewing: "Reviewing",
+  proposed: "Proposed",
   introduced: "Introduced",
-  mutual_interest: "Mutual interest",
   connected: "Connected",
-  rejected: "Rejected",
+  closed: "Closed",
 };
 
 /** What a column is for, under its heading. */
 export const MATCH_STAGE_DESCRIPTIONS: Record<MatchStage, string> = {
-  suggested: "Found by the nightly run. Nobody has looked yet.",
-  reviewing: "You're weighing it up.",
-  introduced: "You've made the introduction.",
-  mutual_interest: "Both said yes.",
-  connected: "They're talking to each other.",
-  rejected: "Turned down. Kept for a month, as taste signal.",
+  // "Proposed", not "Suggested": a matchmaker's own pairing lands here too,
+  // and being told their idea was "suggested" to them reads like the machine
+  // taking the credit.
+  proposed: "Found by the nightly run, or paired by you.",
+  introduced: "You've shown each of them the other, one at a time.",
+  connected: "You've put the two of them in touch.",
+  closed: "Over, one way or the other.",
 };
 
 export function isMatchStage(value: string): value is MatchStage {
   return (MATCH_STAGES as readonly string[]).includes(value);
 }
 
-/** Each side's answer to an introduction, as the matchmaker heard it. */
-export type MatchResponse = "pending" | "yes" | "no";
+/*
+ * ─── How a match ends ───────────────────────────────────────────────────────
+ *
+ * Every match ends, and the two ways it can end are the same *event*: a
+ * matchmaker saying this is over and saying what happened. So there is one
+ * closed stage carrying an outcome, rather than a Rejected lane at one end of
+ * the board and a "married" column at the other.
+ *
+ * Two outcomes and a note. Enough structure to count — "three together this
+ * year" is a sentence a matchmaker should be able to read off their own board
+ * — and not enough to make somebody choose between five shades of no.
+ */
 
-export const MATCH_RESPONSE_LABELS: Record<MatchResponse, string> = {
-  pending: "Waiting",
-  yes: "Yes",
-  no: "No",
+export const MATCH_OUTCOMES = ["together", "didnt_work"] as const;
+
+export type MatchOutcome = (typeof MATCH_OUTCOMES)[number];
+
+export const MATCH_OUTCOME_LABELS: Record<MatchOutcome, string> = {
+  together: "They're together",
+  didnt_work: "It didn't work",
+};
+
+/** The shorter form, for a badge on a closed card. */
+export const MATCH_OUTCOME_BADGES: Record<MatchOutcome, string> = {
+  together: "Together",
+  didnt_work: "Didn't work",
 };
 
 /**
- * Who turned a match down. `system` is the nightly run withdrawing its own
- * suggestion after a profile changed under it — the one rejection nobody
- * chose, and worth telling apart from the three that somebody did.
+ * Who ended it. Meaningful on `didnt_work`, where *whose* no it was is the
+ * taste signal the board exists to collect; a match that ended with the two of
+ * them together wasn't ended by anybody.
+ *
+ * `system` is the nightly run taking back its own suggestion after a profile
+ * changed under it — the one ending nobody chose, and worth telling apart from
+ * the three that somebody did.
  */
-export type MatchRejectedBy =
+export type MatchClosedBy =
   | "matchmaker"
   | "candidateA"
   | "candidateB"
   | "system";
 
-export const MATCH_REJECTED_BY_LABELS: Record<MatchRejectedBy, string> = {
+export const MATCH_CLOSED_BY_LABELS: Record<MatchClosedBy, string> = {
   matchmaker: "You",
   candidateA: "First candidate",
   candidateB: "Second candidate",
   system: "The nightly run",
 };
 
+/** The three a person can pick. `system` is the run's own word. */
+export const MATCH_CLOSED_BY_CHOICES: readonly MatchClosedBy[] = [
+  "matchmaker",
+  "candidateA",
+  "candidateB",
+];
+
 export const MATCH_LIMITS = {
-  /** Why a match was turned down. Short: it is a note, not a case file. */
-  rejectionReason: 500,
-  /** What came of a connected match. */
-  outcome: 500,
+  /** What happened, written when a match is closed. A note, not a case file. */
+  closingNote: 500,
   /**
    * New cards one book may gain in one run. A matchmaker who opens the board
    * to ninety suggestions has been handed a list, not a shortlist.
@@ -128,8 +158,12 @@ export const MATCH_LIMITS = {
    * fields agreeing is not a match, it's a coincidence.
    */
   minCoverage: 0.35,
-  /** How long a rejected card stays on the lane before it ages out of view. */
-  rejectedVisibleDays: 30,
+  /**
+   * Closed cards the board fetches behind its summary line. They are out of
+   * the way rather than out of reach, so nothing has to age out of view — and
+   * the reason a match ended is the one thing worth keeping of it.
+   */
+  closedShown: 100,
   /** Candidates one run reads from a book. Far above a phase-1 book. */
   book: 300,
   /** Books one night's fan-out covers. One scheduled job each. */
@@ -953,54 +987,46 @@ export function coverageLabel(coverage: number): string {
  * machine does, so a card goes anywhere except nowhere. The one thing that
  * isn't a move is moving a card to the column it is already in.
  *
- * Rejection is not here: it carries who and why, and goes through
- * `matches.mutations.reject` instead.
+ * Closing is not here: it carries an outcome and a note, and goes through
+ * `matches.mutations.close` instead. Moving a card *out* of closed is an
+ * ordinary move, and clears what closing recorded — a match that is back on
+ * the board is not one that ended.
  */
 export function stageChangeError(
   from: MatchStage,
   to: MatchStage,
 ): string | null {
   if (from === to) return "It's already there.";
-  if (to === "rejected") {
-    return "Turning a match down records who and why — use Reject.";
-  }
-  return null;
-}
-
-export function rejectionReasonError(raw: string): string | null {
-  const reason = raw.trim();
-  if (!reason) return "Say why, even briefly — it's the taste signal.";
-  if (reason.length > MATCH_LIMITS.rejectionReason) {
-    return `Keep it under ${MATCH_LIMITS.rejectionReason} characters.`;
-  }
-  return null;
-}
-
-export function outcomeError(raw: string): string | null {
-  const outcome = raw.trim();
-  if (!outcome) return "Say what came of it.";
-  if (outcome.length > MATCH_LIMITS.outcome) {
-    return `Keep it under ${MATCH_LIMITS.outcome} characters.`;
+  if (to === "closed") {
+    return "Ending a match records what happened — use Close.";
   }
   return null;
 }
 
 /**
- * Whether both sides have said yes, which is what `mutual_interest` means
- * (prd/phase-3.md §2). Held as sub-state on an introduced card rather than as
- * two more columns.
+ * Why a closing note can't be saved, or `null`.
+ *
+ * Required when it didn't work, because *why* is the whole of what the board
+ * learns from a match that failed. Optional when they're together: the outcome
+ * has already said the thing worth saying, and making somebody write a
+ * sentence about good news is how good news stops getting recorded.
  */
-export function bothSaidYes(
-  a: MatchResponse | undefined,
-  b: MatchResponse | undefined,
-): boolean {
-  return a === "yes" && b === "yes";
+export function closingNoteError(
+  outcome: MatchOutcome,
+  raw: string,
+): string | null {
+  const note = raw.trim();
+  if (!note) {
+    return outcome === "didnt_work"
+      ? "Say why, even briefly — it's the taste signal."
+      : null;
+  }
+  return note.length > MATCH_LIMITS.closingNote
+    ? `Keep it under ${MATCH_LIMITS.closingNote} characters.`
+    : null;
 }
 
-/** Whether a rejected card is still recent enough to show on the lane. */
-export function rejectedIsVisible(
-  stageChangedAt: number,
-  now: number,
-): boolean {
-  return now - stageChangedAt <= MATCH_LIMITS.rejectedVisibleDays * 86_400_000;
+/** Whether closing this way needs somebody to have ended it. */
+export function closingNeedsWho(outcome: MatchOutcome): boolean {
+  return outcome === "didnt_work";
 }

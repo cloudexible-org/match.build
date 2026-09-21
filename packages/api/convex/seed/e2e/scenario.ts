@@ -161,7 +161,7 @@ export type ScenarioMatch = {
   /** Candidate keys. Stored in the table's own order, whichever way round. */
   aKey: string;
   bKey: string;
-  /** Default: "suggested". */
+  /** Default: "proposed". */
   stage?: ScenarioMatchStage;
   /** Default: "algorithm". */
   origin?: "algorithm" | "manual";
@@ -169,24 +169,24 @@ export type ScenarioMatch = {
   coverage?: number;
   signals?: { key: string; weight: number; earned: number; detail: string }[];
   checkDealbreakers?: boolean;
-  candidateAResponse?: ScenarioMatchResponse;
-  candidateBResponse?: ScenarioMatchResponse;
-  rejectedBy?: "matchmaker" | "candidateA" | "candidateB" | "system";
-  rejectionReason?: string;
-  outcome?: string;
+  /** What closing recorded. Only meaningful on a `closed` card. */
+  closedAs?: "together" | "didnt_work";
+  closedBy?: "matchmaker" | "candidateA" | "candidateB" | "system";
+  closingNote?: string;
+  /**
+   * Whether the matchmaker has looked at it. Default: true at every stage but
+   * `proposed`, since a card they moved is a card they saw.
+   */
+  seen?: boolean;
   /** How many days ago the card last moved. Default: 0. */
   stageChangedDaysAgo?: number;
 };
 
 export type ScenarioMatchStage =
-  | "suggested"
-  | "reviewing"
+  | "proposed"
   | "introduced"
-  | "mutual_interest"
   | "connected"
-  | "rejected";
-
-export type ScenarioMatchResponse = "pending" | "yes" | "no";
+  | "closed";
 
 export type ScenarioSpec = {
   /** 4–12 lowercase letters and digits, starting with a letter. */

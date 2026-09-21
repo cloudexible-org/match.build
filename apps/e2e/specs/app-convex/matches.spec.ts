@@ -69,10 +69,12 @@ const BOOK: { key: string; name: string; facts?: Record<string, string> }[] = [
   { key: "rejb", name: "Rejb Two" },
   { key: "inta", name: "Inta One" },
   { key: "intb", name: "Intb Two" },
-  { key: "olda", name: "Olda One" },
-  { key: "oldb", name: "Oldb Two" },
+  { key: "wona", name: "Wona One" },
+  { key: "wonb", name: "Wonb Two" },
   { key: "backa", name: "Backa One" },
   { key: "backb", name: "Backb Two" },
+  { key: "newa", name: "Newa One" },
+  { key: "newb", name: "Newb Two" },
   // Hand-pairing.
   { key: "handa", name: "Handa One" },
   { key: "handb", name: "Handb Two" },
@@ -121,29 +123,37 @@ test.beforeAll(async () => {
         aKey: "inta",
         bKey: "intb",
         stage: "introduced",
-        candidateAResponse: "pending",
-        candidateBResponse: "pending",
         score: 77,
         coverage: 0.6,
       },
       {
-        key: "aged",
+        key: "won",
         matchmakerKey: "book",
-        aKey: "olda",
-        bKey: "oldb",
-        stage: "rejected",
-        rejectedBy: "matchmaker",
-        rejectionReason: "Ancient history.",
-        stageChangedDaysAgo: 60,
+        aKey: "wona",
+        bKey: "wonb",
+        stage: "connected",
+        score: 84,
+        coverage: 0.7,
+      },
+      // Nothing else in the file touches this one, so it is still new when
+      // the test that cares about that runs.
+      {
+        key: "fresh",
+        matchmakerKey: "book",
+        aKey: "newa",
+        bKey: "newb",
+        score: 68,
+        coverage: 0.5,
       },
       {
-        key: "back",
+        key: "closed",
         matchmakerKey: "book",
         aKey: "backa",
         bKey: "backb",
-        stage: "rejected",
-        rejectedBy: "candidateA",
-        rejectionReason: "Bad timing.",
+        stage: "closed",
+        closedAs: "didnt_work",
+        closedBy: "candidateA",
+        closingNote: "Bad timing.",
       },
     ],
   });
@@ -157,7 +167,7 @@ async function openBoard(page: Page) {
   return board;
 }
 
-test("the board is five columns and a lane, reachable from the workspace", async ({
+test("the board is three columns, reachable from the workspace", async ({
   page,
 }) => {
   await signInAs(page, world.email("maya"));
@@ -166,11 +176,14 @@ test("the board is five columns and a lane, reachable from the workspace", async
 
   const board = new MatchesPage(page);
   await expect(board.getRoot()).toBeVisible();
-  await expect(page.getByTestId("match-column")).toHaveCount(5);
-  await expect(board.getColumn("suggested")).toBeVisible();
+  // Three, each of them something that happened between two people.
+  await expect(page.getByTestId("match-column")).toHaveCount(3);
+  await expect(board.getColumn("proposed")).toBeVisible();
   await expect(board.getColumn("connected")).toBeVisible();
-  // Rejected is a lane under the board, not a sixth column.
-  await expect(board.getLane()).toBeVisible();
+
+  // What is over is off the board, behind a line that counts it.
+  await expect(board.getColumn("proposed")).not.toContainText("Backa One");
+  await expect(board.getClosedToggle()).toContainText("closed");
 });
 
 test("a card says who, how well, and why", async ({ page }) => {
@@ -192,85 +205,99 @@ test("a card says who, how well, and why", async ({ page }) => {
 test("a card moves between columns, and the move sticks", async ({ page }) => {
   const board = await openBoard(page);
   const card = board.getCard("Mova One", "Movb Two");
-  await expect(card).toHaveAttribute("data-stage", "suggested");
+  await expect(card).toHaveAttribute("data-stage", "proposed");
 
-  await board.move(card, "reviewing");
+  await board.move(card, "introduced");
   await expect(board.getCard("Mova One", "Movb Two")).toHaveAttribute(
     "data-stage",
-    "reviewing",
+    "introduced",
   );
-  await expect(board.getColumn("reviewing")).toContainText("Mova One");
+  await expect(board.getColumn("introduced")).toContainText("Mova One");
 
   await page.reload();
   await expect(board.getCard("Mova One", "Movb Two")).toHaveAttribute(
     "data-stage",
-    "reviewing",
+    "introduced",
   );
 });
 
-test("turning a card down records who and why", async ({ page }) => {
+test("closing a match that didn't work records who ended it and why", async ({
+  page,
+}) => {
   const board = await openBoard(page);
   const card = board.getCard("Reja One", "Rejb Two");
 
   // The reason is the taste signal: the form refuses to submit without one.
-  await board.openRejectForm(card);
-  await card.getByTestId("reject-submit").click();
-  await expect(card.getByTestId("reject-error")).toBeVisible();
+  await board.openCloseForm(card);
+  await card.getByTestId("close-as-didnt_work").click();
+  await card.getByTestId("close-submit").click();
+  await expect(card.getByTestId("close-error")).toBeVisible();
 
   // Picked by name: which of the two the table calls "A" is down to how their
-  // ids sort, and the person turning a match down is a person, not a slot.
-  await board.getRejectBy(card, "Rejb Two").click();
-  await card.getByTestId("reject-reason").fill("She's moving to Berlin.");
-  await card.getByTestId("reject-submit").click();
+  // ids sort, and the person who ended it is a person, not a slot.
+  await board.getClosedBy(card, "Rejb Two").click();
+  await card.getByTestId("close-note").fill("She's moving to Berlin.");
+  await card.getByTestId("close-submit").click();
 
-  const rejected = board.getCard("Reja One", "Rejb Two");
-  await expect(rejected).toHaveAttribute("data-stage", "rejected");
-  await expect(board.getLane()).toContainText("She's moving to Berlin.");
-  await expect(board.getRejection(rejected)).toContainText("Rejb Two");
+  // Off the board's columns, and into the line underneath.
+  await expect(board.getColumn("proposed")).not.toContainText("Reja One");
+  await board.openClosed();
+  const closed = board.getCard("Reja One", "Rejb Two");
+  await expect(closed).toHaveAttribute("data-stage", "closed");
+  await expect(board.getClosingLine(closed)).toContainText("Rejb Two");
+  await expect(board.getClosingLine(closed)).toContainText("Berlin");
 });
 
-test("a card comes back onto the board without its rejection", async ({
+test("closing a match that worked can take both of them out of the book", async ({
   page,
 }) => {
   const board = await openBoard(page);
+  const card = board.getCard("Wona One", "Wonb Two");
+  await expect(card).toHaveAttribute("data-stage", "connected");
+
+  // No reason required for good news, and nobody "ended" it.
+  await board.close(card, "together", { note: "Engaged in May." });
+
+  await board.openClosed();
+  const closed = board.getCard("Wona One", "Wonb Two");
+  await expect(board.getOutcomeBadge(closed)).toContainText("Together");
+  await expect(board.getClosedToggle()).toContainText("1 together");
+
+  // Both archived by the checkbox, so neither is offered for a new match —
+  // which is the same rule the picker and the nightly run already use.
+  await board.openPairForm();
+  await expect(page.getByTestId("new-match-a")).not.toContainText("Wona One");
+  await expect(page.getByTestId("new-match-a")).not.toContainText("Wonb Two");
+});
+
+test("a card comes back onto the board without what closing recorded", async ({
+  page,
+}) => {
+  const board = await openBoard(page);
+  await board.openClosed();
   const card = board.getCard("Backa One", "Backb Two");
-  await expect(board.getRejection(card)).toContainText("Bad timing.");
+  await expect(board.getClosingLine(card)).toContainText("Bad timing.");
 
-  await board.move(card, "reviewing");
+  await board.move(card, "introduced");
   const moved = board.getCard("Backa One", "Backb Two");
-  await expect(moved).toHaveAttribute("data-stage", "reviewing");
-  await expect(board.getRejection(moved)).toHaveCount(0);
+  await expect(moved).toHaveAttribute("data-stage", "introduced");
+  await expect(board.getClosingLine(moved)).toHaveCount(0);
 });
 
-test("two yeses are what moves a card to mutual interest", async ({ page }) => {
+test("a card is new until you look at it", async ({ page }) => {
   const board = await openBoard(page);
-  const card = board.getCard("Inta One", "Intb Two");
-  await expect(card).toHaveAttribute("data-stage", "introduced");
+  const card = board.getCard("Newa One", "Newb Two");
+  await expect(board.getNewDot(card)).toBeVisible();
 
-  await board.respond(card, "a", "yes");
-  await expect(board.getCard("Inta One", "Intb Two")).toHaveAttribute(
-    "data-stage",
-    "introduced",
-  );
+  // Touching the card at all is looking at it. (Not the names, which are
+  // links to the two conversations.)
+  await board.getScore(card).click();
+  await expect(board.getNewDot(card)).toHaveCount(0);
 
-  await board.respond(board.getCard("Inta One", "Intb Two"), "b", "yes");
-  await expect(board.getCard("Inta One", "Intb Two")).toHaveAttribute(
-    "data-stage",
-    "mutual_interest",
-  );
-  await expect(board.getColumn("mutual_interest")).toContainText("Inta One");
-});
-
-test("a rejection ages out of the board, but only out of the board", async ({
-  page,
-}) => {
-  const board = await openBoard(page);
-  // Two months old: off the lane, while the reason it was turned down stays in
-  // the record for good.
-  await expect(board.getCardById(world.matchId("aged"))).toHaveCount(0);
-  await expect(board.getCards().filter({ hasText: "Olda One" })).toHaveCount(0);
-  // A rejection from today is still there.
-  await expect(board.getCardById(world.matchId("back"))).toBeVisible();
+  await page.reload();
+  await expect(
+    board.getNewDot(board.getCard("Newa One", "Newb Two")),
+  ).toHaveCount(0);
 });
 
 test("two people can be paired by hand", async ({ page }) => {
@@ -279,7 +306,7 @@ test("two people can be paired by hand", async ({ page }) => {
 
   const card = board.getCard("Handa One", "Handb Two");
   await expect(card).toBeVisible();
-  await expect(card).toHaveAttribute("data-stage", "suggested");
+  await expect(card).toHaveAttribute("data-stage", "proposed");
   // Marked as the matchmaker's own, not the run's.
   await expect(card.getByTestId("match-card-manual")).toBeVisible();
 

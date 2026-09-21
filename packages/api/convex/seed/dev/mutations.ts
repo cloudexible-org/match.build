@@ -444,42 +444,43 @@ export const apply = internalMutation({
         type: "system",
         job: "seed",
       });
-      created.push(`${report.created} suggested matches`);
+      created.push(`${report.created} proposed matches`);
 
       // Three of them moved along, so the board is a board rather than one
-      // full column beside four empty ones.
-      const suggested = await ctx.db
+      // full column beside two empty ones — and one of each way a card can
+      // sit: introduced, connected, and closed off the board entirely.
+      const proposed = await ctx.db
         .query("matches")
         .withIndex("by_matchmakerId_and_stage", (q) =>
-          q.eq("matchmakerId", matchmakerId).eq("stage", "suggested"),
+          q.eq("matchmakerId", matchmakerId).eq("stage", "proposed"),
         )
         .order("desc")
         .take(3);
-      const [reviewing, introduced, turnedDown] = suggested;
-      if (reviewing !== undefined) {
-        await ctx.db.patch("matches", reviewing._id, {
-          stage: "reviewing",
-          stageChangedAt: now,
-          updatedAt: now,
-        });
-      }
+      const [introduced, connected, closed] = proposed;
       if (introduced !== undefined) {
         await ctx.db.patch("matches", introduced._id, {
           stage: "introduced",
           stageChangedAt: now,
-          // One yes and one answer still missing: the sub-state neither of the
-          // columns either side of it can show.
-          candidateAResponse: "yes",
-          candidateBResponse: "pending",
+          seenAt: now,
           updatedAt: now,
         });
       }
-      if (turnedDown !== undefined) {
-        await ctx.db.patch("matches", turnedDown._id, {
-          stage: "rejected",
+      if (connected !== undefined) {
+        await ctx.db.patch("matches", connected._id, {
+          stage: "connected",
           stageChangedAt: now,
-          rejectedBy: "candidateB",
-          rejectionReason: "Not ready to meet anyone until the spring.",
+          seenAt: now,
+          updatedAt: now,
+        });
+      }
+      if (closed !== undefined) {
+        await ctx.db.patch("matches", closed._id, {
+          stage: "closed",
+          stageChangedAt: now,
+          closedAs: "didnt_work",
+          closedBy: "candidateB",
+          closingNote: "Not ready to meet anyone until the spring.",
+          seenAt: now,
           updatedAt: now,
         });
       }
