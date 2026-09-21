@@ -122,6 +122,27 @@ test("a note is added, edited and removed", async ({ page }) => {
   await expect(page.getByText("No notes yet.")).toBeVisible();
 });
 
+test("a note under a name of the matchmaker's own", async ({ page }) => {
+  const panel = await openProfile(page, "notes");
+
+  // They type a name, not a key. The field shows back what it will actually
+  // store, so nobody finds out at the row what their note got called.
+  await panel.addCustomNote("Favourite Films", "Anything by Wong Kar-wai.");
+  await expect(panel.getNote("favourite_films")).toContainText(
+    "Anything by Wong Kar-wai.",
+  );
+  await expect(panel.getNote("favourite_films")).toContainText(
+    "Favourite films",
+  );
+
+  await panel.openAddNote();
+  await page.getByTestId("profile-add-note-key").selectOption("__custom");
+  const key = panel.getCustomNoteKey();
+  await key.fill("What went wrong?");
+  await key.blur();
+  await expect(key).toHaveValue("what_went_wrong");
+});
+
 test("an empty note is refused", async ({ page }) => {
   const panel = await openProfile(page, "notes");
   await panel.openAddNote();

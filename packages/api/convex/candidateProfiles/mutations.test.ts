@@ -153,8 +153,8 @@ describe("the matchmaker's own edits", () => {
         matchmakerId: w.matchmakerId,
         candidateId: w.candidateId,
         kind: "facts",
-        key: "age",
-        value: "34",
+        key: "heightCm",
+        value: "180",
       }),
     ).rejects.toThrow("Matchmaker profile not found.");
   });
@@ -262,7 +262,7 @@ describe("the agent's write path", () => {
         candidateId: w.candidateId,
         ...AGENT,
         entries: [
-          { kind: "facts", key: "age", value: "thirty-four" },
+          { kind: "facts", key: "heightCm", value: "very tall" },
           { kind: "facts", key: "notAField", value: "x" },
           { kind: "facts", key: "smoking", value: "never" },
         ],

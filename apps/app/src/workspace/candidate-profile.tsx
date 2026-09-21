@@ -15,6 +15,7 @@ import {
   PROFILE_LIMITS,
   PROFILE_SOURCE_LABELS,
   type ProfileValueSource,
+  slugifyNoteKey,
   valueError,
 } from "@repo/api";
 import {
@@ -662,7 +663,10 @@ function AddNote({
   const suggested = CANDIDATE_PROFILE_NOTES.filter(
     (note) => !filled.includes(note.key),
   );
-  const key = choice === CUSTOM_NOTE ? customKey : choice;
+  // A matchmaker types a name, not a key — "Ideal weekend" — so the key is
+  // whatever `slugifyNoteKey` makes of it. The field shows the slug back on
+  // blur, and this covers the path where they never blur it and press Add.
+  const key = choice === CUSTOM_NOTE ? slugifyNoteKey(customKey) : choice;
 
   function reset() {
     setChoice("");
@@ -734,10 +738,14 @@ function AddNote({
         {choice === CUSTOM_NOTE && (
           <Input
             aria-label="Note name"
-            placeholder="idealWeekend"
+            placeholder="ideal_weekend"
             maxLength={PROFILE_LIMITS.noteKey}
             value={customKey}
+            data-testid="profile-add-note-custom-key"
             onChange={(event) => setCustomKey(event.target.value)}
+            // Not on every keystroke: rewriting what someone is halfway
+            // through typing moves the caret out from under them.
+            onBlur={() => setCustomKey(slugifyNoteKey(customKey))}
           />
         )}
         {choice && (

@@ -7,7 +7,9 @@ import {
   normaliseValue,
   noteBodyError,
   noteKeyError,
+  PROFILE_LIMITS,
   type ProfileFieldDef,
+  slugifyNoteKey,
   valueError,
 } from "./rules";
 
@@ -137,11 +139,39 @@ describe("ageFromDateOfBirth", () => {
 });
 
 describe("note keys and bodies", () => {
-  test("a key is lower-camel letters and digits", () => {
-    expect(noteKeyError("ideal weekend")).toContain("letters and digits");
+  test("a key is letters, digits and underscores", () => {
     expect(noteKeyError("")).toBe("A note needs a name.");
+    expect(noteKeyError("ideal_weekend")).toBeNull();
+    // The camelCase keys the suggested list uses, and every key already
+    // stored, stay valid.
     expect(noteKeyError("idealWeekend")).toBeNull();
+    expect(noteKeyError("ideal weekend")).toContain("letters and digits");
     expect(normaliseNoteKey(" IdealWeekend ")).toBe("idealWeekend");
+  });
+
+  test("a name a person typed becomes a key", () => {
+    expect(slugifyNoteKey("Ideal Weekend")).toBe("ideal_weekend");
+    expect(slugifyNoteKey("  What went wrong?  ")).toBe("what_went_wrong");
+    expect(slugifyNoteKey("Books / films")).toBe("books_films");
+  });
+
+  test("the key it makes is one noteKeyError accepts", () => {
+    for (const typed of [
+      "Ideal Weekend",
+      "5-a-side football",
+      "___odd___",
+      "café & bar",
+      "x".repeat(PROFILE_LIMITS.noteKey + 20),
+    ]) {
+      const key = slugifyNoteKey(typed);
+      expect([typed, noteKeyError(key)]).toEqual([typed, null]);
+    }
+  });
+
+  test("a name with nothing usable in it is left for noteKeyError to refuse", () => {
+    expect(slugifyNoteKey("   ")).toBe("");
+    expect(slugifyNoteKey("!!!")).toBe("");
+    expect(noteKeyError(slugifyNoteKey("!!!"))).toBe("A note needs a name.");
   });
 
   test("a body is trimmed and non-empty", () => {

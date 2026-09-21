@@ -100,7 +100,7 @@ export type ProfileFieldDef = {
 export const PROFILE_LIMITS = {
   /** A free-text note's body. */
   noteBody: 5_000,
-  /** A note's key, e.g. "idealWeekend". */
+  /** A note's key, e.g. "ideal_weekend". */
   noteKey: 60,
   /** How many free-text notes one profile may carry. */
   notes: 60,
@@ -293,9 +293,16 @@ export function ageFromDateOfBirth(
  * ─── Free-text notes ────────────────────────────────────────────────────────
  */
 
-const NOTE_KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9]*$/;
+const NOTE_KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 
-/** Lower-camel, letters and digits. Keeps keys readable and comparable. */
+/**
+ * Letters, digits and underscores, starting with a letter.
+ *
+ * Underscores because a matchmaker types a name — "Ideal weekend" — and
+ * `slugifyNoteKey` turns it into one (`ideal_weekend`) before it is ever
+ * validated. The camelCase keys the suggested list uses, and every key already
+ * stored, stay valid: `humaniseKey` reads both back the same way.
+ */
 export function noteKeyError(raw: string): string | null {
   const key = raw.trim();
   if (!key) return "A note needs a name.";
@@ -303,9 +310,32 @@ export function noteKeyError(raw: string): string | null {
     return `A name is at most ${PROFILE_LIMITS.noteKey} characters.`;
   }
   if (!NOTE_KEY_PATTERN.test(key)) {
-    return "A name is letters and digits, starting with a letter — like idealWeekend.";
+    return "A name is letters and digits — like ideal_weekend.";
   }
   return null;
+}
+
+/**
+ * A name a person typed, as a key: `"Ideal Weekend"` → `"ideal_weekend"`.
+ *
+ * Anything that isn't a letter or a digit becomes a single underscore, and a
+ * leading digit picks up a `n` so the result still starts with a letter. A
+ * name with nothing usable in it at all returns empty, which `noteKeyError`
+ * then refuses with "A note needs a name."
+ *
+ * Applied where a person types a name, not inside `normaliseNoteKey` — that
+ * one is the last gate before the database and runs on the suggested keys too,
+ * which are camelCase and must stay that way to match `CANDIDATE_PROFILE_NOTES`.
+ */
+export function slugifyNoteKey(raw: string): string {
+  const slug = raw
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+  if (slug === "") return "";
+  const key = /^[0-9]/.test(slug) ? `n${slug}` : slug;
+  return key.slice(0, PROFILE_LIMITS.noteKey).replace(/_+$/, "");
 }
 
 export function normaliseNoteKey(raw: string): string {
@@ -324,7 +354,7 @@ export function noteBodyError(raw: string): string | null {
   return null;
 }
 
-/** "idealWeekend" → "Ideal weekend", for a key nobody has named. */
+/** "idealWeekend" or "ideal_weekend" → "Ideal weekend", for a key nobody named. */
 export function humaniseKey(key: string): string {
   const spaced = key
     .replace(/[_-]+/g, " ")

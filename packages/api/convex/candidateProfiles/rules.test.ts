@@ -187,21 +187,41 @@ describe("profileUpdateBrief", () => {
 
 describe("reconcileInstruction", () => {
   const noticed = [{ observation: "Wants kids", quote: "I'd love kids" }];
+  /** 2026-09-21, so the date the instruction states is a fixed one. */
+  const NOW = Date.parse("2026-09-21T12:00:00Z");
+
+  test("tells the model what day it is, so a relative date resolves", () => {
+    // "My birthday's tomorrow" is a birth date only if the model knows when
+    // today is. It goes in the per-turn instruction rather than the opening
+    // brief, because a profile thread is briefed once and then talked to for
+    // months.
+    expect(reconcileInstruction("Sam", noticed, NOW)).toContain(
+      "Monday, 2026-09-21",
+    );
+  });
+
+  test("sends a stated age to the notes, never back out as a birth date", () => {
+    const instruction = reconcileInstruction("Sam", noticed, NOW);
+    expect(instruction).toContain("notes.age");
+    expect(instruction).toContain("never work one back from an age");
+  });
 
   test("carries the candidate's own words through to the second agent", () => {
-    expect(reconcileInstruction("Sam", noticed)).toContain("I'd love kids");
+    expect(reconcileInstruction("Sam", noticed, NOW)).toContain(
+      "I'd love kids",
+    );
   });
 
   test("never asks the model whether to write or to propose", () => {
     // That is the field's policy, applied by applyAgentEntries. An agent that
     // could choose would make the policy advisory (prd/phase-2.md §4.1B).
-    const instruction = reconcileInstruction("Sam", noticed).toLowerCase();
+    const instruction = reconcileInstruction("Sam", noticed, NOW).toLowerCase();
     expect(instruction).not.toContain("suggest");
     expect(instruction).not.toContain("propose");
   });
 
   test("gives it a way to say nothing belongs here", () => {
-    expect(reconcileInstruction("Sam", noticed)).toContain("NOTHING");
+    expect(reconcileInstruction("Sam", noticed, NOW)).toContain("NOTHING");
   });
 });
 

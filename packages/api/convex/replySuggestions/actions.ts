@@ -84,7 +84,9 @@ export const draft = internalAction({
         return null;
       }
     }
-    parts.push(draftInstruction(context.count, brief.candidateName));
+    parts.push(
+      draftInstruction(context.count, brief.candidateName, Date.now()),
+    );
 
     const agent = new Agent(components.agent, {
       name: "conversation",

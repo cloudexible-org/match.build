@@ -45,7 +45,13 @@ export type DevSuggestion = {
 
 /** The matchmaker's record of a candidate (prd/phase-2.md §3). */
 export type DevProfile = {
-  /** Keyed by the registry; values have to pass its validation. */
+  /**
+   * Keyed by the registry; values have to pass its validation.
+   *
+   * A `dateOfBirth` here is a fixed date, so the age the app reads off it goes
+   * up by one on that date every year. That is the point of storing the date
+   * rather than the age, and it is why this seed no longer carries an `age`.
+   */
   facts?: Record<string, string>;
   /** Keyed by anything; the known keys are `CANDIDATE_PROFILE_NOTES`. */
   notes?: Record<string, string>;
@@ -258,7 +264,7 @@ export const DEV_MEMBERS: DevMember[] = [
         lookingFor: "unsure",
         pets: "A cat, Miso",
         wantsKids: "maybe",
-        age: "34",
+        dateOfBirth: "1992-03-14",
         gender: "man",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -318,7 +324,7 @@ export const DEV_MEMBERS: DevMember[] = [
     profile: {
       facts: {
         wantsKids: "yes",
-        age: "31",
+        dateOfBirth: "1995-01-09",
         gender: "woman",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -351,7 +357,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "38",
+        dateOfBirth: "1988-07-22",
         gender: "man",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -378,7 +384,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "33",
+        dateOfBirth: "1993-05-02",
         gender: "woman",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -405,7 +411,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "36",
+        dateOfBirth: "1990-02-18",
         gender: "man",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -432,7 +438,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "29",
+        dateOfBirth: "1997-08-11",
         gender: "woman",
         locationCity: "Montreal",
         locationCountry: "Canada",
@@ -458,7 +464,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "44",
+        dateOfBirth: "1982-04-27",
         gender: "man",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -482,7 +488,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "27",
+        dateOfBirth: "1999-06-05",
         gender: "woman",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -509,7 +515,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "35",
+        dateOfBirth: "1991-03-30",
         gender: "woman",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -536,7 +542,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "30",
+        dateOfBirth: "1996-09-01",
         gender: "woman",
         locationCity: "Montreal",
         locationCountry: "Canada",
@@ -563,7 +569,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "38",
+        dateOfBirth: "1988-01-24",
         gender: "woman",
         locationCity: "Vancouver",
         locationCountry: "Canada",
@@ -593,7 +599,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "32",
+        dateOfBirth: "1994-07-08",
         gender: "man",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -619,7 +625,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "37",
+        dateOfBirth: "1989-05-16",
         gender: "man",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -649,7 +655,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "29",
+        dateOfBirth: "1997-02-03",
         gender: "man",
         locationCity: "Toronto",
         locationCountry: "Canada",
@@ -674,7 +680,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "41",
+        dateOfBirth: "1985-08-19",
         gender: "man",
         locationCity: "Vancouver",
         locationCountry: "Canada",
@@ -703,7 +709,7 @@ export const DEV_MEMBERS: DevMember[] = [
     messages: [],
     profile: {
       facts: {
-        age: "36",
+        dateOfBirth: "1990-06-21",
         gender: "man",
         locationCity: "Toronto",
         locationCountry: "Canada",

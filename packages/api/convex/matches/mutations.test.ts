@@ -14,9 +14,21 @@ const modules = import.meta.glob([
   "!/convex/**/*.d.ts",
 ]);
 
+/**
+ * A birth date that reads as `age` today.
+ *
+ * These tests run against the real clock, and an age is now read off a birth
+ * date — so a hard-coded one would drift a year at a time until a fixture fell
+ * outside the age range a test depends on. Born on the 1st of January, so the
+ * birthday has always already passed whenever the suite runs.
+ */
+function bornAged(age: number): string {
+  return `${new Date().getUTCFullYear() - age}-01-01`;
+}
+
 /** The pair from rules.test.ts: they match, and comfortably. */
 const SAM: ProfileFacts = {
-  age: "34",
+  dateOfBirth: bornAged(34),
   gender: "man",
   locationCity: "Toronto",
   locationCountry: "Canada",
@@ -37,7 +49,7 @@ const SAM: ProfileFacts = {
 
 const JORDAN: ProfileFacts = {
   ...SAM,
-  age: "31",
+  dateOfBirth: bornAged(31),
   gender: "woman",
   exercise: "sometimes",
   education: "undergraduate",
@@ -48,7 +60,7 @@ const JORDAN: ProfileFacts = {
 /** Someone no straight man in the book is looking for: blocked, not low-scored. */
 const ALEX: ProfileFacts = {
   ...SAM,
-  age: "36",
+  dateOfBirth: bornAged(36),
   gender: "man",
   seekingGender: "men",
 };

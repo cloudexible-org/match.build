@@ -22,6 +22,8 @@
  * reader can see exactly what leaves this deployment.
  */
 
+import { todayLine } from "../ai/rules";
+
 /** Where a value on the profile came from, as the registry records it. */
 export type EntrySource = "matchmaker" | "agent" | "agent_approved";
 
@@ -206,8 +208,14 @@ export function voiceUpdate(
  * read, and every wrapper the model has to close correctly is another way for
  * a perfectly good draft to arrive unusable.
  */
-export function draftInstruction(count: number, candidateName: string): string {
+export function draftInstruction(
+  count: number,
+  candidateName: string,
+  now: number,
+): string {
   return [
+    todayLine(now),
+    "",
     "Do two things, and label them with the headings below exactly as written.",
     "",
     "REPLIES",

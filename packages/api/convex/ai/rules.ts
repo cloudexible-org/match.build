@@ -116,3 +116,30 @@ export const OFF_REASON_TEXT: Record<AgentOffReason, string> = {
   no_model: "No model, so there is nothing to call.",
   no_instruction: "No standing instruction, so there is nothing to tell it.",
 };
+
+/*
+ * ─── What day it is ─────────────────────────────────────────────────────────
+ *
+ * A model knows a great deal and does not know today's date. Without it,
+ * "my birthday is tomorrow" is unresolvable and "I'm 34" is undated, so every
+ * relative thing a candidate says either gets dropped or gets guessed at.
+ *
+ * It goes in the **per-turn instruction**, never in an agent's opening brief.
+ * A thread outlives the day it was opened — the profile agent is briefed once
+ * per conversation and then talked to for months — so a date stated in the
+ * brief is a date that quietly goes wrong, and one stated in the brief *and*
+ * restated later is two answers to the same question.
+ *
+ * UTC, because that is what this deployment's clock is. A matchmaker in
+ * Auckland or Los Angeles is within a day of it, which is why the line says
+ * so rather than implying a precision it doesn't have.
+ */
+export function todayLine(now: number): string {
+  const today = new Date(now);
+  const iso = today.toISOString().slice(0, 10);
+  const weekday = today.toLocaleDateString("en-GB", {
+    timeZone: "UTC",
+    weekday: "long",
+  });
+  return `TODAY IS ${weekday}, ${iso} (UTC — the person you are reading may be a few hours either side of it). Anything said as "tomorrow", "last month" or "next year" is relative to this.`;
+}

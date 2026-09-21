@@ -233,17 +233,18 @@ function readable(key: string, value: string): string {
 }
 
 /**
- * Their age: from a birth date where there is one, otherwise from the `age`
- * fact. The registry says the birth date wins, and this is where it does.
+ * Their age, read off their birth date and nowhere else.
+ *
+ * There used to be an `age` fact to fall back on, and it was the wrong shape
+ * for a record that outlives the conversation it came from: "34" is true for
+ * one year and nothing stored beside it knows which one. So an age a candidate
+ * mentions is now prose in `notes.age`, and a pair with no birth date between
+ * them simply scores nothing on this signal rather than scoring on a number
+ * that quietly aged (`candidateProfiles/rules.ts`).
  */
 export function ageOf(facts: ProfileFacts, now: number): number | null {
   const born = fact(facts, "dateOfBirth");
-  if (born !== null) {
-    const age = ageFromDateOfBirth(born, now);
-    if (age !== null) return age;
-  }
-  const stated = fact(facts, "age");
-  return stated === null ? null : Number(stated);
+  return born === null ? null : ageFromDateOfBirth(born, now);
 }
 
 /** `"28-36"` → `[28, 36]`. */
