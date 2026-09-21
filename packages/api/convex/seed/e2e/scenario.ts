@@ -130,6 +130,11 @@ export type ScenarioProfile = {
     current?: string;
     /** The agent proposing the entry go, rather than a new value. */
     remove?: boolean;
+    /**
+     * The candidate's own words behind it, quoted under the proposal so a
+     * matchmaker can check it rather than take it on trust.
+     */
+    quote?: string;
   }[];
 };
 

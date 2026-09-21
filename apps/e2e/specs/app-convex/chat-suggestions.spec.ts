@@ -30,7 +30,12 @@ test.beforeAll(async () => {
     facts: { wantsKids: "no", pets: "A cat" },
     suggestions: [
       { kind: "facts" as const, key: "wantsKids", value: "yes" },
-      { kind: "facts" as const, key: "orientation", value: "bisexual" },
+      {
+        kind: "facts" as const,
+        key: "orientation",
+        value: "bisexual",
+        quote: "I've dated men and women.",
+      },
       // The agent has heard the cat is gone.
       { kind: "facts" as const, key: "pets", value: "", remove: true },
     ],
@@ -128,6 +133,11 @@ test("one row per kind, above the composer, newest card showing", async ({
   );
   await expect(suggestions.getCard("candidateProfile")).toContainText(
     "bisexual",
+  );
+  // The candidate's own words, verbatim, so it can be checked rather than
+  // taken on trust.
+  await expect(suggestions.getCard("candidateProfile")).toContainText(
+    "I've dated men and women.",
   );
 
   // One proposal about the matchmaker, so no counter and no arrows.

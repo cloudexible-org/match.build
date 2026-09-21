@@ -67,6 +67,87 @@ describe("seed.dev.mutations.apply", () => {
     expect(thread?.lastPublicSeq).toBe(2);
   });
 
+  test("seeds the profiles and the proposals waiting on them", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.dev.mutations.apply, {});
+
+    const state = await t.run(async (ctx) => ({
+      profiles: await ctx.db.query("candidateProfiles").collect(),
+      mine: await ctx.db.query("matchmakerProfiles").collect(),
+    }));
+
+    const withProfile = DEV_MEMBERS.filter((m) => m.profile !== undefined);
+    expect(state.profiles).toHaveLength(withProfile.length);
+
+    // Every seeded suggestion is an open `pending` on its entry — the state an
+    // agent produces, and the reason the cards above the composer have
+    // anything to show in dev.
+    const open = state.profiles.flatMap((profile) =>
+      [...Object.values(profile.facts), ...Object.values(profile.notes)].filter(
+        (entry) => entry.pending !== undefined,
+      ),
+    );
+    expect(open).toHaveLength(
+      withProfile.flatMap((m) => m.profile?.suggestions ?? []).length,
+    );
+
+    // A proposal sits beside the value, never instead of it.
+    const replacing = state.profiles
+      .flatMap((p) => Object.entries(p.facts))
+      .find(([key]) => key === "lookingFor");
+    expect(replacing?.[1].value).toBe("unsure");
+    expect(replacing?.[1].pending?.value).toBe("long-term");
+    // And it carries the candidate's own words, so a card can quote them.
+    expect(replacing?.[1].pending?.sourceQuote).toBeDefined();
+
+    // A proposal can be that the entry go, and "" could not have said so.
+    const removal = state.profiles
+      .flatMap((p) => Object.entries(p.facts))
+      .find(([key]) => key === "pets");
+    expect(removal?.[1].pending?.action).toBe("clear");
+    expect(removal?.[1].value).toBe("A cat, Miso");
+
+    // The matchmaker's own voice, with the agent's draft waiting on it.
+    expect(state.mine).toHaveLength(1);
+    expect(state.mine[0].voice?.value).toBe(DEV_MATCHMAKER.voice);
+    expect(state.mine[0].voice?.pending?.value).toBe(
+      DEV_MATCHMAKER.voiceSuggestion,
+    );
+  });
+
+  test("gives a profile to a candidate seeded before profiles existed", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.dev.mutations.apply, {});
+
+    // The state a dev database seeded by the older version of this file is in:
+    // the people and their threads, and no profiles at all.
+    await t.run(async (ctx) => {
+      for (const profile of await ctx.db.query("candidateProfiles").collect()) {
+        await ctx.db.delete("candidateProfiles", profile._id);
+      }
+      for (const mine of await ctx.db.query("matchmakerProfiles").collect()) {
+        await ctx.db.delete("matchmakerProfiles", mine._id);
+      }
+    });
+
+    const again = await t.mutation(internal.seed.dev.mutations.apply, {});
+    // Only the profiles come back — nobody is seeded twice.
+    expect(again.created.every((line) => !line.startsWith("member "))).toBe(
+      true,
+    );
+
+    const after = await t.run(async (ctx) => ({
+      profiles: (await ctx.db.query("candidateProfiles").collect()).length,
+      mine: (await ctx.db.query("matchmakerProfiles").collect()).length,
+      candidates: (await ctx.db.query("candidates").collect()).length,
+    }));
+    expect(after.profiles).toBe(
+      DEV_MEMBERS.filter((m) => m.profile !== undefined).length,
+    );
+    expect(after.mine).toBe(1);
+    expect(after.candidates).toBe(DEV_MEMBERS.length + 1);
+  });
+
   test("is a no-op the second time", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.seed.dev.mutations.apply, {});

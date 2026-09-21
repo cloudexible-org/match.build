@@ -72,6 +72,8 @@ const scenarioProfile = v.object({
         current: v.optional(v.string()),
         /** The agent proposing the entry go, rather than a new value. */
         remove: v.optional(v.boolean()),
+        /** The candidate's own words behind it, quoted under the proposal. */
+        quote: v.optional(v.string()),
       }),
     ),
   ),
@@ -86,6 +88,7 @@ type ScenarioProfileSpec = {
     value: string;
     current?: string;
     remove?: boolean;
+    quote?: string;
   }[];
 };
 
@@ -126,6 +129,7 @@ function profileEntries(
         value: suggestion.remove === true ? "" : suggestion.value,
         suggestedAt: now,
         model: "seed/model",
+        sourceQuote: suggestion.quote,
       },
     };
   }
