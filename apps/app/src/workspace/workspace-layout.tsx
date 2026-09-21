@@ -75,7 +75,11 @@ export function WorkspaceLayout() {
         name={me.name ?? ""}
         nav={
           <nav className="flex min-w-0 items-center gap-1 text-sm">
-            <span aria-hidden className="text-muted-foreground">
+            {/* Separates the workspace from the brand, so it goes with it. */}
+            <span
+              aria-hidden
+              className="hidden text-muted-foreground sm:inline"
+            >
               /
             </span>
             <Link
@@ -84,6 +88,13 @@ export function WorkspaceLayout() {
               data-testid="workspace-name"
             >
               {workspace.displayName}
+            </Link>
+            <Link
+              to={`${base}/matches`}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+              data-testid="workspace-matches"
+            >
+              Matches
             </Link>
             <Link
               to={`${base}/settings`}

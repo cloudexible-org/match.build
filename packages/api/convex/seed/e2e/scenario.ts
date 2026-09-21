@@ -145,12 +145,56 @@ export type ScenarioProfile = {
   }[];
 };
 
+/**
+ * A card on the match board (prd/phase-3.md §2), written straight into the
+ * stage it should be in. The nightly run can only ever produce `suggested`, so
+ * a spec that wants to assert on a card halfway along the board has no way to
+ * get there except through the UI it is testing.
+ *
+ * `score` and `signals` are the run's arithmetic, seeded rather than computed:
+ * a spec asserting "82" against a card should fail when the *board* stops
+ * showing scores, not when the weights in `matches/rules.ts` are retuned.
+ */
+export type ScenarioMatch = {
+  key: string;
+  matchmakerKey: string;
+  /** Candidate keys. Stored in the table's own order, whichever way round. */
+  aKey: string;
+  bKey: string;
+  /** Default: "suggested". */
+  stage?: ScenarioMatchStage;
+  /** Default: "algorithm". */
+  origin?: "algorithm" | "manual";
+  score?: number;
+  coverage?: number;
+  signals?: { key: string; weight: number; earned: number; detail: string }[];
+  checkDealbreakers?: boolean;
+  candidateAResponse?: ScenarioMatchResponse;
+  candidateBResponse?: ScenarioMatchResponse;
+  rejectedBy?: "matchmaker" | "candidateA" | "candidateB" | "system";
+  rejectionReason?: string;
+  outcome?: string;
+  /** How many days ago the card last moved. Default: 0. */
+  stageChangedDaysAgo?: number;
+};
+
+export type ScenarioMatchStage =
+  | "suggested"
+  | "reviewing"
+  | "introduced"
+  | "mutual_interest"
+  | "connected"
+  | "rejected";
+
+export type ScenarioMatchResponse = "pending" | "yes" | "no";
+
 export type ScenarioSpec = {
   /** 4–12 lowercase letters and digits, starting with a letter. */
   ns: string;
   users?: ScenarioUser[];
   matchmakers?: ScenarioMatchmaker[];
   candidates?: ScenarioCandidate[];
+  matches?: ScenarioMatch[];
 };
 
 export type ScenarioManifest = {
@@ -170,6 +214,7 @@ export type ScenarioManifest = {
       inviteToken: string | null;
     }
   >;
+  matches: Record<string, { id: string }>;
 };
 
 /** Namespaces are part of emails and usernames, so keep them URL- and rule-safe. */

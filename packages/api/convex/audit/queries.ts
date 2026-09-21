@@ -68,11 +68,13 @@ export const candidateHistory = query({
   args: {
     matchmakerId: v.id("matchmakers"),
     candidateId: v.id("candidates"),
+    // One literal per key in AUDIT_FILTERS (`audit/rules.ts`).
     filter: v.union(
       v.literal("all"),
       v.literal("details"),
       v.literal("membership"),
       v.literal("profile"),
+      v.literal("matches"),
     ),
     paginationOpts: paginationOptsValidator,
   },
