@@ -1,10 +1,6 @@
 import { Button } from "@repo/ui";
 import { type KeyboardEvent, type ReactNode, useState } from "react";
-import {
-  CarouselArrow,
-  CarouselCounter,
-  CarouselGutter,
-} from "../components/carousel";
+import { CarouselArrow, CarouselCounter } from "../components/carousel";
 import { currentIndex, idAfterDismiss, stepId } from "../lib/carousel";
 import { serverErrorMessage } from "../lib/server-error";
 import {
@@ -19,10 +15,11 @@ import {
  * (prd/phase-2.md §5).
  *
  * One row per kind and one card per row (`suggestions.ts`), each row a
- * carousel: arrows either side, a counter, and the newest showing until the
- * matchmaker arrows away from it. Nothing here is on the record — the dashed
- * border and the tinted ground are the same treatment the candidate panel
- * gives a proposal, and deliberately unlike both a saved value and a message.
+ * carousel: the card runs the full width of the stack and its header carries
+ * the furniture — `‹ 1/2 ›` — with the newest showing until the matchmaker
+ * arrows away from it. Nothing here is on the record: the dashed border and
+ * the tinted ground are the same treatment the candidate panel gives a
+ * proposal, and deliberately unlike both a saved value and a message.
  *
  * Presentation only. What a card says and what answering it does are passed
  * in, so the row that will hold a drafted reply needs no change here.
@@ -59,9 +56,6 @@ export function SuggestionStack({
 }) {
   const rows = rowsByKind(suggestions);
   if (rows.length === 0) return null;
-  // Once any row has arrows, every row leaves room for a pair, so the cards
-  // line up as one stack rather than stepping in and out by 36px each.
-  const gutters = rows.some((row) => row.items.length > 1);
   return (
     // `shrink-0`: the thread above scrolls inside itself, and the stack keeps
     // its height rather than being squeezed as the conversation grows.
@@ -70,12 +64,7 @@ export function SuggestionStack({
       data-testid="suggestion-stack"
     >
       {rows.map((row) => (
-        <Row
-          key={row.kind}
-          kind={row.kind}
-          items={row.items}
-          gutters={gutters}
-        />
+        <Row key={row.kind} kind={row.kind} items={row.items} />
       ))}
     </div>
   );
@@ -85,12 +74,9 @@ export function SuggestionStack({
 function Row({
   kind,
   items,
-  /** Leave room for a pair of arrows even where this row has none. */
-  gutters,
 }: {
   kind: SuggestionKind;
   items: SuggestionCard[];
-  gutters: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -140,37 +126,47 @@ function Row({
     // `min-width: min-content` would otherwise refuse to shrink on a phone.
     <fieldset
       aria-label={SUGGESTION_KIND_LABELS[kind]}
-      className="flex min-w-0 items-center gap-1"
+      className="flex min-w-0 flex-col"
       data-testid="suggestion-row"
       data-kind={kind}
       onKeyDown={handleKeyDown}
     >
-      {many ? (
-        <CarouselArrow
-          direction="previous"
-          label="Newer suggestion"
-          disabled={newerId === null}
-          onClick={() => setSelectedId(newerId)}
-        />
-      ) : (
-        gutters && <CarouselGutter />
-      )}
       <div
         // Nothing here is on the record until somebody says so, so it looks
         // like neither a message nor a saved value.
-        className="flex min-w-0 flex-1 flex-col gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/5 p-3"
+        className="flex min-w-0 flex-col gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/5 p-3"
         data-testid="suggestion-card"
         data-kind={kind}
         data-suggestion-id={card.id}
       >
-        <div className="flex items-start gap-2">
+        <div className="flex items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-xs font-medium text-muted-foreground">
             {SUGGESTION_KIND_LABELS[kind]}
             {card.subject !== undefined && (
               <span className="font-normal"> · {card.subject}</span>
             )}
           </span>
-          {many && <CarouselCounter index={index} count={items.length} />}
+          {/* The whole control in one place: `‹ 1/2 ›`. `-my-1` so a pair of
+              arrows doesn't push the header taller than its own text. */}
+          {many && (
+            <div className="-my-1 flex shrink-0 items-center gap-0.5">
+              <CarouselArrow
+                direction="previous"
+                label="Newer suggestion"
+                className="size-6"
+                disabled={newerId === null}
+                onClick={() => setSelectedId(newerId)}
+              />
+              <CarouselCounter index={index} count={items.length} />
+              <CarouselArrow
+                direction="next"
+                label="Older suggestion"
+                className="size-6"
+                disabled={olderId === null}
+                onClick={() => setSelectedId(olderId)}
+              />
+            </div>
+          )}
         </div>
         {/* Capped rather than clipped: a drafted voice runs to a paragraph,
             and a card that hid the end of it would send someone hunting. */}
@@ -220,16 +216,6 @@ function Row({
           </p>
         )}
       </div>
-      {many ? (
-        <CarouselArrow
-          direction="next"
-          label="Older suggestion"
-          disabled={olderId === null}
-          onClick={() => setSelectedId(olderId)}
-        />
-      ) : (
-        gutters && <CarouselGutter />
-      )}
     </fieldset>
   );
 }
