@@ -115,6 +115,44 @@ describe("seed.dev.mutations.apply", () => {
     );
   });
 
+  test("fills the match board, in every state a card can be in", async () => {
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.seed.dev.mutations.apply, {});
+    const cards = await t.run((ctx) => ctx.db.query("matches").collect());
+
+    const at = (stage: string) => cards.filter((c) => c.stage === stage);
+    // A board, not a single column: something to work on in each of the three,
+    // and enough in Proposed to have to choose.
+    expect(at("proposed").length).toBeGreaterThanOrEqual(5);
+    expect(at("introduced")).toHaveLength(2);
+    expect(at("connected")).toHaveLength(1);
+    expect(at("closed")).toHaveLength(3);
+
+    // Both endings, and all three ways a closing can be attributed.
+    const closed = at("closed");
+    expect(closed.filter((c) => c.closedAs === "together")).toHaveLength(1);
+    expect(new Set(closed.map((c) => c.closedBy))).toEqual(
+      new Set([undefined, "candidateB", "both"]),
+    );
+
+    // One made by hand, scored by the same algorithm as the rest, and
+    // carrying the flag for a dealbreaker no algorithm reads.
+    const byHand = cards.filter((c) => c.origin === "manual");
+    expect(byHand).toHaveLength(1);
+    expect(byHand[0].checkDealbreakers).toBe(true);
+    expect(byHand[0].score).toBeGreaterThan(0);
+
+    // And both sides of "new": cards nobody has looked at, and one read.
+    const proposed = at("proposed");
+    expect(proposed.some((c) => c.seenAt === undefined)).toBe(true);
+    expect(proposed.some((c) => c.seenAt !== undefined)).toBe(true);
+
+    // Every card explains itself, which is the whole point of the algorithm.
+    for (const card of cards) {
+      expect(card.signals?.length ?? 0).toBeGreaterThan(3);
+    }
+  });
+
   test("gives a profile to a candidate seeded before profiles existed", async () => {
     const t = convexTest(schema, modules);
     await t.mutation(internal.seed.dev.mutations.apply, {});
