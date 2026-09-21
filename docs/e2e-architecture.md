@@ -1,7 +1,21 @@
 # E2E Test Architecture
 
-How the Playwright suite in `apps/e2e` is meant to work, what is actually true
-today, and the failure modes worth knowing before writing a spec.
+How the Playwright suite in `tooling/e2e` is meant to work, what is actually
+true today, and the failure modes worth knowing before writing a spec.
+
+The suite is one of three packages under `tooling/`, which between them own
+everything that drives a browser:
+
+| Package | What it is |
+|---|---|
+| [`@repo/harness`](../tooling/harness) | The world: the base Playwright config, the local Convex backend, port allocation, the seed, sign-in, and **every page object**. Registers no tests of its own. |
+| [`e2e`](../tooling/e2e) | The suite. `specs/` and a config that spreads the base and names the projects. |
+| [`marketing`](../tooling/marketing) | Demo clips for the pitch deck, built from the same world and the same page objects. Run on demand, never in CI. See [`demo-videos.md`](demo-videos.md). |
+
+The split exists so the captures cannot be run by accident. A `testDir`
+pointing elsewhere would not be enough — someone eventually runs `playwright
+test` from the repo root — but a package boundary is, and it also stops a
+capture's assert-nothing style from being mistaken for a test.
 
 Adapted from an external playbook written for a Next.js + Clerk + multi-tenant
 app. The parts that assumed that stack have been dropped — see
@@ -14,7 +28,7 @@ what would bring it back.
 
 | | |
 |---|---|
-| Runner | Playwright (`apps/e2e`, package name `e2e`) |
+| Runner | Playwright (`tooling/e2e`, package name `e2e`) |
 | Project `app` | `apps/app` — Vite + React — on a free port |
 | Project `admin` | `apps/admin` — Vite + React, the platform admin app — on a free port |
 | Project `www` | `apps/www` — Next.js — on a free port, `distDir` `.next-e2e` |
@@ -22,8 +36,8 @@ what would bring it back.
 | Project `admin-convex` | `apps/admin` against the same backend (it also drives `apps/app` in a second context, see below) |
 | Backend | Convex (`packages/api/convex`), local deployment only |
 | Auth | Convex Auth, email + one-time code. Keys set per run, codes read from `emailOutbox` (§1d) |
-| Page objects | `apps/e2e/page-objects/<app>/` |
-| Specs | `apps/e2e/specs/<app>/` |
+| Page objects | `tooling/harness/page-objects/<app>/` |
+| Specs | `tooling/e2e/specs/<app>/` |
 
 Each project pins its own `baseURL` and has its own `webServer` entry, rather
 than sharing a single top-level one. That is deliberate: a shared `baseURL` is
@@ -496,7 +510,7 @@ surfaces somewhere unrelated.
 
 ### Scenarios — one world per spec file
 
-Everything else comes from `seedScenario()` (`apps/e2e/scenario.ts`), called
+Everything else comes from `seedScenario()` (`tooling/harness/scenario.ts`), called
 once in a file's `beforeAll`. It asks the backend
 (`seed/e2e/mutations:scenario`) for accounts, profiles, candidates, threads
 and invites under a **namespace unique to that file and run**, and hands back
@@ -569,14 +583,14 @@ pauses, but time-travel over each step.
 
 ### Signing in
 
-`signInAs(page, email)` (`apps/e2e/session.ts`) runs the real Convex Auth
+`signInAs(page, email)` (`tooling/harness/session.ts`) runs the real Convex Auth
 email-code flow over HTTP and writes the session into `localStorage` once,
 before the page loads the app. It is about ten times faster than typing an
 email and a code, and there is no inbox polling to flake.
 
 Use the UI instead only where the sign-in screens are the subject
 (`specs/app-convex/sign-up.spec.ts`, `specs/admin-convex/`), through
-`signUp` / `signInToAdmin` in `apps/e2e/accounts.ts`.
+`signUp` / `signInToAdmin` in `tooling/harness/accounts.ts`.
 
 The session is written, not injected on every navigation, so **signing out
 really signs out** and a test can prove it.

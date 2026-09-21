@@ -10,7 +10,7 @@
  * signs every user out.
  *
  * The e2e suite does NOT use this — it sets fresh keys on its own local
- * backend every run (apps/e2e/auth-env.ts).
+ * backend every run (tooling/harness/auth-env.ts).
  */
 
 import { spawnSync } from "node:child_process";

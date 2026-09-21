@@ -1,0 +1,21 @@
+{
+  "name": "e2e",
+  "version": "4.5.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:observe": "E2E_SLOW_MO=${E2E_SLOW_MO:-500} playwright test --headed",
+    "test:report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@repo/config": "workspace:*",
+    "@repo/harness": "workspace:*",
+    "@types/node": "catalog:",
+    "convex": "catalog:",
+    "typescript": "catalog:"
+  }
+}

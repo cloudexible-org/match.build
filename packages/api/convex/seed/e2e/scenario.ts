@@ -1,6 +1,6 @@
 /**
  * Per-spec-file test data: the shape of a "scenario", written by
- * `./mutations.ts` and asked for by `apps/e2e/scenario.ts`.
+ * `./mutations.ts` and asked for by `tooling/harness/scenario.ts`.
  *
  * ─── Why scenarios exist ────────────────────────────────────────────────────
  *
@@ -15,7 +15,8 @@
  * who left last month, an invite that has expired, an invitation already
  * emailed three times today.
  *
- * Plain data with no Convex imports: `apps/e2e` imports these types directly.
+ * Plain data with no Convex imports: `tooling/harness` imports these types
+ * directly.
  */
 
 export type ScenarioMembership =

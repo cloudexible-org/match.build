@@ -59,6 +59,8 @@ These matchmakers today run on a stack of: a marketing website with a contact fo
 | `apps/www` | Next.js marketing site, static export. No auth; CTAs link to the app. | `www.match.build/` |
 | `packages/api` | Convex backend: schema, functions, agents, HTTP actions, static-hosting mounts. | `/api/…` |
 | `packages/ui` | Shared shadcn/ui + Base UI components (no Radix). | — |
-| `apps/e2e` | Playwright suites for both apps plus a seeded local Convex backend. | — |
+| `tooling/harness` | The world every browser run shares: local Convex backend, seed, sign-in, page objects. | — |
+| `tooling/e2e` | Playwright suites for all three apps. | — |
+| `tooling/marketing` | Demo clips of the app, for the pitch deck. | — |
 
 Convex handles the database, functions, scheduling and HTTP actions. Convex Auth handles sign-in. Resend (via the Convex Resend component) sends the transactional email. Backend code follows the domain layout in `CLAUDE.md`.

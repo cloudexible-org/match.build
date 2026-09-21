@@ -1,0 +1,17 @@
+{
+  "name": "marketing",
+  "version": "4.5.0",
+  "private": true,
+  "scripts": {
+    "capture:demo": "playwright test captures/demos",
+    "render:demo": "node scripts/render-demo.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@repo/config": "workspace:*",
+    "@repo/harness": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@repo/harness",
+  "version": "4.5.0",
+  "private": true,
+  "exports": {
+    "./playwright.config": "./playwright.config.ts",
+    "./page-objects": "./page-objects/index.ts",
+    "./page-objects/*": "./page-objects/*.ts",
+    "./*": "./*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "convex:local": "node scripts/convex-local.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@repo/config": "workspace:*",
+    "@types/node": "catalog:",
+    "convex": "catalog:",
+    "typescript": "catalog:"
+  }
+}

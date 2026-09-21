@@ -1,8 +1,9 @@
 /**
  * The world the e2e suite starts from.
  *
- * Deliberately plain data with no Convex imports, so `apps/e2e` can import this
- * file directly and assert against the same constants the seed writes.
+ * Deliberately plain data with no Convex imports, so `tooling/harness` can
+ * import this file directly and assert against the same constants the seed
+ * writes.
  *
  * ─── One seeded user per signing-in spec ────────────────────────────────────
  *
@@ -10,7 +11,7 @@
  * address, so two specs signing in as one seeded user in parallel would
  * invalidate each other's codes. Give every spec that signs in its own user.
  * Specs that sign *up* use a fresh address per run instead (see
- * `apps/e2e/specs/app-convex/`).
+ * `tooling/e2e/specs/app-convex/`).
  *
  * All addresses use the reserved `.test` TLD, so nothing can ever be mailed.
  */
@@ -64,7 +65,7 @@ export const SEED_USERS: SeedUser[] = [
 
 /**
  * Platform admins for `apps/admin` specs, one per signing-in spec. The e2e
- * harness lists them in `PLATFORM_ADMIN_EMAILS` (apps/e2e/auth-env.ts).
+ * harness lists them in `PLATFORM_ADMIN_EMAILS` (tooling/harness/auth-env.ts).
  */
 export const SEED_ADMINS: SeedUser[] = [
   {
