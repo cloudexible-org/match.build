@@ -56,10 +56,15 @@ test.beforeAll(async () => {
         membership: "joined",
         name: "Jane Member",
         messages: LONG_THREAD,
-        notes: Array.from(
-          { length: 20 },
-          (_, index) => `Note ${index + 1}: something worth remembering.`,
-        ),
+        // Enough of a profile that the panel has its own reason to scroll.
+        profile: {
+          notes: Object.fromEntries(
+            Array.from({ length: 20 }, (_, index) => [
+              `note${index + 1}`,
+              `Note ${index + 1}: something worth remembering.`,
+            ]),
+          ),
+        },
       },
       // The rest of the book, so the candidate list overflows its column.
       ...Array.from({ length: 30 }, (_, index) => ({
@@ -127,9 +132,9 @@ test("the workspace's three columns scroll one at a time, and the composer stays
   const conversation = new ConversationPage(page);
   const panel = new CandidatePanelPage(page);
   await expect(conversation.getCandidateName()).toHaveText("Jane Member");
-  // Notes rather than Details: 20 of them is the panel's own reason to scroll.
-  await panel.openSection("Notes");
-  await expect(page.getByTestId("candidate-note").first()).toBeVisible();
+  // Profile rather than Details: 20 notes is the panel's own reason to scroll.
+  await panel.openSection("Profile");
+  await expect(panel.getNotes().first()).toBeVisible();
 
   const list = workspace.getCandidatesScroll();
   const thread = conversation.getThread();
