@@ -8,8 +8,8 @@
   "scripts": {
     "dev": "convex dev",
     "ship": "convex deploy && pnpm run ship:www && pnpm run ship:app && pnpm run ship:admin",
-    "ship:www": "static-hosting upload --prod --component www --dist ../../apps/www/out --no-spa --build-command 'cd ../../apps/www && NEXT_PUBLIC_CONVEX_URL=$VITE_CONVEX_URL pnpm run build'",
-    "ship:app": "static-hosting upload --prod --component app --dist ../../apps/app/dist --build-command 'cd ../../apps/app && pnpm run build'",
+    "ship:www": "static-hosting upload --prod --component www --dist ../../apps/www/out --no-spa --build-command 'cd ../../apps/www && NEXT_PUBLIC_CONVEX_URL=$VITE_CONVEX_URL doppler run -p matchbuild -c prd --preserve-env=VITE_CONVEX_URL,NEXT_PUBLIC_CONVEX_URL -- pnpm run build'",
+    "ship:app": "static-hosting upload --prod --component app --dist ../../apps/app/dist --build-command 'cd ../../apps/app && doppler run -p matchbuild -c prd --preserve-env=VITE_CONVEX_URL,NEXT_PUBLIC_CONVEX_URL -- pnpm run build'",
     "ship:admin": "static-hosting upload --prod --component admin --dist ../../apps/admin/dist --build-command 'cd ../../apps/admin && pnpm run build'",
     "preview:www": "static-hosting upload --component www --dist ../../apps/www/out --no-spa --build-command 'cd ../../apps/www && NEXT_PUBLIC_CONVEX_URL=$VITE_CONVEX_URL pnpm run build'",
     "preview:app": "static-hosting upload --component app --dist ../../apps/app/dist --build-command 'cd ../../apps/app && pnpm run build'",

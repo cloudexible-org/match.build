@@ -144,6 +144,15 @@ The static-hosting CLI builds each app with the target deployment's
 app, a fixed Vite `base` of `/app/` (see `apps/app/vite.config.ts`). Uploads
 publish atomically, so a failed upload leaves the previous version live.
 
+The production builds of `www` and `app` run under Doppler's `prd` config
+(`doppler run -p matchbuild -c prd`), which is where the PostHog keys
+(`NEXT_PUBLIC_POSTHOG_*`, `VITE_POSTHOG_*`) live — so `pnpm ship` needs a
+logged-in Doppler CLI, the same one `pnpm dev` uses. The Convex URL is exempt
+(`--preserve-env`): the upload tool's value for the deployment it is uploading
+to always wins over the one in Doppler. `admin` is built without Doppler because
+it is deliberately uninstrumented, and `pnpm ship:preview` too, so smoke tests
+on the dev deployment never count as production traffic.
+
 ### Custom domain
 
 Production is served at **https://www.match.build**. DNS is on Cloudflare;
