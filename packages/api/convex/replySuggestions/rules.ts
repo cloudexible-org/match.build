@@ -50,6 +50,18 @@ export type Brief = {
   matchmakerName: string;
   /** The matchmaker's voice, or "" where they have not written one. */
   voice: string;
+  /**
+   * What this matchmaker's practice is, in their own words: who they work
+   * with, how they work, what they don't do. Only the filled ones, in the
+   * order the settings page shows them.
+   *
+   * **The agent has no other way to know any of it.** It is shown a
+   * conversation and a candidate; that a matchmaker serves one community, or
+   * never discusses money, or introduces people by email after a call, is
+   * nowhere in either — so a draft would either avoid the subject or make
+   * something up.
+   */
+  practice: { label: string; value: string }[];
   facts: BriefEntry[];
   notes: BriefEntry[];
   /**
@@ -213,6 +225,9 @@ export function openingBrief(brief: Brief): string {
       : `HOW ${brief.matchmakerName.toUpperCase()} WRITES\nThey have not described their voice yet. Match the way they write in the thread below.`,
   );
 
+  const practice = practiceSection(brief);
+  if (practice !== null) parts.push(practice);
+
   // Emitted even when empty, where the old brief dropped the heading
   // entirely. An agent shown no profile section has no way to tell a candidate
   // nobody has asked anything yet from a candidate there is nothing left to
@@ -238,6 +253,32 @@ export function openingBrief(brief: Brief): string {
   );
 
   return parts.join("\n\n");
+}
+
+/**
+ * The matchmaker's practice, as standing fact.
+ *
+ * Omitted whole when they have filled none of it in, rather than stated as
+ * absent: unlike the candidate's profile — where "nobody has asked yet" is the
+ * most useful thing the agent can know — there is nothing for the agent to do
+ * about a practice nobody has described, and a heading saying so would only
+ * invite it to ask the candidate about the matchmaker's business.
+ *
+ * Labelled "in their own words" because it is exactly that: typed by the
+ * matchmaker, never written or proposed by any agent (`matchmakerProfiles/
+ * rules.ts`). The agent is told to work within it, not to repeat it — a draft
+ * that recites the terms of business at somebody who asked about hiking is
+ * worse than one that never had them.
+ */
+function practiceSection(brief: Brief): string | null {
+  if (brief.practice.length === 0) return null;
+  return [
+    `HOW ${brief.matchmakerName.toUpperCase()} RUNS THEIR PRACTICE — their own words, and standing fact.`,
+    "Work within this. Never contradict it, never promise past it, and do not recite it back unless the candidate has asked.",
+    brief.practice
+      .map((entry) => `${entry.label}: ${entry.value}`)
+      .join("\n\n"),
+  ].join("\n");
 }
 
 /**
@@ -316,8 +357,24 @@ export function voiceUpdate(
   voiceUpdatedAt: number,
 ): string | null {
   if (voiceUpdatedAt <= since.voiceUpdatedAt) return null;
-  if (brief.voice === "") return null;
-  return `HOW ${brief.matchmakerName.toUpperCase()} WRITES — they have rewritten this, so it replaces what you were told before\n${brief.voice}`;
+
+  const parts: string[] = [];
+  if (brief.voice !== "") {
+    parts.push(
+      `HOW ${brief.matchmakerName.toUpperCase()} WRITES — they have rewritten this, so it replaces what you were told before\n${brief.voice}`,
+    );
+  }
+  // The practice rides on the same mark. One high-water mark covers everything
+  // about the matchmaker (`voiceUpdatedAt` in `helpers.ts` takes the latest of
+  // the four), because a second would be a second field on `conversations` and
+  // a second way for the two to disagree about what the agent has been told.
+  const practice = practiceSection(brief);
+  if (practice !== null) {
+    parts.push(
+      `${practice}\n\nThis replaces anything you were told about how they work.`,
+    );
+  }
+  return parts.length === 0 ? null : parts.join("\n\n");
 }
 
 /**

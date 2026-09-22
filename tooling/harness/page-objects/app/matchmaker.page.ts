@@ -110,8 +110,8 @@ export class WorkspacePage {
 }
 
 /**
- * `/app/mm/:username/settings`: display name, business name and their voice.
- * Rendered by `apps/app/src/pages/matchmaker-settings.tsx`.
+ * `/app/mm/:username/settings`: display name, business name, their practice
+ * and their voice. Rendered by `apps/app/src/pages/matchmaker-settings.tsx`.
  */
 export class MatchmakerSettingsPage {
   constructor(public readonly page: Page) {}
@@ -138,6 +138,45 @@ export class MatchmakerSettingsPage {
 
   getSaveButton() {
     return this.page.getByRole("button", { name: "Save changes" });
+  }
+
+  // --- Their practice (`matchmakerProfiles/rules.ts`) -----------------------
+  //
+  // Three fields, each saved on its own. Nothing an agent writes, so there is
+  // no suggestion card here — unlike the voice below.
+
+  getPracticeForm() {
+    return this.page.getByTestId("practice-form");
+  }
+
+  getPracticeField(field: "whoYouWorkWith" | "howYouWork" | "whatYouDont") {
+    return this.page.getByTestId(`practice-${field}`);
+  }
+
+  getPracticeInput(
+    field: Parameters<MatchmakerSettingsPage["getPracticeField"]>[0],
+  ) {
+    return this.getPracticeField(field).getByRole("textbox");
+  }
+
+  getPracticeSave(
+    field: Parameters<MatchmakerSettingsPage["getPracticeField"]>[0],
+  ) {
+    return this.page.getByTestId(`practice-${field}-save`);
+  }
+
+  getPracticeStatus(
+    field: Parameters<MatchmakerSettingsPage["getPracticeField"]>[0],
+  ) {
+    return this.page.getByTestId(`practice-${field}-status`);
+  }
+
+  async savePractice(
+    field: Parameters<MatchmakerSettingsPage["getPracticeField"]>[0],
+    value: string,
+  ) {
+    await this.getPracticeInput(field).fill(value);
+    await this.getPracticeSave(field).click();
   }
 
   // --- Voice (prd/phase-2.md §4.1C) ----------------------------------------

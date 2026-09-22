@@ -2,9 +2,10 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "../_generated/api";
+import { agentWriteMode } from "../profiles/rules";
 import schema from "../schema";
 import { noteSentMessage } from "./helpers";
-import { VOICE_SAMPLE_MESSAGES } from "./rules";
+import { PRACTICE_FIELDS, VOICE_FIELD, VOICE_SAMPLE_MESSAGES } from "./rules";
 
 // See waitlist/mutations.test.ts for why the glob is inline and root-anchored.
 const modules = import.meta.glob([
@@ -45,6 +46,15 @@ async function world() {
             .unique(),
         )
       )?.voice,
+    profile: () =>
+      t.run((ctx) =>
+        ctx.db
+          .query("matchmakerProfiles")
+          .withIndex("by_matchmakerId", (q) =>
+            q.eq("matchmakerId", matchmakerId),
+          )
+          .unique(),
+      ),
     events: () => t.run((ctx) => ctx.db.query("auditEvents").collect()),
   };
 }
@@ -108,7 +118,13 @@ describe("matchmakerProfiles.setVoice", () => {
       await w.asOwner.query(api.matchmakerProfiles.queries.get, {
         matchmakerId: w.matchmakerId,
       }),
-    ).toEqual({ voice: null, updatedAt: 0 });
+    ).toEqual({
+      voice: null,
+      whoYouWorkWith: null,
+      howYouWork: null,
+      whatYouDont: null,
+      updatedAt: 0,
+    });
   });
 });
 
@@ -259,5 +275,103 @@ describe("the voice agent's cadence (prd/phase-2.md §4.1C)", () => {
     expect((await profile(w))?.voiceReadThrough).toBe(
       VOICE_SAMPLE_MESSAGES * 2,
     );
+  });
+});
+
+describe("the matchmaker's practice fields", () => {
+  test("no agent may write one, whatever the field already holds", () => {
+    // The guarantee, at its source: `agentWriteMode` refuses a `matchmaker`
+    // field outright rather than turning the write into a proposal, for an
+    // untouched field and for one the matchmaker has already filled in. Voice
+    // is `suggest` and sits beside them, which is the contrast worth pinning.
+    for (const field of PRACTICE_FIELDS) {
+      expect(field.policy).toBe("matchmaker");
+      for (const existing of [null, "matchmaker", "agent"] as const) {
+        expect(agentWriteMode(field.policy, existing)).toBe("refuse");
+      }
+    }
+    expect(agentWriteMode(VOICE_FIELD.policy, null)).toBe("suggest");
+  });
+
+  test("the matchmaker writes one, and the trail keeps what it replaced", async () => {
+    const w = await world();
+    await w.asOwner.mutation(
+      api.matchmakerProfiles.mutations.setPracticeField,
+      {
+        matchmakerId: w.matchmakerId,
+        field: "whoYouWorkWith",
+        value: "  British Indian families in London.\r\nMostly 28–40.  ",
+      },
+    );
+    expect((await w.profile())?.whoYouWorkWith).toMatchObject({
+      value: "British Indian families in London.\nMostly 28–40.",
+      source: "matchmaker",
+      updatedByUserId: w.owner,
+    });
+
+    await w.asOwner.mutation(
+      api.matchmakerProfiles.mutations.setPracticeField,
+      {
+        matchmakerId: w.matchmakerId,
+        field: "whoYouWorkWith",
+        value: "Second marriages only.",
+      },
+    );
+    const events = await w.events();
+    expect(events[1]).toMatchObject({
+      action: "matchmaker_profile.updated",
+      // JSON-encoded, as the trail stores every value: it holds fields of
+      // several types and a string is not the only one.
+      changes: [
+        {
+          field: "whoYouWorkWith",
+          before: JSON.stringify(
+            "British Indian families in London.\nMostly 28–40.",
+          ),
+          after: JSON.stringify("Second marriages only."),
+        },
+      ],
+    });
+  });
+
+  test("each field is stored on its own, so saving one cannot lose another", async () => {
+    const w = await world();
+    for (const field of [
+      "whoYouWorkWith",
+      "howYouWork",
+      "whatYouDont",
+    ] as const) {
+      await w.asOwner.mutation(
+        api.matchmakerProfiles.mutations.setPracticeField,
+        { matchmakerId: w.matchmakerId, field, value: `${field} value` },
+      );
+    }
+    const profile = await w.profile();
+    expect(profile?.whoYouWorkWith?.value).toBe("whoYouWorkWith value");
+    expect(profile?.howYouWork?.value).toBe("howYouWork value");
+    expect(profile?.whatYouDont?.value).toBe("whatYouDont value");
+  });
+
+  test("another matchmaker's account cannot write one", async () => {
+    const w = await world();
+    await expect(
+      w.asStranger.mutation(api.matchmakerProfiles.mutations.setPracticeField, {
+        matchmakerId: w.matchmakerId,
+        field: "whatYouDont",
+        value: "anything",
+      }),
+    ).rejects.toThrow();
+    expect((await w.profile())?.whatYouDont).toBeUndefined();
+  });
+
+  test("a value past the limit is refused", async () => {
+    const w = await world();
+    await expect(
+      w.asOwner.mutation(api.matchmakerProfiles.mutations.setPracticeField, {
+        matchmakerId: w.matchmakerId,
+        field: "howYouWork",
+        value: "x".repeat(1_501),
+      }),
+    ).rejects.toThrow();
   });
 });

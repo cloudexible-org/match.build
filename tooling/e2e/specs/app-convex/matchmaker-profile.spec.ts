@@ -12,7 +12,8 @@ import { signInAs } from "@repo/harness/session";
 
 /**
  * Creating a matchmaker profile, opening its workspace and editing it
- * (prd/phase-1.md §1, §4) — including their voice (prd/phase-2.md §4.1C).
+ * (prd/phase-1.md §1, §4) — including their practice and their voice
+ * (prd/phase-2.md §4.1C).
  *
  * A separate seeded account per test that writes: the creator has no profile
  * yet, the editor has one to change, the stranger owns nothing.
@@ -28,10 +29,16 @@ test.beforeAll(async () => {
       { key: "stranger" },
       { key: "owner" },
       { key: "voiced" },
+      { key: "practitioner" },
     ],
     matchmakers: [
       { key: "editable", ownerKey: "editor", displayName: "Editable Book" },
       { key: "taken", ownerKey: "owner" },
+      {
+        key: "practising",
+        ownerKey: "practitioner",
+        displayName: "Practising Book",
+      },
       {
         key: "drafted",
         ownerKey: "voiced",
@@ -187,4 +194,49 @@ test("their voice is theirs to write, and the assistant only ever drafts", async
   await expect(settings.getVoiceStatus()).toHaveText(
     "Suggested by the assistant, approved by you",
   );
+});
+
+test("their practice is theirs alone to write, field by field", async ({
+  page,
+}) => {
+  await signInAs(page, world.email("practitioner"));
+  const settings = new MatchmakerSettingsPage(page);
+  await settings.goto(world.username("practising"));
+
+  await expect(settings.getPracticeForm()).toBeVisible();
+  // Nothing here is ever written by an agent — these are `matchmaker` policy,
+  // which `agentWriteMode` refuses outright — so unlike the voice below there
+  // is no suggestion to accept and no "Added by the assistant" to read.
+  await expect(settings.getPracticeForm()).toContainText(
+    "Only you write these",
+  );
+
+  // Save is dead until something changes, so a page nobody has touched cannot
+  // write an empty value over a field.
+  await expect(settings.getPracticeSave("whoYouWorkWith")).toBeDisabled();
+
+  await settings.savePractice(
+    "whoYouWorkWith",
+    "British Indian families in London. Mostly 28–40.",
+  );
+  await expect(settings.getPracticeStatus("whoYouWorkWith")).toHaveText(
+    "Saved.",
+  );
+
+  // Each field saves on its own, so a long edit to one cannot lose another.
+  await settings.savePractice(
+    "whatYouDont",
+    "I never discuss anyone's income.",
+  );
+  await expect(settings.getPracticeStatus("whatYouDont")).toHaveText("Saved.");
+
+  await page.reload();
+  await expect(settings.getPracticeInput("whoYouWorkWith")).toHaveValue(
+    "British Indian families in London. Mostly 28–40.",
+  );
+  await expect(settings.getPracticeInput("whatYouDont")).toHaveValue(
+    "I never discuss anyone's income.",
+  );
+  // Untouched, and still empty — saving a sibling wrote nothing here.
+  await expect(settings.getPracticeInput("howYouWork")).toHaveValue("");
 });

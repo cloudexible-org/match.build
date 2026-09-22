@@ -1,13 +1,19 @@
 /**
- * The matchmaker's own profile (prd/phase-2.md §4.1C). One field so far —
- * their **voice** — under the same rules as a candidate's profile: a policy
- * that says who may write it, a record of who did, and an agent that may
- * propose but not overwrite.
+ * The matchmaker's own profile (prd/phase-2.md §4.1C): their **voice**, and
+ * three things about their **practice** — under the same rules as a
+ * candidate's profile: a policy that says who may write a field, a record of
+ * who did, and an agent that may propose but not overwrite.
  *
- * Not a registry and not a map, because there is one field. When a second one
- * arrives, it becomes a column beside `voice`, not a key in a bag: what the
+ * Columns, not a map, as this file said the second field would be: what the
  * product knows about a matchmaker is a short, deliberate list, unlike a
  * candidate's profile, which grows with whatever a conversation turns up.
+ *
+ * **The practice fields exist because `voice` could not hold them.** Its own
+ * description claimed "how they work and what they care about in a match", but
+ * the voice agent rewrites that field end to end with a description of how
+ * somebody writes — so a matchmaker who typed their niche into it would lose
+ * it the moment they accepted a suggestion. A field an agent replaces cannot
+ * also be a field a person keeps facts in.
  *
  * Plain code with no Convex imports, exported through `@repo/api`.
  */
@@ -17,10 +23,11 @@ import type { ProfileFieldDef } from "../profiles/rules";
 /**
  * How they write, in their own words, with examples.
  *
- * Wider than the name suggests (prd/phase-2.md §4.1): not only register and
- * rhythm, but how they work and what they care about in a match. What the
- * product learns about the *matchmaker* lands here, because `candidateProfiles`
- * is keyed to a candidate and there is deliberately no third place.
+ * **Only how they write.** It used to be the one place anything about a
+ * matchmaker lived, and so was described as covering how they work too; the
+ * practice fields below are that, and this is now what its name says. The
+ * voice agent is the reason the split matters — it proposes a replacement for
+ * the whole of this field, and anything else kept here would go with it.
  */
 export const VOICE_FIELD: ProfileFieldDef = {
   key: "voice",
@@ -46,6 +53,94 @@ I open with their first name and no greeting. I sign off with just my name.
 Examples:
 "Sam — I've got someone in mind. Free for a call Thursday?"
 "That makes sense. Let's park it and see how the next one goes."`;
+
+/*
+ * ─── What this matchmaker's practice is ─────────────────────────────────────
+ *
+ * Three things the drafting agent has no other way to know: who this
+ * matchmaker serves, how they run an introduction, and what they will not do.
+ *
+ * **Every one is `matchmaker` policy, and that is the point.** These are facts
+ * about somebody's business, not something to be inferred from a conversation
+ * and proposed back — an agent that could write here would be guessing at a
+ * person's livelihood from a handful of messages. `agentWriteMode` refuses a
+ * `matchmaker` field outright, so there is no path by which one is written
+ * except a person typing it.
+ *
+ * **Only the conversation agent is shown them.** The profile agent is
+ * deliberately not: it decides what gets written down about a candidate, and
+ * an agent that knows the matchmaker serves one community would start
+ * inferring that about a candidate who never said it — an invention that would
+ * land on a real person's record. The voice agent is not shown them either; it
+ * is describing how somebody writes, and this would push it towards describing
+ * their business instead.
+ *
+ * Shorter than `voice` on purpose. This is standing context on every draft, so
+ * it is paid for on every generation, and a field long enough to write an
+ * essay in is a field somebody writes an essay in.
+ */
+
+export const PRACTICE_FIELDS: readonly ProfileFieldDef[] = [
+  {
+    key: "whoYouWorkWith",
+    label: "Who you work with",
+    value: { kind: "text", maxLength: 1_500 },
+    policy: "matchmaker",
+    personal: false,
+    hint: "The people your book is for — community, faith, age, city, anything that makes someone a fit or not. The assistant has no other way to know.",
+  },
+  {
+    key: "howYouWork",
+    label: "How you work",
+    value: { kind: "text", maxLength: 1_500 },
+    policy: "matchmaker",
+    personal: false,
+    hint: "What happens after someone joins: how you meet, how you introduce, what you ask of them, what you charge if that comes up.",
+  },
+  {
+    key: "whatYouDont",
+    label: "What you don't do",
+    value: { kind: "text", maxLength: 1_500 },
+    policy: "matchmaker",
+    personal: false,
+    hint: "Your lines. Things you never promise, questions you won't ask, matches you won't make. The assistant is told not to cross these.",
+  },
+];
+
+/** A practice field's key, as the mutation and the audit trail name it. */
+export type PracticeFieldKey = "whoYouWorkWith" | "howYouWork" | "whatYouDont";
+
+export const PRACTICE_FIELD_KEYS: readonly PracticeFieldKey[] = [
+  "whoYouWorkWith",
+  "howYouWork",
+  "whatYouDont",
+];
+
+export function isPracticeFieldKey(value: string): value is PracticeFieldKey {
+  return (PRACTICE_FIELD_KEYS as readonly string[]).includes(value);
+}
+
+export function practiceField(key: string): ProfileFieldDef | null {
+  return PRACTICE_FIELDS.find((field) => field.key === key) ?? null;
+}
+
+/**
+ * What each field looks like empty. Prose rather than a placeholder value, for
+ * the reason `VOICE_PLACEHOLDER` is: somebody staring at a blank box needs to
+ * be shown the kind of thing that goes in it, and the assistant reads whatever
+ * they write verbatim.
+ */
+export const PRACTICE_PLACEHOLDERS: Record<PracticeFieldKey, string> = {
+  whoYouWorkWith: `British Indian families in London and the South East. Mostly 28–40, professionals, first marriages.
+
+Both sides usually want families involved early. I don't work outside the UK.`,
+  howYouWork: `A call with me first, then I introduce two people by email and step back.
+
+I check in with both after a fortnight. Nobody pays until an introduction is made.`,
+  whatYouDont: `I never share a photo before both sides have agreed.
+
+I don't discuss anyone's income, and I don't chase people who have gone quiet.`,
+};
 
 /** The audit trail records the field by name; there is no map to qualify. */
 export const VOICE_AUDIT_FIELD = "voice";

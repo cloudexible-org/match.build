@@ -21,6 +21,10 @@ const brief: Brief = {
   candidateName: "Sam",
   matchmakerName: "Maya",
   voice: "Warm and brief.",
+  practice: [
+    { label: "Who you work with", value: "British Indian families in London." },
+    { label: "What you don't do", value: "I never discuss anyone's income." },
+  ],
   facts: [
     {
       key: "wantsKids",
@@ -198,8 +202,19 @@ describe("voiceUpdate", () => {
     expect(voiceUpdate(brief, since, 10)).toBeNull();
   });
 
-  it("has nothing to say about a voice nobody has written", () => {
-    expect(voiceUpdate({ ...brief, voice: "" }, since, 90)).toBeNull();
+  it("has nothing to say where they have written neither", () => {
+    expect(
+      voiceUpdate({ ...brief, voice: "", practice: [] }, since, 90),
+    ).toBeNull();
+  });
+
+  it("carries the practice on the same mark as the voice", () => {
+    // One high-water mark covers everything about the matchmaker, so an edit
+    // to either reaches an agent that was briefed before it.
+    const text = voiceUpdate({ ...brief, voice: "" }, since, 90);
+    expect(text).toContain("RUNS THEIR PRACTICE");
+    expect(text).toContain("British Indian families in London.");
+    expect(text).toContain("replaces anything you were told");
   });
 });
 
@@ -509,5 +524,32 @@ describe("aiSwitchPatch", () => {
   it("stores a voice both ways, because absent is not off here", () => {
     expect(aiSwitchPatch({}, "voice", false).voiceOff).toBe(true);
     expect(aiSwitchPatch({}, "voice", true).voiceOff).toBe(false);
+  });
+});
+
+describe("the matchmaker's practice in the opening brief", () => {
+  it("is given as their own words and as standing fact", () => {
+    const text = openingBrief(brief);
+    expect(text).toContain("RUNS THEIR PRACTICE");
+    expect(text).toContain("their own words");
+    expect(text).toContain("Who you work with: British Indian families");
+    expect(text).toContain("I never discuss anyone's income.");
+  });
+
+  it("tells the agent to work within it rather than recite it", () => {
+    // The failure this guards against is a draft that answers "what do you do
+    // at weekends?" with the terms of business.
+    const text = openingBrief(brief);
+    expect(text).toContain("Work within this");
+    expect(text).toContain("do not recite it back");
+  });
+
+  it("says nothing at all where they have described no practice", () => {
+    // Unlike the candidate's profile, where "nobody has asked yet" is the most
+    // useful thing the agent can know, an absent practice is nothing for it to
+    // act on — and a heading saying so invites it to ask the candidate about
+    // the matchmaker's business.
+    const text = openingBrief({ ...brief, practice: [] });
+    expect(text).not.toContain("PRACTICE");
   });
 });

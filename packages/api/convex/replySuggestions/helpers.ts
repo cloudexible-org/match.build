@@ -19,6 +19,10 @@ import {
 } from "../candidateProfiles/rules";
 import { candidateDisplayName } from "../candidates/helpers";
 import { matchmakerProfileFor } from "../matchmakerProfiles/helpers";
+import {
+  PRACTICE_FIELD_KEYS,
+  PRACTICE_FIELDS,
+} from "../matchmakerProfiles/rules";
 import { displayValue } from "../profiles/rules";
 import {
   type Brief,
@@ -167,6 +171,18 @@ export async function briefFor(
     candidateName: await candidateDisplayName(ctx, candidate),
     matchmakerName: matchmaker.displayName,
     voice: mine?.voice?.value ?? "",
+    // Only the ones they have filled in, in the order the settings page shows
+    // them — an empty field is nothing to tell an agent about.
+    practice:
+      mine === null
+        ? []
+        : PRACTICE_FIELDS.flatMap((field) => {
+            const value =
+              mine[field.key as (typeof PRACTICE_FIELD_KEYS)[number]];
+            return value === undefined || value.value === ""
+              ? []
+              : [{ label: field.label, value: value.value }];
+          }),
     facts:
       profile === null
         ? []
@@ -191,13 +207,27 @@ export async function briefFor(
   };
 }
 
-/** When the matchmaker's voice last moved, or 0 where they have none. */
+/**
+ * When anything the agent is told about the *matchmaker* last moved — their
+ * voice or any of the three practice fields — or 0 where they have written
+ * none of it.
+ *
+ * One mark for all four, matching the single `agentBriefedVoiceAt` on the
+ * conversation. Splitting it would mean a second field and a second way for
+ * the two to disagree about what the agent has already been told, to save
+ * re-sending a few hundred characters that only change when somebody edits
+ * their own settings page.
+ */
 export async function voiceUpdatedAt(
   ctx: QueryCtx,
   matchmakerId: Id<"matchmakers">,
 ): Promise<number> {
   const mine = await matchmakerProfileFor(ctx, matchmakerId);
-  return mine?.voice?.updatedAt ?? 0;
+  if (mine === null) return 0;
+  return [mine.voice, ...PRACTICE_FIELD_KEYS.map((key) => mine[key])].reduce(
+    (latest, entry) => Math.max(latest, entry?.updatedAt ?? 0),
+    0,
+  );
 }
 
 /** What the agent has already been told about this conversation. */

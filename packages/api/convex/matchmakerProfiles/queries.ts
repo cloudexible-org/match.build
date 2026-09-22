@@ -15,6 +15,12 @@ export const get = query({
   args: { matchmakerId: v.id("matchmakers") },
   returns: v.object({
     voice: v.union(profileEntry, v.null()),
+    // Named one by one rather than as a map, because the columns are named one
+    // by one — a bag here would be the first place this table pretended to be
+    // a registry.
+    whoYouWorkWith: v.union(profileEntry, v.null()),
+    howYouWork: v.union(profileEntry, v.null()),
+    whatYouDont: v.union(profileEntry, v.null()),
     updatedAt: v.number(),
   }),
   handler: async (ctx, args) => {
@@ -22,6 +28,9 @@ export const get = query({
     const profile = await matchmakerProfileFor(ctx, matchmaker._id);
     return {
       voice: profile?.voice ?? null,
+      whoYouWorkWith: profile?.whoYouWorkWith ?? null,
+      howYouWork: profile?.howYouWork ?? null,
+      whatYouDont: profile?.whatYouDont ?? null,
       updatedAt: profile?.updatedAt ?? 0,
     };
   },

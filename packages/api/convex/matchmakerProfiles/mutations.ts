@@ -1,11 +1,15 @@
 /**
- * Writing a matchmaker's own profile (prd/phase-2.md §4.1C) — so far, their
- * voice. The same three doors as a candidate's profile, and the same engine
- * behind them: the matchmaker writes it, the voice-profile agent proposes, and
- * the policy in `rules.ts` decides which.
+ * Writing a matchmaker's own profile (prd/phase-2.md §4.1C): their voice, and
+ * the three practice fields. The same three doors as a candidate's profile,
+ * and the same engine behind them: the matchmaker writes it, an agent
+ * proposes, and the policy in `rules.ts` decides which.
  *
  * Their voice is `suggest`, so an agent never changes it under them. It may
  * distil a draft from what they have sent; they decide it sounds like them.
+ *
+ * The practice fields are `matchmaker`, which is stricter still: `writeEntry`
+ * refuses an agent write outright rather than turning it into a proposal, so
+ * there is no door here an agent can reach at all.
  */
 
 import { ConvexError, v } from "convex/values";
@@ -16,7 +20,78 @@ import { approveEntry, rejectEntry, writeEntry } from "../profiles/helpers";
 import { normaliseValue, valueError } from "../profiles/rules";
 import { aiAgentId } from "../schema";
 import { ensureMatchmakerProfile, matchmakerProfileFor } from "./helpers";
-import { VOICE_AUDIT_FIELD, VOICE_FIELD } from "./rules";
+import {
+  type PracticeFieldKey,
+  practiceField,
+  VOICE_AUDIT_FIELD,
+  VOICE_FIELD,
+} from "./rules";
+
+/**
+ * One of the three practice fields (`rules.ts`): who they work with, how they
+ * work, what they don't do.
+ *
+ * One mutation over three, because they differ only in which column they land
+ * in — three near-identical handlers would be three places for the audit call
+ * to be forgotten.
+ *
+ * No agent path. These are `matchmaker` policy, so `writeEntry` would refuse
+ * an agent writer, and nothing internal calls this anyway: it takes a signed-in
+ * matchmaker or it does nothing.
+ */
+export const setPracticeField = mutation({
+  args: {
+    matchmakerId: v.id("matchmakers"),
+    field: v.union(
+      v.literal("whoYouWorkWith"),
+      v.literal("howYouWork"),
+      v.literal("whatYouDont"),
+    ),
+    value: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { user, matchmaker } = await requireMatchmaker(
+      ctx,
+      args.matchmakerId,
+    );
+    const field = practiceField(args.field);
+    // Unreachable through the validator above; the alternative is a non-null
+    // assertion on a registry lookup, which is the thing that stops being true.
+    if (field === null) throw new ConvexError("Unknown field.");
+
+    const invalid = valueError(field, args.value);
+    if (invalid) throw new ConvexError(invalid);
+
+    const profile = await ensureMatchmakerProfile(ctx, matchmaker._id);
+    const key: PracticeFieldKey = args.field;
+    const now = Date.now();
+    const { entry, outcome } = writeEntry({
+      entry: profile[key],
+      policy: field.policy,
+      write: { action: "set", value: normaliseValue(field, args.value) },
+      writer: { kind: "matchmaker", userId: user._id },
+      now,
+    });
+    if (outcome.kind !== "written") return null;
+
+    await ctx.db.patch("matchmakerProfiles", profile._id, {
+      [key]: entry,
+      updatedAt: now,
+    });
+    await recordAudit(ctx, {
+      matchmakerId: matchmaker._id,
+      actor: { type: "user", userId: user._id, role: "matchmaker" },
+      action: "matchmaker_profile.updated",
+      entity: { table: "matchmakerProfiles", id: profile._id },
+      // Before and after both, as the voice write does: the trail is where a
+      // field's history lives, and a matchmaker who pastes over their own
+      // notes should be able to get the old ones back.
+      changes: [{ field: key, before: outcome.before, after: outcome.after }],
+    });
+    return null;
+  },
+});
 
 export const setVoice = mutation({
   args: { matchmakerId: v.id("matchmakers"), value: v.string() },

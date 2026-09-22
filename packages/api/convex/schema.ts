@@ -392,6 +392,15 @@ export default defineSchema({
   matchmakerProfiles: defineTable({
     matchmakerId: v.id("matchmakers"),
     voice: v.optional(profileEntry),
+    // ─── Their practice (`matchmakerProfiles/rules.ts`) ─────────────────────
+    //
+    // Columns rather than a map, as this table has held since it had one
+    // field: what the product knows about a matchmaker is a short, deliberate
+    // list. All three are `matchmaker` policy — no agent writes them — and
+    // only the drafting agent is ever shown them.
+    whoYouWorkWith: v.optional(profileEntry),
+    howYouWork: v.optional(profileEntry),
+    whatYouDont: v.optional(profileEntry),
     updatedAt: v.number(),
     // ─── The voice agent's cadence (prd/phase-2.md §4.1C) ───────────────────
     //
