@@ -401,10 +401,14 @@ describe("the conversation's own switch", () => {
       api.replySuggestions.queries.enabledFor,
       { matchmakerId: w.matchmakerId, candidateId: w.candidateId },
     );
-    expect(state.enabled).toBe(true);
+    expect(state.drafts.on).toBe(true);
+    expect(state.profile.on).toBe(true);
+    // Voice is unset, so it follows the master switch, which is on.
+    expect(state.voice.on).toBe(true);
     // No agent configured in this world, so nothing would run anyway — which
-    // is a different no, and the switch says so.
+    // is a different no, and the panel says so per function.
     expect(state.available).toBe(false);
+    expect(state.drafts.available).toBe(false);
   });
 
   test("off retires the drafts, cancels the job and drops the thread", async () => {
@@ -412,7 +416,8 @@ describe("the conversation's own switch", () => {
     await w.seedDraft("On offer");
     await w.seedThread(4);
 
-    await w.asOwner.mutation(api.replySuggestions.mutations.setEnabled, {
+    await w.asOwner.mutation(api.replySuggestions.mutations.setAiFunction, {
+      fn: "drafts",
       matchmakerId: w.matchmakerId,
       candidateId: w.candidateId,
       enabled: false,
@@ -428,7 +433,8 @@ describe("the conversation's own switch", () => {
 
   test("a message while it is off schedules nothing", async () => {
     const w = await world();
-    await w.asOwner.mutation(api.replySuggestions.mutations.setEnabled, {
+    await w.asOwner.mutation(api.replySuggestions.mutations.setAiFunction, {
+      fn: "drafts",
       matchmakerId: w.matchmakerId,
       candidateId: w.candidateId,
       enabled: false,
@@ -444,7 +450,8 @@ describe("the conversation's own switch", () => {
 
   test("a job already in flight refuses to draft once it is switched off", async () => {
     const w = await world();
-    await w.asOwner.mutation(api.replySuggestions.mutations.setEnabled, {
+    await w.asOwner.mutation(api.replySuggestions.mutations.setAiFunction, {
+      fn: "drafts",
       matchmakerId: w.matchmakerId,
       candidateId: w.candidateId,
       enabled: false,
@@ -463,7 +470,8 @@ describe("the conversation's own switch", () => {
       await ctx.db.patch("conversations", w.conversationId, { aiOff: true });
     });
 
-    await w.asOwner.mutation(api.replySuggestions.mutations.setEnabled, {
+    await w.asOwner.mutation(api.replySuggestions.mutations.setAiFunction, {
+      fn: "drafts",
       matchmakerId: w.matchmakerId,
       candidateId: w.candidateId,
       enabled: true,
@@ -480,7 +488,8 @@ describe("the conversation's own switch", () => {
   test("another matchmaker's account cannot touch the switch", async () => {
     const w = await world();
     await expect(
-      w.asStranger.mutation(api.replySuggestions.mutations.setEnabled, {
+      w.asStranger.mutation(api.replySuggestions.mutations.setAiFunction, {
+        fn: "drafts",
         matchmakerId: w.matchmakerId,
         candidateId: w.candidateId,
         enabled: false,

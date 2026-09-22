@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  aiFunctionStates,
+  aiSwitchPatch,
   type Brief,
   type BriefedThrough,
   draftInstruction,
@@ -440,5 +442,72 @@ describe("updateBrief and what is still unknown", () => {
     const text = updateBrief(brief, since);
     expect(text).toContain("NEW MESSAGES");
     expect(text).not.toContain("STILL UNKNOWN");
+  });
+});
+
+describe("aiFunctionStates", () => {
+  it("is all on for a conversation nobody has touched", () => {
+    expect(aiFunctionStates({})).toEqual({
+      drafts: true,
+      profile: true,
+      voice: true,
+    });
+  });
+
+  it("takes the profile down with the drafts, because they are one call", () => {
+    const off = aiFunctionStates({ aiOff: true });
+    expect(off.drafts).toBe(false);
+    expect(off.profile).toBe(false);
+  });
+
+  it("lets the profile go off on its own, with drafts left running", () => {
+    expect(aiFunctionStates({ profileOff: true })).toEqual({
+      drafts: true,
+      profile: false,
+      voice: true,
+    });
+  });
+
+  it("follows the master switch for a voice nobody has set", () => {
+    // The gap this closes: a conversation switched off before the voice field
+    // existed was still feeding the voice agent the matchmaker's half of it.
+    expect(aiFunctionStates({ aiOff: true }).voice).toBe(false);
+  });
+
+  it("obeys an explicit voice over the master switch, either way", () => {
+    expect(aiFunctionStates({ aiOff: true, voiceOff: false }).voice).toBe(true);
+    expect(aiFunctionStates({ voiceOff: true }).voice).toBe(false);
+  });
+});
+
+describe("aiSwitchPatch", () => {
+  it("stores only the exception for drafts and profile", () => {
+    expect(
+      aiSwitchPatch({ aiOff: true }, "drafts", true).aiOff,
+    ).toBeUndefined();
+    expect(
+      aiSwitchPatch({ profileOff: true }, "profile", true).profileOff,
+    ).toBeUndefined();
+  });
+
+  it("takes an untouched voice down with the drafts", () => {
+    // Left unset, so it keeps following the master switch — and the panel
+    // shows that switch move rather than leaving voice on behind an off one.
+    const patch = aiSwitchPatch({}, "drafts", false);
+    expect(patch.voiceOff).toBeUndefined();
+    expect(aiFunctionStates(patch).voice).toBe(false);
+  });
+
+  it("leaves an explicit voice alone when drafts move", () => {
+    const patch = aiSwitchPatch({ voiceOff: false }, "drafts", false);
+    expect(aiFunctionStates(patch)).toMatchObject({
+      drafts: false,
+      voice: true,
+    });
+  });
+
+  it("stores a voice both ways, because absent is not off here", () => {
+    expect(aiSwitchPatch({}, "voice", false).voiceOff).toBe(true);
+    expect(aiSwitchPatch({}, "voice", true).voiceOff).toBe(false);
   });
 });

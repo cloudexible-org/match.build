@@ -21,7 +21,7 @@ import {
   replyCount,
   voiceUpdatedAt,
 } from "./helpers";
-import type { Brief, BriefedThrough } from "./rules";
+import { aiFunctionStates, type Brief, type BriefedThrough } from "./rules";
 
 /**
  * The drafts waiting on one candidate, newest first.
@@ -59,12 +59,14 @@ export const forCandidate = query({
 });
 
 /**
- * Whether drafting is on for one conversation, and whether it could be.
+ * What AI is doing on one conversation, function by function, and what could
+ * be doing anything at all.
  *
- * Two different noes, and the switch has to tell them apart: a matchmaker who
- * turned it off should see an off switch, and one whose deployment has no
- * agent configured should be told that rather than handed a switch that does
- * nothing.
+ * **Two different noes per function, and the panel has to tell them apart:** a
+ * matchmaker who turned something off should see an off switch, and one whose
+ * deployment has no agent configured for it should be told that rather than
+ * handed a switch that does nothing. They are separate fields because they are
+ * separate facts — `available` is the platform's answer and `on` is theirs.
  */
 export const enabledFor = query({
   args: {
@@ -72,9 +74,16 @@ export const enabledFor = query({
     candidateId: v.id("candidates"),
   },
   returns: v.object({
-    /** This conversation's own switch. */
-    enabled: v.boolean(),
-    /** Whether an agent would run at all if it were on. */
+    /** Drafted replies: this conversation's switch, and whether it could run. */
+    drafts: v.object({ on: v.boolean(), available: v.boolean() }),
+    /** The profile the drafting run keeps up to date. */
+    profile: v.object({ on: v.boolean(), available: v.boolean() }),
+    /** Whether what they type here is a sample for their voice. */
+    voice: v.object({ on: v.boolean(), available: v.boolean() }),
+    /**
+     * Whether anything at all could run. The control is hidden on `false`: a
+     * panel of three switches that all do nothing is worse than no panel.
+     */
     available: v.boolean(),
   }),
   handler: async (ctx, args) => {
@@ -85,9 +94,19 @@ export const enabledFor = query({
       .query("conversations")
       .withIndex("by_candidateId", (q) => q.eq("candidateId", candidate._id))
       .unique();
+    const states = aiFunctionStates(conversation ?? {});
+    const draftsAvailable = (await activeAgent(ctx, "conversation")) !== null;
+    // The profile agent needs the drafting one as well as itself: the
+    // observations it reconciles are produced by the drafting generation.
+    const profileAvailable =
+      draftsAvailable && (await activeAgent(ctx, "candidate_profile")) !== null;
+    const voiceAvailable = (await activeAgent(ctx, "voice_profile")) !== null;
+
     return {
-      enabled: conversation?.aiOff !== true,
-      available: (await activeAgent(ctx, "conversation")) !== null,
+      drafts: { on: states.drafts, available: draftsAvailable },
+      profile: { on: states.profile, available: profileAvailable },
+      voice: { on: states.voice, available: voiceAvailable },
+      available: draftsAvailable || profileAvailable || voiceAvailable,
     };
   },
 });

@@ -70,7 +70,7 @@ export const send = mutation({
     // And it is one more sample of how they write. Counted here, generated
     // nowhere near here: the voice agent wakes every N messages, not every
     // message (prd/phase-2.md §4.1C).
-    await noteSentMessage(ctx, matchmaker._id);
+    await noteSentMessage(ctx, matchmaker._id, conversation);
     return { seq };
   },
 });

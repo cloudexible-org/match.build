@@ -7,6 +7,7 @@
 import { v } from "convex/values";
 import { internalQuery, query } from "../_generated/server";
 import { requireMatchmaker } from "../matchmakers/helpers";
+import { aiFunctionStates } from "../replySuggestions/rules";
 import { profileEntry } from "../schema";
 import { matchmakerProfileFor, voiceSampleMessages } from "./helpers";
 
@@ -71,8 +72,27 @@ export const voiceContext = internalQuery({
       // would swing with whatever kind of week they have just had.
       .take(every * 2);
 
+    // Conversations this matchmaker has switched voice off on. Read once per
+    // distinct conversation in the window rather than per message — the window
+    // is `every * 2` messages over a handful of threads — and applied
+    // retroactively: turning the switch off is meant to take what was already
+    // typed there out of the sample, not merely stop the next message going
+    // in. Without this the switch would only bite on a conversation that had
+    // no history when it was flipped.
+    const voiceOffIds = new Set<string>();
+    for (const conversationId of new Set(recent.map((m) => m.conversationId))) {
+      const conversation = await ctx.db.get("conversations", conversationId);
+      if (conversation !== null && !aiFunctionStates(conversation).voice) {
+        voiceOffIds.add(conversationId);
+      }
+    }
+
     const samples = recent
-      .filter((message) => message.source === "typed")
+      .filter(
+        (message) =>
+          message.source === "typed" &&
+          !voiceOffIds.has(message.conversationId),
+      )
       .map((message) => ({ body: message.body, sentAt: message.sentAt }))
       .reverse(); // oldest first, the way they wrote them
     if (samples.length === 0) return null;

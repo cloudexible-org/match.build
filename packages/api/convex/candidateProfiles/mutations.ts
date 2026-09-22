@@ -40,6 +40,7 @@ import {
   noteKeyError,
   valueError,
 } from "../profiles/rules";
+import { aiFunctionStates } from "../replySuggestions/rules";
 import { aiAgentId } from "../schema";
 import { ensureCandidateProfile, noteCountError } from "./helpers";
 import {
@@ -508,10 +509,10 @@ export const rememberProfileThread = internalMutation({
   handler: async (ctx, args) => {
     const conversation = await ctx.db.get("conversations", args.conversationId);
     if (conversation === null) return null;
-    // The switch may have gone off while the model was thinking, and turning
-    // it off deletes the threads. Writing this back would point the record at
-    // a thread that no longer exists.
-    if (conversation.aiOff === true) return null;
+    // A switch may have gone off while the model was thinking, and turning one
+    // off deletes the threads. Writing this back would point the record at a
+    // thread that no longer exists.
+    if (!aiFunctionStates(conversation).profile) return null;
     await ctx.db.patch("conversations", args.conversationId, {
       profileThreadId: args.threadId,
       profileBriefedAt: args.briefedAt,

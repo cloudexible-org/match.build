@@ -11,7 +11,11 @@
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { settingNumber } from "../replySuggestions/rules";
+import {
+  type AiSwitches,
+  aiFunctionStates,
+  settingNumber,
+} from "../replySuggestions/rules";
 import { VOICE_SAMPLE_MESSAGES } from "./rules";
 
 /**
@@ -68,7 +72,12 @@ export function voiceSampleMessages(): number {
 export async function noteSentMessage(
   ctx: MutationCtx,
   matchmakerId: Id<"matchmakers">,
+  conversation: AiSwitches,
 ): Promise<void> {
+  // A conversation whose voice switch is off is not a sample, so it does not
+  // count towards the next run either. Counting it would wake the agent early
+  // over a window `voiceContext` is about to filter most of out of.
+  if (!aiFunctionStates(conversation).voice) return;
   const profile = await ensureMatchmakerProfile(ctx, matchmakerId);
   const sentMessages = (profile.sentMessages ?? 0) + 1;
   const every = voiceSampleMessages();

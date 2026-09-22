@@ -72,6 +72,92 @@ export type Brief = {
   gaps: string[];
 };
 
+/*
+ * ─── The three switches on one conversation ─────────────────────────────────
+ *
+ * A matchmaker turns AI off on a conversation by function rather than
+ * wholesale: the drafts, the profile the drafting run keeps up to date, and
+ * whether what they type here teaches the product how they write.
+ *
+ * **One resolver, because two of the three are not independent.** Read the
+ * stored fields directly and a caller has to remember that drafting and
+ * noticing are one generation, and that an unset voice follows the master
+ * switch — which is three chances to get it wrong in three different files.
+ */
+
+export const AI_FUNCTIONS = ["drafts", "profile", "voice"] as const;
+
+export type AiFunction = (typeof AI_FUNCTIONS)[number];
+
+export function isAiFunction(value: string): value is AiFunction {
+  return (AI_FUNCTIONS as readonly string[]).includes(value);
+}
+
+/** The three fields as `conversations` stores them. */
+export type AiSwitches = {
+  aiOff?: boolean;
+  profileOff?: boolean;
+  voiceOff?: boolean;
+};
+
+/** Whether each function runs on this conversation. */
+export type AiFunctionStates = Record<AiFunction, boolean>;
+
+/**
+ * What is actually on, out of what is stored.
+ *
+ * **`profile` cannot outlive `drafts`.** One generation produces the replies
+ * and the observations both (`draftInstruction`), and `reconcile` is scheduled
+ * from inside the drafting run with what that run noticed — so there is no
+ * path by which a profile is kept up to date while drafting is off. The UI
+ * disables the control and says so rather than offering a switch that would
+ * quietly do nothing.
+ *
+ * **An unset `voice` follows `aiOff`.** A conversation switched off before
+ * that field existed would otherwise still be feeding the voice agent the
+ * matchmaker's half of it, which is not what somebody who turned AI off here
+ * was agreeing to. Touching the control makes it explicit, after which it is
+ * independent — including staying on over a conversation whose drafts are off.
+ */
+export function aiFunctionStates(stored: AiSwitches): AiFunctionStates {
+  const drafts = stored.aiOff !== true;
+  return {
+    drafts,
+    profile: drafts && stored.profileOff !== true,
+    voice: stored.voiceOff === undefined ? drafts : stored.voiceOff !== true,
+  };
+}
+
+/**
+ * The patch that sets one function, given what is stored now.
+ *
+ * **Turning drafts off takes an untouched voice with it, visibly.** The rule
+ * is the one `aiFunctionStates` states and nothing here overrides it: unset
+ * follows the master switch, and the panel shows the switch move. The
+ * alternative was to pin voice to whatever it was displaying whenever drafts
+ * moved, which would have made two conversations that both read "drafts off"
+ * behave differently depending on whether they predated the field — a
+ * difference nothing on screen could explain.
+ *
+ * Touching voice writes it either way, after which it is that matchmaker's
+ * answer and the master switch stops speaking for it. That is why `false` is
+ * stored here where the other two store only the exception.
+ */
+export function aiSwitchPatch(
+  stored: AiSwitches,
+  fn: AiFunction,
+  enabled: boolean,
+): AiSwitches {
+  switch (fn) {
+    case "drafts":
+      return { ...stored, aiOff: enabled ? undefined : true };
+    case "profile":
+      return { ...stored, profileOff: enabled ? undefined : true };
+    case "voice":
+      return { ...stored, voiceOff: !enabled };
+  }
+}
+
 /** What the agent has already been told, so the next turn can be a delta. */
 export type BriefedThrough = {
   seq: number;

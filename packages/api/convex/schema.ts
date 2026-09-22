@@ -266,6 +266,26 @@ export default defineSchema({
     // conversation out, not how the feature is turned on.
     aiOff: v.optional(v.boolean()),
     //
+    // The other two functions on this conversation, resolved together with the
+    // one above by `aiFunctionStates` (`replySuggestions/rules.ts`) — which is
+    // the only thing that should read these three fields.
+    //
+    // `profileOff` turns off the profile the drafting run keeps up to date.
+    // Absent means on, like the switch above, and it is subordinate to it:
+    // noticing rides along with drafting in one generation, so drafts off is
+    // profile off whatever this says.
+    profileOff: v.optional(v.boolean()),
+    // `voiceOff` is whether what the matchmaker types here is a sample the
+    // voice agent may read (prd/phase-2.md §4.1C).
+    //
+    // **Absent does not mean on here — it means "follow `aiOff`".** The other
+    // two store only the exception because their default is fixed; this one's
+    // default is the conversation's master switch, so that a conversation
+    // somebody switched AI off on before this field existed is not still
+    // feeding a model. That makes `false` a value worth storing, where for the
+    // other two it would be noise.
+    voiceOff: v.optional(v.boolean()),
+    //
     // The agent is briefed once and then kept up to date, so what matters here
     // is how much of the world it has already been told about. The thread is
     // the component's (`@convex-dev/agent`), not ours: `ctx.db` cannot see it,

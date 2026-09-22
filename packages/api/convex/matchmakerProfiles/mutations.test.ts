@@ -191,7 +191,9 @@ describe("the voice agent's cadence (prd/phase-2.md §4.1C)", () => {
   /** Sends one matchmaker message the way `messages.send` does. */
   async function sent(w: Awaited<ReturnType<typeof world>>, times: number) {
     for (let i = 0; i < times; i++) {
-      await w.t.run(async (ctx) => await noteSentMessage(ctx, w.matchmakerId));
+      await w.t.run(
+        async (ctx) => await noteSentMessage(ctx, w.matchmakerId, {}),
+      );
     }
   }
 
@@ -212,6 +214,22 @@ describe("the voice agent's cadence (prd/phase-2.md §4.1C)", () => {
     const w = await world();
     await sent(w, 3);
     expect((await profile(w))?.sentMessages).toBe(3);
+  });
+
+  test("counts nothing from a conversation with voice switched off", async () => {
+    const w = await world();
+    await w.t.run(
+      async (ctx) => await noteSentMessage(ctx, w.matchmakerId, {}),
+    );
+    // Explicitly off, and derived off because the master switch is.
+    for (const conversation of [{ voiceOff: true }, { aiOff: true }]) {
+      await w.t.run(
+        async (ctx) => await noteSentMessage(ctx, w.matchmakerId, conversation),
+      );
+    }
+    // Only the first one. Counting the others would wake the agent early over
+    // a window `voiceContext` is about to filter most of back out.
+    expect((await profile(w))?.sentMessages).toBe(1);
   });
 
   test("does not wake the agent before a full sample", async () => {

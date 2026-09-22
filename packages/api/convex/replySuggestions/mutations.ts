@@ -21,6 +21,7 @@ import { appendMessage, conversationFor } from "../messages/helpers";
 import { messageBodyError, normaliseMessageBody } from "../messages/rules";
 import { scheduleMessageNotifications } from "../notifications/helpers";
 import { debounceSeconds } from "./helpers";
+import { aiFunctionStates, aiSwitchPatch } from "./rules";
 
 /**
  * Everything waiting on this conversation stops being an answer.
@@ -171,10 +172,11 @@ export const clearJob = internalMutation({
  * fortnight of conversation, and switched it back on should not get an agent
  * carrying on a sentence from a fortnight ago.
  */
-export const setEnabled = mutation({
+export const setAiFunction = mutation({
   args: {
     matchmakerId: v.id("matchmakers"),
     candidateId: v.id("candidates"),
+    fn: v.union(v.literal("drafts"), v.literal("profile"), v.literal("voice")),
     enabled: v.boolean(),
   },
   returns: v.null(),
@@ -183,6 +185,20 @@ export const setEnabled = mutation({
     const candidate = await ctx.db.get("candidates", args.candidateId);
     assertSameTenant(candidate, matchmaker._id);
     const conversation = await conversationFor(ctx, candidate._id);
+
+    const patch = aiSwitchPatch(conversation, args.fn, args.enabled);
+    const before = aiFunctionStates(conversation);
+    const after = aiFunctionStates(patch);
+
+    const draftsMoved = before.drafts !== after.drafts;
+    const profileMoved = before.profile !== after.profile;
+
+    // Voice keeps no thread and has nothing pending, so a change to it is the
+    // patch and nothing else. The other two own state that has to go.
+    if (!draftsMoved && !profileMoved) {
+      await ctx.db.patch("conversations", conversation._id, patch);
+      return null;
+    }
 
     const now = Date.now();
     if (conversation.draftJobId !== undefined) {
@@ -197,9 +213,16 @@ export const setEnabled = mutation({
     // cannot see them. Async — it deletes a thread's messages in batches in
     // the background, which is what keeps a long thread from blowing the
     // limits of the mutation that asked.
+    // Only the threads whose function actually moved, and in **either**
+    // direction. Off, so a thread nobody will send to again is not a copy of
+    // a candidate's conversation kept for nothing; on, so the next run is a
+    // first run rather than an agent carrying on a fortnight-old sentence.
+    // Turning the profile off on a conversation still being drafted for must
+    // not throw away the drafting agent's memory of it, which is what the
+    // per-function condition buys.
     for (const threadId of [
-      conversation.agentThreadId,
-      conversation.profileThreadId,
+      draftsMoved ? conversation.agentThreadId : undefined,
+      profileMoved ? conversation.profileThreadId : undefined,
     ]) {
       if (threadId === undefined) continue;
       await ctx.runMutation(
@@ -211,15 +234,19 @@ export const setEnabled = mutation({
     }
 
     await ctx.db.patch("conversations", conversation._id, {
-      // Absent means on, so the switch stores only the exception.
-      aiOff: args.enabled ? undefined : true,
-      agentThreadId: undefined,
-      agentBriefedSeq: undefined,
-      agentBriefedVoiceAt: undefined,
-      agentBriefedProfileAt: undefined,
+      ...patch,
       draftJobId: undefined,
-      profileThreadId: undefined,
-      profileBriefedAt: undefined,
+      ...(draftsMoved
+        ? {
+            agentThreadId: undefined,
+            agentBriefedSeq: undefined,
+            agentBriefedVoiceAt: undefined,
+            agentBriefedProfileAt: undefined,
+          }
+        : {}),
+      ...(profileMoved
+        ? { profileThreadId: undefined, profileBriefedAt: undefined }
+        : {}),
     });
     return null;
   },

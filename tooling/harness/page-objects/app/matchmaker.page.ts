@@ -270,12 +270,28 @@ export class ConversationPage {
   }
 
   /**
-   * The header's "AI" switch for drafted replies (prd/phase-2.md §4A) —
-   * `role="switch"`, named "Drafted replies" by the label around it. Absent
-   * where no agent is configured, which on the e2e backend is always.
+   * The header's "AI" button (prd/phase-2.md §4A), which opens a panel of one
+   * switch per function. Absent where no agent is configured at all, which on
+   * the e2e backend is always — so a spec here can assert it is hidden, and
+   * nothing below it can be reached without a gateway.
    */
   getSuggestionsToggle() {
     return this.page.getByTestId("toggle-suggestions");
+  }
+
+  /** The dot on the button: filled, half or hollow for all/some/none on. */
+  getAiIndicator() {
+    return this.page.getByTestId("ai-indicator");
+  }
+
+  /** One row of the panel, once the button has been clicked. */
+  getAiSwitch(fn: "drafts" | "profile" | "voice") {
+    return this.page.getByTestId(`ai-switch-${fn}`);
+  }
+
+  /** The switch control itself, for reading `checked` or pressing it. */
+  getAiSwitchControl(fn: Parameters<ConversationPage["getAiSwitch"]>[0]) {
+    return this.getAiSwitch(fn).getByRole("switch");
   }
 
   getComposer() {

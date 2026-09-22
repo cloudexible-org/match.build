@@ -12,6 +12,7 @@ import { type Infer, v } from "convex/values";
 import { internalQuery, query } from "../_generated/server";
 import { candidateDisplayName } from "../candidates/helpers";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
+import { aiFunctionStates } from "../replySuggestions/rules";
 import { profileEntry } from "../schema";
 import { candidateProfileFor } from "./helpers";
 import {
@@ -93,9 +94,9 @@ export const reconcileContext = internalQuery({
   handler: async (ctx, { conversationId }) => {
     const conversation = await ctx.db.get("conversations", conversationId);
     if (conversation === null) return null;
-    // The matchmaker's switch for this conversation covers both agents: it
-    // says "no AI on this one", not "no drafts on this one".
-    if (conversation.aiOff === true) return null;
+    // The profile has a switch of its own now, subordinate to the drafting
+    // one — `aiFunctionStates` is what knows that, not this line.
+    if (!aiFunctionStates(conversation).profile) return null;
     const candidate = await ctx.db.get("candidates", conversation.candidateId);
     if (candidate === null) return null;
 
