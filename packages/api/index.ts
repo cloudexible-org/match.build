@@ -12,6 +12,8 @@ export * from "./convex/matches/rules";
 export * from "./convex/matchmakerProfiles/rules";
 export * from "./convex/matchmakers/rules";
 export * from "./convex/messages/rules";
+export * from "./convex/notifications/rules";
 export * from "./convex/profiles/rules";
+export * from "./convex/replySuggestions/rules";
 export * from "./convex/users/rules";
 export * from "./convex/waitlist/rules";
