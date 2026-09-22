@@ -43,6 +43,18 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  /*
+   * The first row of every chat column — the list's heading, the
+   * conversation's header, the panel's own bar on a phone.
+   *
+   * It has to end exactly where the panel's accordion puts its first divider,
+   * because from `lg` up all three columns are on screen and that rule reads
+   * as one line across the window. An accordion trigger is `px-4 py-3` round
+   * a `text-sm` line: 44px, with the divider under it. A header carries its
+   * own `border-b` *inside* its box, so it needs the extra pixel to put its
+   * border in the same place — `h-11` would sit one pixel high.
+   */
+  --spacing-column-header: calc(var(--spacing) * 11 + 1px);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

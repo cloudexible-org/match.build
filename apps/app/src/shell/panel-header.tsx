@@ -1,4 +1,5 @@
-import { Button } from "@repo/ui";
+import { Button, cn } from "@repo/ui";
+import { COLUMN_HEADER } from "./chat-shell";
 
 /**
  * The bar at the top of a side panel, below `lg`, where the panel covers the
@@ -15,7 +16,12 @@ export function PanelHeader({
   closeTestId: string;
 }) {
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4 lg:hidden">
+    <div
+      className={cn(
+        COLUMN_HEADER,
+        "flex items-center justify-between gap-2 px-4 lg:hidden",
+      )}
+    >
       <span className="truncate font-medium">{title}</span>
       <Button
         variant="ghost"

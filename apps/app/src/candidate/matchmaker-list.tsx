@@ -1,5 +1,6 @@
 import { cn } from "@repo/ui";
 import { Link } from "react-router";
+import { COLUMN_HEADER } from "../shell/chat-shell";
 
 export type JoinedMatchmaker = {
   candidateId: string;
@@ -47,7 +48,7 @@ export function MatchmakerList({
       className={cn("flex-col border-border", className)}
       data-testid="candidate-matchmakers"
     >
-      <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
+      <div className={cn(COLUMN_HEADER, "flex items-center px-4")}>
         <h1 id="candidate-matchmakers-heading" className="font-display text-xl">
           Matchmakers
         </h1>

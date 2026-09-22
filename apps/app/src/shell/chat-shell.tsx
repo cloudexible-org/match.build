@@ -2,6 +2,29 @@ import { cn } from "@repo/ui";
 import type { ReactNode } from "react";
 
 /**
+ * The first row of every column: the list's heading, the conversation's
+ * header, and the panel's own bar on a phone.
+ *
+ * From `lg` up all three columns are on screen at once, and their first
+ * horizontal rule reads as one line across the window. The panel's, though,
+ * is the divider under its first accordion section rather than a header of
+ * its own, and an accordion trigger is 44px. The headers used to be `h-14`,
+ * so the rule in the third column sat eleven pixels lower than the other two
+ * and the columns read as three pages parked side by side.
+ *
+ * `--spacing-column-header` (`@repo/ui/theme.css`) is that 44px plus the
+ * pixel a header's own `border-b` takes out of its box; changing the trigger
+ * instead was the wrong half of it, because `AccordionSection` is a
+ * `@repo/ui` component and cannot promise a height for a title it doesn't
+ * choose.
+ *
+ * Anything put in here has to live inside 44px — a `size="sm"` button (32px)
+ * does, a title stacked over a subtitle does not, which is why the
+ * conversation header reads its subtitle inline.
+ */
+export const COLUMN_HEADER = "h-column-header shrink-0 border-b border-border";
+
+/**
  * The columns both sides of the product are laid out in: a list beside a
  * conversation (prd/phase-1.md §4.1 and §4.2).
  *

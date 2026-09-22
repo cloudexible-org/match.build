@@ -1,6 +1,7 @@
 import { Button, buttonVariants, cn } from "@repo/ui";
 import { type ReactNode, useState } from "react";
 import { Link } from "react-router";
+import { COLUMN_HEADER } from "./chat-shell";
 
 /**
  * A conversation with its side panel, on both sides of the product: the
@@ -31,7 +32,7 @@ export function ConversationPanes({
   back: { to: string; label: string };
   title: string;
   titleTestId: string;
-  /** A second line under the title, where one side has more to say. */
+  /** Beside the title, where one side has more to say. */
   subtitle?: ReactNode;
   /** Names the panel for a screen reader, e.g. "About Jane Member". */
   panelLabel: string;
@@ -59,7 +60,10 @@ export function ConversationPanes({
           panelOpen ? "hidden lg:flex" : "flex",
         )}
       >
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4">
+        <header
+          className={cn(COLUMN_HEADER, "flex items-center gap-3 px-4")}
+          data-testid={`${testId}-header`}
+        >
           <Link
             to={back.to}
             className={cn(
@@ -70,7 +74,18 @@ export function ConversationPanes({
           >
             ←
           </Link>
-          <div className="flex min-w-0 flex-1 flex-col">
+          {/* The subtitle sits *beside* the title rather than under it: this
+              row is 44px so that the three columns' first rule is one line
+              across the window (`COLUMN_HEADER`), and two stacked lines do not
+              fit in 44px. `items-baseline` so the small line sits on the same
+              baseline as the name instead of floating in the middle of it.
+
+              Both halves truncate, and both may shrink — `truncate` sets
+              `overflow: hidden`, which is what lets a flex item go below its
+              own content width. A long name and a long email therefore give
+              way together rather than one of them pushing the other out of
+              the header. */}
+          <div className="flex min-w-0 flex-1 items-baseline gap-2">
             {/* `h2`: the list column owns the page's `h1`. */}
             <h2 className="truncate font-medium" data-testid={titleTestId}>
               {title}

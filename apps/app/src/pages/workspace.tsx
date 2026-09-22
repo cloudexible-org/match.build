@@ -3,7 +3,7 @@ import { buttonVariants, cn, Input } from "@repo/ui";
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { Link, Outlet, useParams } from "react-router";
-import { ChatShell } from "../shell/chat-shell";
+import { ChatShell, COLUMN_HEADER } from "../shell/chat-shell";
 import {
   candidateDisplayName,
   membershipMarker,
@@ -85,7 +85,13 @@ function CandidateList({
       className={cn("flex-col border-border", className)}
       data-testid="workspace-candidates"
     >
-      <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
+      <div
+        className={cn(
+          COLUMN_HEADER,
+          "flex items-center justify-between gap-3 px-4",
+        )}
+        data-testid="workspace-candidates-header"
+      >
         <h1 id="workspace-candidates-heading" className="font-display text-xl">
           Candidates
         </h1>

@@ -69,6 +69,11 @@ export class WorkspacePage {
     return this.page.getByTestId("workspace-candidates-scroll");
   }
 
+  /** The column's first row, whose bottom border is its first rule. */
+  getCandidatesHeader() {
+    return this.page.getByTestId("workspace-candidates-header");
+  }
+
   getConversation() {
     return this.page.getByTestId("workspace-conversation");
   }
@@ -279,6 +284,11 @@ export class ConversationPage {
     return this.page.getByTestId("conversation-candidate-name");
   }
 
+  /** The column's first row, whose bottom border is its first rule. */
+  getHeader() {
+    return this.page.getByTestId("conversation-header");
+  }
+
   getMessages() {
     return this.page.getByTestId("conversation-message");
   }
@@ -356,7 +366,7 @@ export class ConversationPage {
     return this.page.getByTestId("membership-banner");
   }
 
-  /** "Invited as … · Accepted as …", or the email under a named candidate. */
+  /** "Invited as … · Accepted as …", or the email beside a named candidate. */
   getCandidateEmail() {
     return this.page.getByTestId("conversation-candidate-email");
   }

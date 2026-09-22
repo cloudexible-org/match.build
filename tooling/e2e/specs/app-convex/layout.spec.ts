@@ -12,10 +12,11 @@ import { type Scenario, seedScenario } from "@repo/harness/scenario";
 import { signInAs } from "@repo/harness/session";
 
 /**
- * The chat shell's scrolling (`shell/chat-shell.tsx`,
- * `shell/conversation-panes.tsx`): the window itself never scrolls, each of
- * the three columns scrolls inside itself, and the composer stays on the
- * bottom of the middle one however long the thread gets.
+ * The chat shell (`shell/chat-shell.tsx`, `shell/conversation-panes.tsx`):
+ * the window itself never scrolls, each of the three columns scrolls inside
+ * itself, the composer stays on the bottom of the middle one however long the
+ * thread gets, and the three columns' first rule is one line across the
+ * window.
  *
  * Read-only — every test here only looks — so the whole file shares one
  * seeded world, long enough in every column to have something to scroll.
@@ -119,6 +120,64 @@ async function expectComposerOnScreen(page: Page, composer: Locator) {
   expect(box.y).toBeGreaterThanOrEqual(0);
   expect(Math.round(box.y + box.height)).toBeLessThanOrEqual(viewport.height);
 }
+
+/**
+ * Where a column's first horizontal rule starts, in page coordinates.
+ *
+ * The two headers draw it as their own `border-b`, which `box-sizing:
+ * border-box` puts *inside* the element; the panel draws it as the accordion
+ * divider under its first trigger, below that trigger's box. Taking the
+ * element's own bottom border back off measures the same line either way.
+ */
+async function ruleTop(locator: Locator) {
+  const box = await locator.boundingBox();
+  if (box === null) throw new Error("Nothing to measure");
+  const border = await locator.evaluate((element) =>
+    Number.parseFloat(getComputedStyle(element).borderBottomWidth),
+  );
+  return Math.round(box.y + box.height - border);
+}
+
+test("the three columns' first row is one band, with the email beside the name", async ({
+  page,
+}) => {
+  await signInAs(page, world.email("maya"));
+  await page.goto(
+    `/app/mm/${world.username("book")}/c/${world.candidateId("jane")}`,
+  );
+
+  const workspace = new WorkspacePage(page);
+  const conversation = new ConversationPage(page);
+  const panel = new CandidatePanelPage(page);
+  const name = conversation.getCandidateName();
+  const email = conversation.getCandidateEmail();
+  await expect(name).toHaveText("Jane Member");
+  await expect(email).toBeVisible();
+
+  // One test rather than two, because it is one row: the email is beside the
+  // name *because* the row is 44px, and a stacked title is what stopped it
+  // fitting. The project's viewport is 1280 wide, past `lg`, so the panel is
+  // alongside — below that there is no third rule to line up with, and a
+  // phone shows one column at a time anyway.
+  //
+  // The panel has no header of its own up here, so its first rule is the
+  // divider under Matches rather than a border of its own.
+  const list = await ruleTop(workspace.getCandidatesHeader());
+  const middle = await ruleTop(conversation.getHeader());
+  const sections = await ruleTop(panel.getSection("Matches"));
+  expect(middle).toBe(list);
+  expect(sections).toBe(list);
+
+  // Inline, not stacked: the email to the right of the name, and their boxes
+  // overlapping vertically, which two stacked lines never would.
+  const nameBox = await name.boundingBox();
+  const emailBox = await email.boundingBox();
+  if (nameBox === null || emailBox === null)
+    throw new Error("Nothing to measure");
+  expect(emailBox.x).toBeGreaterThan(nameBox.x + nameBox.width - 1);
+  expect(emailBox.y).toBeLessThan(nameBox.y + nameBox.height);
+  expect(nameBox.y).toBeLessThan(emailBox.y + emailBox.height);
+});
 
 test("the workspace's three columns scroll one at a time, and the composer stays put", async ({
   page,

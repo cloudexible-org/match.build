@@ -62,7 +62,7 @@ export function SuggestionsToggle({
   const [busy, setBusy] = useState<AiFunction | null>(null);
 
   // Nothing while it loads, and nothing where no agent would run: the header
-  // is 14 rows tall on a phone and a control that cannot work has not earned
+  // is 11 rows tall on a phone and a control that cannot work has not earned
   // a place in it.
   if (state === undefined || !state.available) return null;
 
@@ -91,7 +91,7 @@ export function SuggestionsToggle({
       trigger={
         <button
           type="button"
-          // Two letters in a 14-row header; the whole state for a screen
+          // Two letters in an 11-row header; the whole state for a screen
           // reader, which cannot see the dot.
           aria-label={`AI on this conversation — ${onCount} of ${ORDER.length} on`}
           title={`AI: ${onCount} of ${ORDER.length} on`}

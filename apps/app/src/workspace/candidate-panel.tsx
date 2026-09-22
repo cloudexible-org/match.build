@@ -76,6 +76,11 @@ export function CandidatePanel({
           details and what they know at once, not one at a time. They scroll as
           this column, under its header — never as the page.
 
+          No header of its own from `lg` up, so the divider under the first
+          section *is* this column's first rule, and it lines up with the other
+          two columns' header borders because an accordion trigger and
+          `COLUMN_HEADER` are both 44px (`shell/chat-shell.tsx`).
+
           Details stays open by default: who they are, where they stand and
           whether they're still active is what you want on opening a thread
           you haven't touched in a week (the invite controls themselves are in
