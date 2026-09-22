@@ -8,7 +8,7 @@ is what `tooling/e2e` and `tooling/marketing` are both built on.
 | `@repo/harness/playwright.config` | The base config (default export) plus `APP_URL`, `ADMIN_URL`, `WWW_URL`, `WITH_CONVEX`. Spread it, add `testDir` and `projects`. |
 | `@repo/harness/page-objects` | Every page object, namespaced: `POM.App.ConversationPage`. One file at a time: `@repo/harness/page-objects/app/matches.page`. |
 | `@repo/harness/scenario` | `seedScenario()` — a world of this file's own, namespaced so nothing else can see it. |
-| `@repo/harness/session` | `signInAs(page, email)` — the real Convex Auth flow over HTTP, about ten times faster than typing a code. |
+| `@repo/harness/session` | `signInAs(page, email)` — the real Convex Auth flow over HTTP, about ten times faster than typing a code. It arms the session; your next `goto` applies it. |
 | `@repo/harness/accounts` | `signUp` / `signInToAdmin`, for the specs that are *about* signing up. |
 | `@repo/harness/seed` | The baseline fixture's constants and types (`SEED_ADMINS`, …). |
 | `@repo/harness/paths` | `REPO_ROOT`, `API_DIR`, `SCRATCH_DIR`, `appDir()`. |

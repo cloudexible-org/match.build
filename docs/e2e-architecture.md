@@ -604,8 +604,30 @@ Use the UI instead only where the sign-in screens are the subject
 (`specs/app-convex/sign-up.spec.ts`, `specs/admin-convex/`), through
 `signUp` / `signInToAdmin` in `tooling/harness/accounts.ts`.
 
-The session is written, not injected on every navigation, so **signing out
-really signs out** and a test can prove it.
+**It arms the session; your next `goto` applies it.** `signInAs` deliberately
+does not navigate — landing on the app as a candidate opens their first
+conversation and marks it read, which is a thing several specs assert has *not*
+happened yet. Every call is followed by a navigation already; one that is not
+stays signed in as whoever the page was before.
+
+**It writes before the app's own code runs, and only once.** Both halves are
+there for a reason, and neither is stylistic:
+
+- A document that boots with a session already in storage starts Convex's auth
+  client on it, and that client confirms the token it found and then *rotates*
+  it — `initialAuthTokenReuse` defaults to `false` — writing the new pair back.
+  Writing the next person's tokens into such a live document is two writers
+  over one pair of keys, and the loser is decided by which round trip finishes
+  first. It lost rarely and only under load: `mobile.spec.ts` signs in twice on
+  one page, and when the first person's refresh landed second the accept screen
+  came back as *them* — "You're already a member of this matchmaker." where the
+  spec expected Accept and Decline. An init script lands before the document has
+  run any app code, by which time the document holding the old session is gone,
+  so there is no second writer to outrun.
+- A script that re-ran on every navigation would silently sign the page back in
+  after a sign-out, so **signing out really signs out** and a test can prove it.
+  A per-call marker in `localStorage` confines each script to the first
+  navigation after its own `signInAs`.
 
 ### Rules that still hold
 
