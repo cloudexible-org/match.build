@@ -12,7 +12,11 @@ import { components } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { env, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { candidateProfileFor } from "../candidateProfiles/helpers";
-import { candidateField, candidateNoteLabel } from "../candidateProfiles/rules";
+import {
+  candidateField,
+  candidateNoteLabel,
+  MATCH_CRITICAL_KEYS,
+} from "../candidateProfiles/rules";
 import { candidateDisplayName } from "../candidates/helpers";
 import { matchmakerProfileFor } from "../matchmakerProfiles/helpers";
 import { displayValue } from "../profiles/rules";
@@ -90,6 +94,38 @@ function briefEntries(
 }
 
 /**
+ * How many unfilled fields the agent is shown at once.
+ *
+ * All thirty-one of them is a form, and an agent handed a form asks like one.
+ * Enough for there to be something natural to pick up on whatever the
+ * candidate just said, few enough that it reads as context rather than as a
+ * queue. The list is already ordered for a conversation
+ * (`MATCH_CRITICAL_KEYS`), so the cut takes the askable ones.
+ */
+const MAX_GAPS = 12;
+
+/**
+ * The match-critical fields with no answer on this profile, in the order it is
+ * natural to ask them.
+ *
+ * A field held open by nothing but an unaccepted proposal counts as unknown,
+ * which is the same judgement `briefEntries` makes for the opposite reason:
+ * nobody has agreed to a proposal, so it is neither something the agent knows
+ * nor something it should treat as asked.
+ */
+function gapLabels(entries: Entries | null): string[] {
+  const labels: string[] = [];
+  for (const key of MATCH_CRITICAL_KEYS) {
+    if ((entries?.[key]?.value ?? "") !== "") continue;
+    const label = candidateField(key)?.label;
+    if (label === undefined) continue;
+    labels.push(label);
+    if (labels.length === MAX_GAPS) break;
+  }
+  return labels;
+}
+
+/**
  * Everything the agent gets about one conversation.
  *
  * Every message in the live window, whatever its visibility: the matchmaker's
@@ -151,6 +187,7 @@ export async function briefFor(
             (_key, value) => value,
           ),
     messages,
+    gaps: gapLabels(profile?.facts ?? null),
   };
 }
 

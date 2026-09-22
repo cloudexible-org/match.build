@@ -60,6 +60,7 @@ const brief: Brief = {
       body: "Based in Toronto.",
     },
   ],
+  gaps: ["Occupation", "Date of birth"],
 };
 
 describe("openingBrief", () => {
@@ -115,10 +116,13 @@ describe("openingBrief", () => {
     );
   });
 
-  it("leaves out a section it has nothing for", () => {
+  it("leaves out the matchmaker's notes when they have written none", () => {
     const bare = openingBrief({ ...brief, facts: [], notes: [] });
-    expect(bare).not.toContain("HAS TOLD THEM");
     expect(bare).not.toContain("OWN NOTES");
+    // The profile is the exception: it is stated even when empty, because
+    // "nobody has asked yet" is the single most useful thing the agent can
+    // know about a freshly invited candidate.
+    expect(bare).toContain("HAS TOLD THEM");
   });
 });
 
@@ -209,8 +213,8 @@ describe("draftInstruction", () => {
   });
 
   it("asks for as many as it was told to", () => {
-    expect(draftInstruction(3, "Sam", NOW)).toContain("3 replies");
-    expect(draftInstruction(1, "Sam", NOW)).toContain("one reply");
+    expect(draftInstruction(3, "Sam", NOW)).toContain("3 messages");
+    expect(draftInstruction(1, "Sam", NOW)).toContain("one message");
   });
 
   it("repeats the rule that matters most, where the model will act on it", () => {
@@ -221,6 +225,20 @@ describe("draftInstruction", () => {
 
   it("gives it a way to decline", () => {
     expect(draftInstruction(3, "Sam", NOW)).toContain("NOTHING");
+  });
+
+  it("asks for an opening the candidate can answer, one question at a time", () => {
+    const text = draftInstruction(3, "Sam", NOW);
+    expect(text).toContain("easily answer");
+    expect(text).toContain("no message should ask more than one question");
+  });
+
+  it("asks for three that differ in what they do, not one reworded", () => {
+    expect(draftInstruction(3, "Sam", NOW)).toContain("genuinely different");
+    // With one draft there is nothing to differ from.
+    expect(draftInstruction(1, "Sam", NOW)).not.toContain(
+      "genuinely different",
+    );
   });
 
   it("asks for both halves, replies first", () => {
@@ -373,5 +391,54 @@ describe("settingNumber", () => {
   it("clamps rather than trusting a typo", () => {
     expect(settingNumber("9000", 3, { min: 1, max: 10 })).toBe(10);
     expect(settingNumber("-4", 3, { min: 1, max: 10 })).toBe(1);
+  });
+});
+
+describe("openingBrief, on a candidate nobody has learned anything about", () => {
+  const cold: Brief = { ...brief, facts: [], notes: [], messages: [] };
+
+  it("says the profile is empty rather than omitting it", () => {
+    // The bug this replaced: the heading was dropped when there were no facts,
+    // so the agent could not tell "nobody has asked yet" from "nothing left to
+    // ask" — and drafted a greeting back at "hey".
+    const text = openingBrief(cold);
+    expect(text).toContain("WHAT SAM HAS TOLD THEM");
+    expect(text).toContain("Their profile is empty");
+  });
+
+  it("lists what is still unknown, and says it is not a checklist", () => {
+    const text = openingBrief(cold);
+    expect(text).toContain("STILL UNKNOWN ABOUT SAM");
+    expect(text).toContain("- Occupation");
+    expect(text).toContain("not a checklist");
+    expect(text).toContain("at most one");
+  });
+
+  it("says so when a match has everything it needs", () => {
+    const text = openingBrief({ ...cold, gaps: [] });
+    expect(text).toContain("STILL UNKNOWN ABOUT SAM");
+    expect(text).toContain("Nothing a match turns on");
+    expect(text).not.toContain("not a checklist");
+  });
+});
+
+describe("updateBrief and what is still unknown", () => {
+  it("restates the gaps when the profile has moved", () => {
+    const text = updateBrief(brief, { ...NEVER_BRIEFED, seq: 2 });
+    expect(text).toContain("PROFILE HAS CHANGED");
+    expect(text).toContain("STILL UNKNOWN ABOUT SAM");
+  });
+
+  it("leaves them alone when only a message arrived", () => {
+    // The opening brief's list still stands, and re-sending it every turn is
+    // both noise and a nudge to ask again.
+    const since: BriefedThrough = {
+      seq: 1,
+      voiceUpdatedAt: 0,
+      profileUpdatedAt: 999,
+    };
+    const text = updateBrief(brief, since);
+    expect(text).toContain("NEW MESSAGES");
+    expect(text).not.toContain("STILL UNKNOWN");
   });
 });

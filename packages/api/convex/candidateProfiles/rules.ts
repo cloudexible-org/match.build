@@ -534,6 +534,60 @@ export const CANDIDATE_PROFILE_FIELDS: readonly CandidateFieldDef[] = [
   },
 ] as const;
 
+/**
+ * The fields a match is actually decided on, in the order it is natural to
+ * learn them.
+ *
+ * `matches/rules.ts` reads exactly these: `hardBlockers` refuses a pair over
+ * them and every weighted signal scores one. A profile missing them cannot be
+ * matched however much prose it carries, which is why the drafting agent is
+ * shown the unfilled ones first (`replySuggestions/rules.ts`).
+ *
+ * **Ordered for a conversation, not for the matcher.** What someone does for a
+ * living is a first-exchange question and what they will not compromise on is
+ * not, so the cheap and public ones lead and the ones that need some warmth
+ * behind them come last. The agent is told to pick what fits rather than to
+ * work down the list, but the order is what it sees first.
+ *
+ * Not every registry key is here, and that is the point — a gap list of all
+ * forty-seven is a form. `rules.test.ts` asserts each key below is a real
+ * field; nothing can assert this stays in step with the matcher's own reads,
+ * so a new signal there wants a line here.
+ */
+export const MATCH_CRITICAL_KEYS: readonly string[] = [
+  "locationCity",
+  "occupation",
+  "dateOfBirth",
+  "gender",
+  "seekingGender",
+  "orientation",
+  "lookingFor",
+  "relationshipStatus",
+  "locationCountry",
+  "heightCm",
+  "education",
+  "exercise",
+  "diet",
+  "drinking",
+  "smoking",
+  "wantsKids",
+  "hasKids",
+  "religion",
+  "religionImportance",
+  "politics",
+  "readinessTimeline",
+  "willingToRelocate",
+  "partnerAgeRange",
+  "partnerLocation",
+  "partnerWantsKids",
+  "partnerHasKidsOk",
+  "partnerEducation",
+  "partnerHeightRangeCm",
+  "partnerReligion",
+  "partnerReligionRequired",
+  "dealbreakers",
+];
+
 export function candidateField(key: string): CandidateFieldDef | null {
   return CANDIDATE_PROFILE_FIELDS.find((field) => field.key === key) ?? null;
 }

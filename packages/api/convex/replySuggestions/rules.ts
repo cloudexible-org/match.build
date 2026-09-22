@@ -59,6 +59,17 @@ export type Brief = {
    * starts, and the standing instruction tells the agent as much.
    */
   messages: BriefMessage[];
+  /**
+   * The labels of match-critical fields the profile still has no answer for,
+   * most conversational first, already capped (`helpers.ts`).
+   *
+   * **Without this the agent cannot see what it does not know.** The profile
+   * section lists what is filled, so on a new candidate it is empty and the
+   * agent reads an absence of information as an absence of anything to ask —
+   * which is how a thread dies at "hey". Empty here means the profile has
+   * every field a match is decided on, which is a real state and worth saying.
+   */
+  gaps: string[];
 };
 
 /** What the agent has already been told, so the next turn can be a delta. */
@@ -105,6 +116,7 @@ function entryLines(entries: BriefEntry[]): string {
  * profile, and the thread so far.
  */
 export function openingBrief(brief: Brief): string {
+  const them = brief.candidateName.toUpperCase();
   const parts: string[] = [
     `You are drafting replies for ${brief.matchmakerName}, a matchmaker, to send to ${brief.candidateName}, a candidate in their book.`,
   ];
@@ -115,16 +127,23 @@ export function openingBrief(brief: Brief): string {
       : `HOW ${brief.matchmakerName.toUpperCase()} WRITES\nThey have not described their voice yet. Match the way they write in the thread below.`,
   );
 
-  if (brief.facts.length > 0) {
-    parts.push(
-      `WHAT ${brief.candidateName.toUpperCase()} HAS TOLD THEM\n${entryLines(brief.facts)}`,
-    );
-  }
+  // Emitted even when empty, where the old brief dropped the heading
+  // entirely. An agent shown no profile section has no way to tell a candidate
+  // nobody has asked anything yet from a candidate there is nothing left to
+  // ask, and the two call for opposite drafts.
+  parts.push(
+    brief.facts.length > 0
+      ? `WHAT ${them} HAS TOLD THEM\n${entryLines(brief.facts)}`
+      : `WHAT ${them} HAS TOLD THEM\nNothing. Their profile is empty — nobody has learned anything about them yet.`,
+  );
+
   if (brief.notes.length > 0) {
     parts.push(
       `${brief.matchmakerName.toUpperCase()}'S OWN NOTES — to draft from, never to repeat back\n${entryLines(brief.notes)}`,
     );
   }
+
+  parts.push(gapSection(brief));
 
   parts.push(
     brief.messages.length > 0
@@ -133,6 +152,27 @@ export function openingBrief(brief: Brief): string {
   );
 
   return parts.join("\n\n");
+}
+
+/**
+ * What is still missing, and how to treat it.
+ *
+ * The framing does as much work as the list. A bare list of field labels is
+ * read as a form to get through, which is the failure the opposite of silence:
+ * an agent that opens by asking a stranger their religion and their income.
+ * So the heading says what it is not, and the standing instruction
+ * (`seed/ai/fixture.ts`) carries the pacing rules that go with it.
+ */
+function gapSection(brief: Brief): string {
+  const heading = `STILL UNKNOWN ABOUT ${brief.candidateName.toUpperCase()}`;
+  if (brief.gaps.length === 0) {
+    return `${heading}\nNothing a match turns on. Ask only what this conversation calls for.`;
+  }
+  return [
+    `${heading} — what a match turns on and nobody has asked yet.`,
+    "This is what is missing, not a checklist and not an order to follow. Ask at most one of these, and only where the conversation has made it natural.",
+    brief.gaps.map((label) => `- ${label}`).join("\n"),
+  ].join("\n");
 }
 
 /**
@@ -160,6 +200,10 @@ export function updateBrief(
     parts.push(
       `${brief.candidateName.toUpperCase()}'S PROFILE HAS CHANGED\nThese are current; anything you were told earlier about the same field is out of date.\n${entryLines(changedFacts)}`,
     );
+    // Restated only when the profile moved, because that is the only thing
+    // that shortens the list — and a gap list left standing from the opening
+    // brief is how an agent asks a second time for something it was told.
+    parts.push(gapSection(brief));
   }
   if (changedNotes.length > 0) {
     parts.push(
@@ -219,12 +263,23 @@ export function draftInstruction(
     "Do two things, and label them with the headings below exactly as written.",
     "",
     "REPLIES",
-    `Draft ${count === 1 ? "one reply" : `${count} replies`} the matchmaker could send to ${candidateName} next, in their voice.`,
+    // "Message the matchmaker could send next" rather than "reply": a reply is
+    // a response to content, and the thread this agent most often meets has no
+    // content in it — a candidate who was invited and typed "hey". Asked for a
+    // reply to that, a model writes a greeting back and the thread stops.
+    `Draft ${count === 1 ? "one message" : `${count} messages`} the matchmaker could send to ${candidateName} next, in their voice.`,
     `Write ${count === 1 ? "it" : "each one"} on a single line, numbered, like:`,
-    "1. <the reply>",
-    count > 1 ? "2. <a different reply>" : "",
-    "No preamble, no explanation, no quotation marks around the reply.",
-    `Each one should be a complete message, ready to send. Use a newline inside a reply only if the matchmaker would have used one; write it as "\\n".`,
+    "1. <the message>",
+    count > 1 ? "2. <a different message>" : "",
+    "No preamble, no explanation, no quotation marks around the message.",
+    `Each one should be a complete message, ready to send. Use a newline inside a message only if the matchmaker would have used one; write it as "\\n".`,
+    // The pacing rules live in the standing instruction; these two are here
+    // because they are about the shape of this batch, which only this turn
+    // knows. Three drafts that differ only in wording are one draft.
+    `Almost every one should end with something ${candidateName} can easily answer, and no message should ask more than one question.`,
+    count > 1
+      ? "Make them genuinely different in what they do — a different question, a different thing picked up on, a different length — not the same message reworded."
+      : "",
     "Never repeat the matchmaker's private notes back to the candidate, and never mention another candidate by name.",
     "If there is genuinely nothing useful to say next, write NOTHING under this heading.",
     "",

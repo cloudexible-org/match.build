@@ -10,6 +10,7 @@ import {
   candidateNoteLabel,
   candidateNotePolicy,
   candidateProfileFieldLabel,
+  MATCH_CRITICAL_KEYS,
   MAX_RECONCILED,
   parseReconciled,
   profileOpeningBrief,
@@ -301,5 +302,30 @@ describe("parseReconciled", () => {
   test("unwraps a value or a quote the model put in quotation marks", () => {
     const [entry] = parseReconciled('facts | age | 34 | 0.9 | "I\'m 34"');
     expect(entry?.quote).toBe("I'm 34");
+  });
+});
+
+describe("MATCH_CRITICAL_KEYS", () => {
+  test("every key is a field that actually exists", () => {
+    // The list is hand-kept and feeds the drafting agent's gap list. A typo
+    // here is silent: the key never matches, the label never renders, and the
+    // agent simply never learns to ask about that field.
+    const missing = MATCH_CRITICAL_KEYS.filter(
+      (key) => candidateField(key) === null,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  test("names no key twice", () => {
+    expect(new Set(MATCH_CRITICAL_KEYS).size).toBe(MATCH_CRITICAL_KEYS.length);
+  });
+
+  test("asks for nothing only the matchmaker may fill in", () => {
+    // Income band is theirs. Sending an agent to fish for it is both a bad
+    // question and one whose answer it could not write down.
+    const theirs = MATCH_CRITICAL_KEYS.filter(
+      (key) => candidateField(key)?.policy === "matchmaker",
+    );
+    expect(theirs).toEqual([]);
   });
 });
