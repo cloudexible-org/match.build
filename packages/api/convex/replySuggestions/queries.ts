@@ -8,7 +8,7 @@
  * should ever return that in one object.
  */
 
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 import { internalQuery, query } from "../_generated/server";
 import { type AgentSettings, activeAgent } from "../ai/helpers";
 import { assertSameTenant, requireMatchmaker } from "../matchmakers/helpers";
@@ -171,6 +171,7 @@ const briefShape = v.object({
   candidateName: v.string(),
   matchmakerName: v.string(),
   voice: v.string(),
+  practice: v.array(v.object({ label: v.string(), value: v.string() })),
   facts: v.array(briefEntry),
   notes: v.array(briefEntry),
   messages: v.array(
@@ -190,27 +191,43 @@ const briefShape = v.object({
       body: v.string(),
     }),
   ),
+  gaps: v.array(v.string()),
 });
+
+const draftContextShape = v.object({
+  brief: briefShape,
+  settings: v.object(agentSettingsShape),
+  briefedThrough: v.object({
+    seq: v.number(),
+    voiceUpdatedAt: v.number(),
+    profileUpdatedAt: v.number(),
+  }),
+  threadId: v.union(v.string(), v.null()),
+  voiceAt: v.number(),
+  profileAt: v.number(),
+  throughSeq: v.number(),
+  count: v.number(),
+});
+
+/**
+ * The validator and `DraftContext` must be the same shape, both ways.
+ *
+ * **TypeScript will not say so on its own.** A handler returning an object
+ * with a field the validator never declared type-checks — the extra field is
+ * simply allowed — and then fails at runtime, on every call, at the query
+ * boundary. That is how `brief.gaps` and `brief.practice` shipped. A field
+ * added to `Brief` (or any type here) without its validator now fails `tsc`.
+ */
+type SameShape<A, B> = [A] extends [B]
+  ? [B] extends [A]
+    ? true
+    : false
+  : false;
+true satisfies SameShape<Infer<typeof draftContextShape>, DraftContext>;
 
 export const draftContext = internalQuery({
   args: { conversationId: v.id("conversations") },
-  returns: v.union(
-    v.object({
-      brief: briefShape,
-      settings: v.object(agentSettingsShape),
-      briefedThrough: v.object({
-        seq: v.number(),
-        voiceUpdatedAt: v.number(),
-        profileUpdatedAt: v.number(),
-      }),
-      threadId: v.union(v.string(), v.null()),
-      voiceAt: v.number(),
-      profileAt: v.number(),
-      throughSeq: v.number(),
-      count: v.number(),
-    }),
-    v.null(),
-  ),
+  returns: v.union(draftContextShape, v.null()),
   handler: async (ctx, args): Promise<DraftContext | null> => {
     const conversation = await ctx.db.get("conversations", args.conversationId);
     if (conversation === null) return null;
