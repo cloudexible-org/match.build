@@ -1,5 +1,5 @@
 import { Button, cn, Popover, PopoverTitle } from "@repo/ui";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   bellLabel,
@@ -31,14 +31,22 @@ import {
  * still says which ones were new for as long as it is on screen. The bell
  * behind it goes quiet immediately, which is the honest answer to "is there
  * anything I haven't seen".
+ *
+ * Both of those wait for a list to exist. `items` is `undefined` until the
+ * feed arrives, and a bell clicked in that moment used to snapshot nothing and
+ * mark nothing read — which silently threw away the dots for everything that
+ * was about to land, and told the backend it had been seen. Opening early now
+ * shows the panel and holds: "read" is written when there is something to have
+ * read.
  */
 export function NotificationsMenu({
   items,
   onOpen,
 }: {
-  /** Newest first. */
-  items: Notification[];
-  /** Called as the panel opens — where "read" is written, for all of them. */
+  /** Newest first, or `undefined` while the feed is still loading. */
+  items: Notification[] | undefined;
+  /** Called once the panel is open over a loaded list — where "read" is
+   * written, for all of them. */
   onOpen?: () => void;
 }) {
   // Read when the panel opens, so "3m" is three minutes ago now rather than
@@ -46,9 +54,19 @@ export function NotificationsMenu({
   // once a minute to change a character nobody is looking at.
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const [wasUnread, setWasUnread] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
+  // `null` while this opening has nothing to snapshot yet: the panel is shut,
+  // or it was opened before the feed arrived.
+  const [wasUnread, setWasUnread] = useState<ReadonlySet<string> | null>(null);
+
+  // The one moment that counts as "looked": open, with a list to look at. A
+  // layout effect rather than a plain one so the dots are already right on the
+  // first frame the panel is painted, instead of appearing after it.
+  useLayoutEffect(() => {
+    if (!open || items === undefined || wasUnread !== null) return;
+    setNow(Date.now());
+    setWasUnread(unreadIds(items));
+    onOpen?.();
+  }, [open, items, wasUnread, onOpen]);
 
   return (
     <Popover
@@ -59,20 +77,29 @@ export function NotificationsMenu({
       // the page it just opened.
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) return;
-        setNow(Date.now());
-        setWasUnread(unreadIds(items));
-        onOpen?.();
+        // A fresh snapshot for each opening; the effect above takes it. On the
+        // way out the old one stays, so the dots don't blink off mid-close.
+        if (next) setWasUnread(null);
       }}
       className="w-[min(22rem,calc(100vw-1.5rem))]"
-      trigger={bellTrigger(unreadCount(items))}
+      trigger={bellTrigger(unreadCount(items ?? []))}
     >
       <div data-testid="notifications-panel">
         <div className="border-b border-border px-3 py-2">
           <PopoverTitle>Notifications</PopoverTitle>
         </div>
 
-        {items.length === 0 ? (
+        {items === undefined ? (
+          // Not "you're all caught up": we don't know that yet, and saying it
+          // to someone who has three messages waiting is a lie they then watch
+          // correct itself.
+          <p
+            className="px-3 py-8 text-center text-sm text-muted-foreground"
+            data-testid="notifications-loading"
+          >
+            Loading…
+          </p>
+        ) : items.length === 0 ? (
           <p
             className="px-3 py-8 text-center text-sm text-muted-foreground"
             data-testid="notifications-empty"
@@ -89,7 +116,7 @@ export function NotificationsMenu({
                 <NotificationRow
                   item={item}
                   now={now}
-                  unread={wasUnread.has(item.id)}
+                  unread={wasUnread?.has(item.id) ?? false}
                   onFollow={() => setOpen(false)}
                 />
               </li>

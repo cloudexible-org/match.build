@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { setBackendEnv } from "./admin-client";
 
 /**
@@ -67,10 +67,18 @@ export const FAKE_SUBSCRIPTION = {
 } as const;
 
 /**
- * An endpoint on the local backend's own HTTP origin that answers 200 — the
- * deployment's health check. Used as a stand-in push service: a real one would
- * be Apple's or Google's, and pointing at this one proves the request was
- * built and sent without needing the internet.
+ * A stand-in push service on the local backend's own HTTP origin. The route is
+ * the deployment's health check, which is registered for GET alone, so the
+ * push's POST gets a 404 — a push service's "this browser is gone", which is
+ * the case worth proving (prd §8.2). Pointing at ourselves proves the request
+ * was built, signed and sent without needing the internet.
+ *
+ * Unique per call, like everything else a spec seeds (`scenario.ts`).
+ * `pushSubscriptions` is keyed by endpoint and read back through
+ * `by_endpoint` with `.unique()`, so two rows sharing one URL — a retried
+ * `beforeAll` reseeding, or a second spec that also wants a dead browser —
+ * would make every lookup for it throw, and the subscription would never be
+ * dropped. The query string is ignored by the route.
  */
 export function fakePushEndpoint(): string {
   const port = process.env.E2E_CONVEX_SITE_PORT;
@@ -79,5 +87,6 @@ export function fakePushEndpoint(): string {
       "E2E_CONVEX_SITE_PORT is unset — run the suite via Playwright.",
     );
   }
-  return `http://127.0.0.1:${port}/api/health`;
+  const ns = randomBytes(6).toString("hex");
+  return `http://127.0.0.1:${port}/api/health?e2e=${ns}`;
 }

@@ -289,6 +289,17 @@ signing in. Nothing about that touches a real inbox or a cloud deployment:
   at all proves the deployment encrypted the payload and signed the VAPID JWT in
   its own runtime. That is the part unit tests cannot cover: they run on Node's
   Web Crypto, not Convex's.
+  - `fakePushEndpoint()` is **unique per call**, because an endpoint is a seeded
+    row like any other. `pushSubscriptions` is keyed by endpoint and read back
+    with `.unique()`, so two rows sharing one URL make every lookup for it
+    throw — including the one that drops it.
+- **A notification's final status is not the end of its send.**
+  `mutations.deliver` writes `sent` and *then* schedules the action, so
+  `waitForDelivery` returning means the send has *started*: the POST may still
+  be in flight, and anything its answer causes — a 404 dropping the
+  subscription — lands later still. Assert on that with the helper's `until`
+  predicate, which is waited for in addition to the row settling. Never with a
+  sleep: under a loaded machine it is a coin toss, which is how this was found.
 - **Codes a platform admin issues** (`specs/admin-convex/sign-in-codes.spec.ts`)
   never reach the outbox: the admin app returns them instead of mailing them.
   Spend one through "I already have a code" on the app's sign-in page —

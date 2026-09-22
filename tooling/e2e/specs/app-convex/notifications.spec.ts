@@ -146,9 +146,15 @@ test("a push is really built, signed and posted, and a dead browser is dropped",
   // Reaching a final state at all means the deployment encrypted the payload
   // (RFC 8291) and signed the VAPID JWT (RFC 8292) in its own runtime — those
   // both happen before the request, and a failure there would record `failed`.
+  //
+  // The status alone settles too early to assert the rest on: `deliver` writes
+  // `sent` and *then* schedules the action, so the row stops saying
+  // `scheduled` while the POST is still in flight. The subscription going away
+  // is the transition this test is actually about, so wait for that.
   const delivery = await waitForDelivery(
     world.conversationId("pushed"),
     "push",
+    { until: (row) => row.subscriptions === 0 },
   );
   expect(delivery.status).toBe("sent");
   // The stand-in endpoint answers "not found" to the POST, which is a push

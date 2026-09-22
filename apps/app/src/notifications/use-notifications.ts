@@ -12,11 +12,14 @@ import type { Notification } from "./notifications";
  * takes the list as it comes. `read` is one watermark per account, which is
  * why marking is one mutation with no arguments rather than one per item.
  *
- * While the query is loading there is nothing to show: an empty bell for a
- * moment is better than a count that lands and then changes.
+ * While the query is loading `items` is `undefined`, not `[]`: an empty bell
+ * for a moment is better than a count that lands and then changes, but the
+ * panel has to be able to tell "nothing is waiting" from "we don't know yet" —
+ * opening it is what marks everything read, and it must not do that over a
+ * list that hasn't arrived.
  */
 export function useNotifications(): {
-  items: Notification[];
+  items: Notification[] | undefined;
   markAllRead: () => void;
 } {
   const feed = useQuery(api.notifications.queries.feed);
@@ -26,5 +29,5 @@ export function useNotifications(): {
     void markFeedSeen({});
   }, [markFeedSeen]);
 
-  return { items: feed ?? [], markAllRead };
+  return { items: feed, markAllRead };
 }

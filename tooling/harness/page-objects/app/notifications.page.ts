@@ -18,15 +18,21 @@ export class NotificationsPage {
   }
 
   /**
-   * Opens the panel, unless it is already open. By whether the panel is
-   * showing rather than by the trigger's state: clicking a second time would
-   * close it again.
+   * Opens the panel, unless it is already open, and waits for the feed behind
+   * it to have arrived. By whether the panel is showing rather than by the
+   * trigger's state: clicking a second time would close it again.
+   *
+   * The wait is the point. The bell can be clicked before the feed query has
+   * resolved, and the panel then holds rather than marking an empty list read
+   * (`notifications-menu.tsx`) — so the dots, the quiet bell and "you're all
+   * caught up" are all only true of this opening once the list is there.
    */
   async open() {
     if (!(await this.getPanel().isVisible())) {
       await this.getTrigger().click();
       await expect(this.getPanel()).toBeVisible();
     }
+    await expect(this.getLoading()).toHaveCount(0);
   }
 
   getPanel() {
@@ -52,5 +58,10 @@ export class NotificationsPage {
 
   getEmptyState() {
     return this.page.getByTestId("notifications-empty");
+  }
+
+  /** Shown in place of the list while the feed is still loading. */
+  getLoading() {
+    return this.page.getByTestId("notifications-loading");
   }
 }
