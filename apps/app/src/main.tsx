@@ -6,6 +6,8 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import "./index.css";
 import App from "./App.tsx";
+import { AnalyticsIdentity } from "./analytics/identity";
+import { maskAppPath } from "./analytics/routes";
 // Validates environment variables at startup (see ./env.ts).
 import { env } from "./env";
 
@@ -36,6 +38,7 @@ createRoot(rootElement).render(
     <AnalyticsProvider
       apiKey={env.VITE_POSTHOG_KEY}
       apiHost={env.VITE_POSTHOG_HOST}
+      maskPath={maskAppPath}
     >
       <ConvexAuthProvider client={convex}>
         {/* The app is mounted under Vite's `base` (/app/ today). The basename
@@ -43,6 +46,9 @@ createRoot(rootElement).render(
             bare "/app", which production serves without redirecting, and the
             page would render nothing. "/app" matches both. */}
         <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          {/* Above the routes, so it survives every navigation — including the
+              one that leaves the last signed-in route behind. */}
+          <AnalyticsIdentity />
           <App />
         </BrowserRouter>
       </ConvexAuthProvider>
