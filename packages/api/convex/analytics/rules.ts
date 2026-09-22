@@ -320,6 +320,11 @@ export function posthogBatch(
         ...capture.properties,
         distinct_id: capture.distinctId,
         $lib: "convex",
+        // PostHog geolocates an event by the IP that sent it, which here is
+        // Convex's data centre, and writes the result onto the person —
+        // overwriting the location their browser reported. Every server event
+        // would move its person to the same point in the middle of the US.
+        $geoip_disable: true,
         ...(capture.personless ? { $process_person_profile: false } : {}),
         ...(context.group === undefined
           ? {}

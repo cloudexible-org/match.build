@@ -95,6 +95,7 @@ describe("emitAuditAnalytics", () => {
           to: "paused",
           distinct_id: w.owner,
           $lib: "convex",
+          $geoip_disable: true,
           $groups: { matchmaker: "maya" },
         },
       },

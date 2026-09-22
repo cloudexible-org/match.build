@@ -224,6 +224,7 @@ describe("posthogBatch", () => {
             actor_type: "system",
             distinct_id: "system:nightly",
             $lib: "convex",
+            $geoip_disable: true,
             $process_person_profile: false,
             $groups: { matchmaker: "maya" },
           },
@@ -245,7 +246,11 @@ describe("posthogBatch", () => {
       ],
       { timestamp: 0 },
     ).batch;
-    expect(sent?.properties).toEqual({ distinct_id: "u_1", $lib: "convex" });
+    expect(sent?.properties).toEqual({
+      distinct_id: "u_1",
+      $lib: "convex",
+      $geoip_disable: true,
+    });
   });
 });
 
