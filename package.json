@@ -17,6 +17,7 @@
     "capture:demo": "pnpm --filter marketing capture:demo",
     "render:demo": "pnpm --filter marketing render:demo",
     "stitch:demo": "pnpm --filter marketing stitch:demo",
+    "narrate:demo": "pnpm --filter marketing narrate:demo",
     "format": "biome format . --write",
     "check": "biome check .",
     "storybook": "pnpm --filter @repo/ui storybook",

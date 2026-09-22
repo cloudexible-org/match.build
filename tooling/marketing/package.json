@@ -6,6 +6,7 @@
     "capture:demo": "playwright test captures/demos",
     "render:demo": "node scripts/render-demo.mjs",
     "stitch:demo": "node scripts/stitch-demo.mjs",
+    "narrate:demo": "node scripts/narrate-demo.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

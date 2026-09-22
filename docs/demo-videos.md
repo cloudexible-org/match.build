@@ -11,6 +11,7 @@ runs in CI or as part of `pnpm test:e2e`.
 pnpm capture:demo                          # drive the app, write frames + a manifest
 pnpm render:demo -- --name inbox-ai-reply  # render mp4 / gif / poster
 pnpm stitch:demo                           # join the rendered clips into one film
+pnpm narrate:demo -- --audio take-3.m4a    # lay a voiceover over that film
 ```
 
 ## The demos
@@ -251,6 +252,39 @@ Two things about them are not obvious:
   its quote and its Accept button is directly above the composer, and so is
   Send. An overlaid caption covered exactly those. The band costs 170px of
   frame height (`--band-height`) and occludes nothing.
+
+---
+
+## Recording the voiceover
+
+The film is silent and its subtitles are burned in, so recording is just
+reading each card while it is on screen — see
+[`demo-script.md`](./demo-script.md). Record into anything (Voice Memos,
+QuickTime, Audacity), export a single file, and lay it over the film:
+
+```bash
+pnpm narrate:demo -- --audio ~/Desktop/take-3.m4a
+pnpm narrate:demo -- --audio take-3.m4a --offset 0.4   # start the voice later
+pnpm narrate:demo -- --audio take-3.m4a --offset -1.2  # trim dead air off the head
+pnpm narrate:demo -- --audio take-3.m4a --gain 3       # 3dB louder
+```
+
+Writes `match-build-demo-narrated.mp4` beside the silent film and leaves the
+original alone, so a bad take costs nothing.
+
+Three things it does that a bare ffmpeg command would not:
+
+- **The picture is never re-encoded** (`-c:v copy`), so the fourth take is as
+  instant and as lossless as the first.
+- **A length mismatch is reported rather than silently cut.** `-shortest` on
+  its own would quietly truncate whichever stream ran long — usually the
+  narration, losing the last sentence. A take that runs past the end of the
+  film is a warning; one that finishes early is padded with silence.
+- **`--offset` moves the voice, not the picture**, so the subtitles and the
+  footage stay exactly where they were.
+
+If a take keeps overrunning, do not talk faster: lengthen a `hold` in the
+capture and re-render that clip, or re-stitch at a lower `--speed`.
 
 ---
 

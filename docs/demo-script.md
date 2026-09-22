@@ -6,6 +6,7 @@ The voiceover for the stitched demo film — what to say, and when.
 pnpm capture:demo     # film all seven clips
 pnpm render:demo -- --name <each>
 pnpm stitch:demo      # → .scratch/marketing/demos/_stitched/match-build-demo.mp4
+pnpm narrate:demo -- --audio take-3.m4a   # lay your recording over it
 ```
 
 **This file is the film's edit, not a description of it.** `stitch-demo.mjs`
@@ -147,8 +148,11 @@ by model.*
   match card and the cost tiles all need a moment to be *read*.
 - **Say "she", not "the user".** The film is about one person's afternoon, and
   the first judging criterion is everyday usefulness.
-- **Record the audio separately** and lay it over the mp4. The clips have no
-  sound, so there is nothing to duck.
+- **Record the audio separately** and lay it over the mp4 with
+  `pnpm narrate:demo -- --audio <file>`. The clips have no sound, so there is
+  nothing to duck, the picture is never re-encoded, and the original silent
+  film is left alone — so takes are cheap. `--offset` nudges the voice if you
+  came in early or late.
 - **If you would rather have no burnt-in text**, `pnpm stitch:demo --
   --no-subtitles` renders the same film clean — cards and all — and the `.srt`
   beside it can be attached as a soft subtitle track instead.
