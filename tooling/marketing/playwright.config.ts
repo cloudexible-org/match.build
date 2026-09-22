@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import base, { APP_URL } from "@repo/harness/playwright.config";
+import base, { ADMIN_URL, APP_URL } from "@repo/harness/playwright.config";
 
 /**
  * Marketing capture — the demo clips that go in the pitch deck. Run on demand,
@@ -30,13 +30,28 @@ export default defineConfig({
   retries: 0,
   reporter: "list",
   /**
-   * One project, replacing the suite's five. Marketing only films `apps/app`;
-   * each capture sets its own viewport and colour scheme with `test.use`.
+   * Two projects, replacing the suite's five — one per app a demo can be
+   * filmed against. Each capture sets its own viewport and colour scheme with
+   * `test.use`.
+   *
+   * They are split by **filename** rather than by directory so that every demo
+   * stays in one place (`captures/demos/`, which is what `capture:demo` and
+   * the docs both name) and `render:demo --name <x>` keeps matching the spec
+   * called `<x>.spec.ts`. A capture that drives `apps/admin` is prefixed
+   * `admin-`; anything else gets the app. Without the split a capture would
+   * inherit `baseURL: APP_URL` and quietly photograph the *app* at
+   * `/admin/usage`, which 404s.
    */
   projects: [
     {
       name: "capture",
+      testIgnore: /admin-[^/]*\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: APP_URL },
+    },
+    {
+      name: "capture-admin",
+      testMatch: /admin-[^/]*\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"], baseURL: ADMIN_URL },
     },
   ],
 });

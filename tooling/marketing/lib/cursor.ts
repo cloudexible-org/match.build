@@ -80,6 +80,14 @@ export const STILL_CSS = `
 export interface BootstrapArg {
   style: CursorStyle;
   css: string;
+  /**
+   * Install the stillness CSS but no pointer overlay.
+   *
+   * For a `Director` companion page: a clip has one cursor, and it belongs to
+   * whichever page is being driven. The companion still needs its animations
+   * frozen, or two screenshots of the same state would differ.
+   */
+  hidden?: boolean;
 }
 
 /**
@@ -92,7 +100,7 @@ export interface BootstrapArg {
  * The layer mounts on `documentElement` rather than `body` because React owns
  * `body`'s subtree and will unmount a stray child during a route change.
  */
-export function bootstrap({ style, css }: BootstrapArg): void {
+export function bootstrap({ style, css, hidden }: BootstrapArg): void {
   const mount = (): void => {
     const root = document.documentElement;
     if (!root) return;
@@ -104,6 +112,7 @@ export function bootstrap({ style, css }: BootstrapArg): void {
       root.appendChild(tag);
     }
 
+    if (hidden) return;
     if (document.getElementById("__demo-layer")) return;
 
     const layer = document.createElement("div");

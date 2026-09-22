@@ -6,9 +6,10 @@ import {
 } from "@repo/harness/page-objects/app/matchmaker.page";
 import { SuggestionsPage } from "@repo/harness/page-objects/app/suggestions.page";
 import { SCRATCH_DIR } from "@repo/harness/paths";
-import { type Scenario, seedScenario } from "@repo/harness/scenario";
+import type { Scenario } from "@repo/harness/scenario";
 import { signInAs } from "@repo/harness/session";
 import { Director } from "../../lib/director";
+import { seedScene } from "../../lib/scene";
 
 /**
  * The pitch's core claim, in twelve seconds: a matchmaker's whole book in one
@@ -82,7 +83,7 @@ const THREAD = [
 let world: Scenario;
 
 test.beforeAll(async () => {
-  world = await seedScenario({
+  world = await seedScene({
     // Emails as well as names, because both are on camera: the candidate list,
     // the conversation header and the Details panel all show an address, and
     // the one the seeder invents carries this run's namespace
@@ -223,7 +224,7 @@ test("inbox to a drafted reply", async ({ page }) => {
     workspace.getCandidates().getByRole("listitem").first(),
   ).toContainText("Sam Okonkwo");
   await page.waitForLoadState("networkidle");
-  await director.hold(1100, "the book");
+  await director.hold(2200, "the book");
 
   // ── 2. Into the conversation ───────────────────────────────────────────────
   const samRow = workspace.getCandidateRow("Sam Okonkwo");
@@ -242,7 +243,7 @@ test("inbox to a drafted reply", async ({ page }) => {
   // separate query, and photographing before it lands gives a frame of empty
   // composer where the payoff should be.
   await suggestions.getRow("reply").waitFor({ state: "visible" });
-  await director.hold(1600, "a reply, already drafted");
+  await director.hold(3200, "a reply, already drafted");
 
   // ── 4. The matchmaker makes it hers ────────────────────────────────────────
   // Edit rather than Send: "the AI wrote it and she pressed go" is the story
@@ -264,7 +265,7 @@ test("inbox to a drafted reply", async ({ page }) => {
   await director.click(conversation.getSendButton(), {
     // The longest hold in the clip. This is the frame the poster is cut from,
     // and the one a viewer should still be reading when it loops.
-    settleMs: 2000,
+    settleMs: 4000,
     label: "sent",
   });
 

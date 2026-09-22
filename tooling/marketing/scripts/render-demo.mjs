@@ -119,6 +119,15 @@ const gifFps = Number(args.gifFps || 12);
 const gifWidth = Number(args.gifWidth || 800);
 const crf = Number(args.crf || 20);
 
+/**
+ * The gutter between the two halves of a two-up capture, in *captured* pixels
+ * (so 32 here is 16 CSS px at `deviceScaleFactor: 2`), and its colour. Only
+ * used when the manifest says `companion: true`.
+ */
+const twoUpGap = Number(args.twoUpGap ?? 32);
+const twoUpGapColor =
+  typeof args.twoUpGapColor === "string" ? args.twoUpGapColor : "0x2b2724";
+
 const FFMPEG = resolveFfmpeg(
   typeof args.ffmpeg === "string" ? args.ffmpeg : "",
 );
@@ -132,10 +141,76 @@ if (!existsSync(manifestPath)) {
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 const { fps } = manifest;
-const framesDir = join(inDir, "frames");
 const workDir = join(inDir, ".render");
 rmSync(workDir, { recursive: true, force: true });
 mkdirSync(workDir, { recursive: true });
+
+/**
+ * Pastes each companion still to the right of its twin, and returns the
+ * directory of composites.
+ *
+ * A two-up capture writes `frames/NNNN.png` and `frames-b/NNNN.png` for the
+ * same instant. Compositing them here — rather than teaching the concat list,
+ * the `xfade` expansion and the GIF palette each to juggle two inputs — means
+ * everything downstream keeps seeing exactly one directory of numbered stills.
+ *
+ * `vstack`'s sibling `hstack` needs both inputs the same height, which they
+ * are: the Director films one viewport height. The widths differ on purpose
+ * (a phone beside a laptop).
+ *
+ * **The gutter is not decoration.** Butted straight together the two screens
+ * read as a single window with an extra column — both are the same app in the
+ * same palette, so the seam vanishes and the whole point of the shot (two
+ * devices, two accounts) is lost. A dark bar between them is what makes a
+ * viewer count two screens. `--two-up-gap 0` removes it.
+ */
+function composeCompanion() {
+  const mainDir = join(inDir, "frames");
+  const sideDir = join(inDir, "frames-b");
+  if (!existsSync(sideDir)) {
+    throw new Error(
+      `${manifestPath} says companion: true, but ${sideDir} is missing.\n` +
+        "Re-run the capture.",
+    );
+  }
+
+  const outFrames = join(workDir, "composed");
+  mkdirSync(outFrames, { recursive: true });
+
+  const files = new Set();
+  for (const entry of manifest.timeline) {
+    if (entry.kind === "frame") files.add(entry.file);
+    else {
+      files.add(entry.from);
+      files.add(entry.to);
+    }
+  }
+
+  const filter =
+    twoUpGap > 0
+      ? `[0]pad=iw+${twoUpGap}:ih:0:0:color=${twoUpGapColor}[l];[l][1]hstack=inputs=2`
+      : "[0][1]hstack=inputs=2";
+
+  for (const file of files) {
+    ffmpeg([
+      "-y",
+      "-i",
+      join(mainDir, file),
+      "-i",
+      join(sideDir, file),
+      "-filter_complex",
+      filter,
+      join(outFrames, file),
+    ]);
+  }
+
+  console.log(`  composited ${files.size} two-up frames`);
+  return outFrames;
+}
+
+const framesDir = manifest.companion
+  ? composeCompanion()
+  : join(inDir, "frames");
 
 /**
  * Renders the in-between frames of one dissolve with `xfade`.
@@ -203,15 +278,27 @@ if (shots.length === 0) throw new Error("Capture timeline is empty.");
  * The concat demuxer ignores the *final* entry's `duration`, so the last still
  * is listed twice — otherwise the closing frame flashes by in one frame rather
  * than holding, which is exactly where a viewer needs the pause most.
+ *
+ * **And the repeat inherits the duration it was given**, so listing the closing
+ * still at its full length played it for *twice* that: a `hold(4500)` closed
+ * the clip on 9 seconds of one frame. Measured, not guessed — every rendered
+ * mp4 came out exactly `manifest total + final hold` long. Splitting the hold
+ * across the two entries makes the pair add up to the hold that was asked for,
+ * which is the whole premise of the format: the numbers in the capture are the
+ * edit, and a clip should be as long as its timeline says.
  */
 const quote = (p) => `'${p.replaceAll("'", "'\\''")}'`;
 const listPath = join(workDir, "concat.txt");
+const closing = shots.at(-1);
 writeFileSync(
   listPath,
   [
     "ffconcat version 1.0",
-    ...shots.map((s) => `file ${quote(s.file)}\nduration ${s.dur.toFixed(6)}`),
-    `file ${quote(shots.at(-1).file)}`,
+    ...shots
+      .slice(0, -1)
+      .map((s) => `file ${quote(s.file)}\nduration ${s.dur.toFixed(6)}`),
+    `file ${quote(closing.file)}\nduration ${(closing.dur / 2).toFixed(6)}`,
+    `file ${quote(closing.file)}`,
     "",
   ].join("\n"),
 );
@@ -282,7 +369,9 @@ console.log(
   [
     "",
     `  ${name} — ${(totalMs / 1000).toFixed(2)}s, ${shots.length} frames @ ${fps}fps`,
-    `  captured ${manifest.width}x${manifest.height}, video ${videoWidth}px wide`,
+    // The manifest's width is the two viewports; the gutter is added here, so
+    // report what was actually fed to the encoder rather than what was filmed.
+    `  captured ${manifest.width + (manifest.companion ? twoUpGap : 0)}x${manifest.height}, video ${videoWidth}px wide`,
     "",
     ...[mp4, gif, poster].map((f) => `  ${f}  ${formatBytes(f)}`),
     "",

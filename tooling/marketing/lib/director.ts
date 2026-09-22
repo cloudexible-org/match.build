@@ -54,6 +54,13 @@ export interface DemoManifest {
   /** Device pixels, i.e. viewport × `deviceScaleFactor` — what the PNGs are. */
   width: number;
   height: number;
+  /**
+   * Set when a companion page was filmed alongside the main one. Every still
+   * in `timeline` then exists twice — `frames/<file>` and `frames-b/<file>` —
+   * and `render-demo.mjs` composites the pair left-to-right before it renders
+   * anything. `width` above is the *combined* width.
+   */
+  companion?: boolean;
   timeline: TimelineEntry[];
 }
 
@@ -68,6 +75,23 @@ export interface DirectorOptions {
   viewport: { width: number; height: number };
   deviceScaleFactor: number;
   cursor?: CursorStyle;
+  /**
+   * A second page photographed at the same instant as the main one, and
+   * composited to its right by the renderer.
+   *
+   * For the clips whose subject is *two people at once* — a candidate writing
+   * on his phone while the matchmaker's book updates under her. Filming that
+   * as two separate takes would prove nothing: the whole claim is that the two
+   * screens moved together, and only one screenshot pair per beat can show it.
+   *
+   * The caller owns this page: its own context, its own session, and its own
+   * viewport, whose width need not match the main one (a phone beside a
+   * laptop is the point). The cursor overlay is *not* installed on it — there
+   * is one pointer in a clip, and it belongs to the page being driven — but
+   * the still-frame CSS is, or its animations would sample at a different
+   * phase in every frame.
+   */
+  companion?: { page: Page; viewport: { width: number; height: number } };
 }
 
 interface Point {
@@ -86,10 +110,15 @@ function lerp(a: number, b: number, t: number): number {
 
 export class Director {
   private readonly page: Page;
-  private readonly opts: Required<Omit<DirectorOptions, "cursor">> & {
+  private readonly opts: Required<
+    Omit<DirectorOptions, "cursor" | "companion">
+  > & {
     cursor: CursorStyle;
+    companion?: DirectorOptions["companion"];
   };
   private readonly framesDir: string;
+  /** Only written when a companion page is being filmed. */
+  private readonly companionFramesDir: string;
   private readonly timeline: TimelineEntry[] = [];
 
   private seq = 0;
@@ -106,6 +135,7 @@ export class Director {
       ...options,
     };
     this.framesDir = join(options.outDir, "frames");
+    this.companionFramesDir = join(options.outDir, "frames-b");
     this.pos = {
       x: options.viewport.width / 2,
       y: options.viewport.height + 60,
@@ -130,6 +160,20 @@ export class Director {
       style: this.opts.cursor,
       css: STILL_CSS,
     });
+
+    const { companion } = this.opts;
+    if (companion) {
+      rmSync(this.companionFramesDir, { recursive: true, force: true });
+      mkdirSync(this.companionFramesDir, { recursive: true });
+      // The still-frame CSS, but no pointer: a clip has one cursor, and it
+      // belongs to whichever page is being driven. `hidden: true` makes
+      // `bootstrap` install the freeze and skip the overlay.
+      await companion.page.addInitScript(bootstrap, {
+        style: this.opts.cursor,
+        css: STILL_CSS,
+        hidden: true,
+      });
+    }
   }
 
   /** Pushes the overlay's state into the page, then captures one still. */
@@ -159,6 +203,21 @@ export class Director {
       animations: "disabled",
       caret: "hide",
     });
+
+    /**
+     * The companion is photographed under the *same* name, immediately after.
+     * "Immediately" is the whole contract: the pair is what lets the finished
+     * clip claim the two screens moved together, so nothing may be awaited
+     * between them beyond the screenshots themselves.
+     */
+    const { companion } = this.opts;
+    if (companion) {
+      await companion.page.screenshot({
+        path: join(this.companionFramesDir, file),
+        animations: "disabled",
+        caret: "hide",
+      });
+    }
     return file;
   }
 
@@ -252,6 +311,14 @@ export class Director {
    * click, and would only reach the end of the *line* in a textarea anyway;
    * setting the selection directly is both correct and independent of the
    * platform's key bindings.
+   *
+   * Only *some* inputs have a selection to set. `setSelectionRange` throws
+   * `InvalidStateError` on `email`, `number`, `date` and the rest of the typed
+   * inputs — HTML only defines the selection APIs for `text`, `search`, `url`,
+   * `tel` and `password` — so the call is made where it is defined and skipped
+   * where it is not. Skipping costs nothing: a field with no selection API is
+   * one the app holds no draft in, so the click that focused it has already put
+   * the caret at the end of whatever short value is there.
    */
   async type(
     target: Locator,
@@ -261,7 +328,13 @@ export class Director {
     const { chunk = 3, settleMs = 500 } = opts;
     await target.click();
     await target.evaluate((el) => {
-      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      const SELECTABLE = ["text", "search", "url", "tel", "password"];
+      if (el instanceof HTMLTextAreaElement) {
+        el.setSelectionRange(el.value.length, el.value.length);
+      } else if (
+        el instanceof HTMLInputElement &&
+        SELECTABLE.includes(el.type)
+      ) {
         el.setSelectionRange(el.value.length, el.value.length);
       }
     });
@@ -381,11 +454,16 @@ export class Director {
 
   /** Writes `manifest.json` beside `frames/`. Returns the finished timeline. */
   finish(): DemoManifest {
+    const { companion, viewport, deviceScaleFactor } = this.opts;
+    // Combined, when there are two pages: what the renderer will emit after it
+    // composites each pair, which is what `width` has to describe.
+    const cssWidth = viewport.width + (companion?.viewport.width ?? 0);
     const manifest: DemoManifest = {
       name: this.opts.name,
       fps: this.opts.fps,
-      width: this.opts.viewport.width * this.opts.deviceScaleFactor,
-      height: this.opts.viewport.height * this.opts.deviceScaleFactor,
+      width: cssWidth * deviceScaleFactor,
+      height: viewport.height * deviceScaleFactor,
+      ...(companion ? { companion: true } : {}),
       timeline: this.timeline,
     };
     writeFileSync(

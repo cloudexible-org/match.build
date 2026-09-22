@@ -11,11 +11,10 @@
  * specs assert only statically-rendered chrome. That is how CI runs.
  */
 
-import { adminClient } from "../admin-client";
 import { configureAuthEnv } from "../auth-env";
 import { convexEnabled } from "../convex-enabled";
 import { assertLocalBackendIdentity } from "../local-backend";
-import type { SeedManifest } from "../seed";
+import { resetAndSeedBaseline } from "../reset";
 
 async function globalSetup(): Promise<void> {
   if (!convexEnabled()) {
@@ -43,32 +42,7 @@ async function globalSetup(): Promise<void> {
     return;
   }
 
-  const client = adminClient();
-
-  // Referenced by string rather than through the generated `internal.*` tree:
-  // the harness has no dependency on the backend's generated API, and adding one
-  // would drag Convex codegen into the e2e typecheck.
-  let guard = 0;
-  for (;;) {
-    const { done } = (await client.mutation(
-      "seed/e2e/mutations:reset" as never,
-      {} as never,
-    )) as {
-      deleted: number;
-      done: boolean;
-    };
-    if (done) break;
-    if (++guard > 100) {
-      throw new Error(
-        "seed reset did not converge after 100 pages — is something writing to the database?",
-      );
-    }
-  }
-
-  const manifest = (await client.mutation(
-    "seed/e2e/mutations:apply" as never,
-    {} as never,
-  )) as SeedManifest;
+  const manifest = await resetAndSeedBaseline();
 
   console.log(
     `🌱 seeded ${Object.keys(manifest.users).length} users, ` +

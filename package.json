@@ -16,6 +16,7 @@
     "test:e2e:observe": "pnpm --filter e2e test:observe",
     "capture:demo": "pnpm --filter marketing capture:demo",
     "render:demo": "pnpm --filter marketing render:demo",
+    "stitch:demo": "pnpm --filter marketing stitch:demo",
     "format": "biome format . --write",
     "check": "biome check .",
     "storybook": "pnpm --filter @repo/ui storybook",
