@@ -92,7 +92,6 @@ test.beforeAll(async () => {
          */
         username: "makerandco",
         displayName: "Maya Maker",
-        businessName: "Maker & Co.",
         voice: "Warm, brief, curious. Never salesy.",
       },
     ],

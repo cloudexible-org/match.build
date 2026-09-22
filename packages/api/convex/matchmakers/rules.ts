@@ -10,7 +10,6 @@ export const MATCHMAKER_LIMITS = {
   usernameMin: 6,
   usernameMax: 30,
   displayName: 60,
-  businessName: 80,
 } as const;
 
 /**
@@ -157,19 +156,6 @@ export function displayNameError(raw: string): string | null {
   if (!name) return "Enter a display name.";
   if (name.length > MATCHMAKER_LIMITS.displayName) {
     return "That display name is too long.";
-  }
-  return null;
-}
-
-/** The business name is optional: blank clears it. */
-export function normaliseBusinessName(raw: string): string | undefined {
-  return normaliseName(raw) || undefined;
-}
-
-/** Returns an error message, or `null` when the (raw) business name is fine. */
-export function businessNameError(raw: string): string | null {
-  if (normaliseName(raw).length > MATCHMAKER_LIMITS.businessName) {
-    return "That business name is too long.";
   }
   return null;
 }

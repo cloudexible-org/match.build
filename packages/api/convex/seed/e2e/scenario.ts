@@ -74,7 +74,6 @@ export type ScenarioMatchmaker = {
   username?: string;
   /** Default: `<Key> <ns>`, so it can't collide in an assertion. */
   displayName?: string;
-  businessName?: string;
   /** Their voice (prd/phase-2.md §4.1C), as if they had written it themselves. */
   voice?: string;
   /** A voice the agent has drafted and nobody has answered yet. */

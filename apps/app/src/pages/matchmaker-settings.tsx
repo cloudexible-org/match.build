@@ -1,6 +1,5 @@
 import {
   api,
-  businessNameError,
   displayNameError,
   MATCHMAKER_LIMITS,
   PRACTICE_FIELDS,
@@ -55,15 +54,12 @@ export function MatchmakerSettingsPage() {
   );
 }
 
-type Errors = { displayName?: string; businessName?: string; form?: string };
+type Errors = { displayName?: string; form?: string };
 
 function ProfileForm() {
   const workspace = useWorkspace();
   const update = useMutation(api.matchmakers.mutations.update);
   const [displayName, setDisplayName] = useState(workspace.displayName);
-  const [businessName, setBusinessName] = useState(
-    workspace.businessName ?? "",
-  );
   const [errors, setErrors] = useState<Errors>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
 
@@ -71,16 +67,14 @@ function ProfileForm() {
     event.preventDefault();
     const invalid: Errors = {
       displayName: displayNameError(displayName) ?? undefined,
-      businessName: businessNameError(businessName) ?? undefined,
     };
     setErrors(invalid);
-    if (invalid.displayName || invalid.businessName) return;
+    if (invalid.displayName) return;
     setStatus("saving");
     try {
       await update({
         matchmakerId: workspace.matchmakerId,
         displayName,
-        businessName,
       });
       setStatus("saved");
     } catch (error) {
@@ -130,24 +124,6 @@ function ProfileForm() {
               <FieldDescription>
                 Candidates see your display name.
               </FieldDescription>
-            )}
-          </Field>
-
-          <Field invalid={errors.businessName !== undefined}>
-            <FieldLabel>Business name (optional)</FieldLabel>
-            <Input
-              autoComplete="organization"
-              maxLength={MATCHMAKER_LIMITS.businessName + 10}
-              value={businessName}
-              onChange={(event) => {
-                setBusinessName(event.target.value);
-                edited();
-              }}
-            />
-            {errors.businessName ? (
-              <FieldError match>{errors.businessName}</FieldError>
-            ) : (
-              <FieldDescription>Leave blank to remove it.</FieldDescription>
             )}
           </Field>
 

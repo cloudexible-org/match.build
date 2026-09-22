@@ -163,7 +163,7 @@ export const conversation = query({
  * matchmaker — alike). Candidate-facing: returns only what the candidate may
  * see, never the matchmaker's private data.
  *
- * `businessName` and `joinedAt` feed the candidate shell's third column
+ * The display name and `joinedAt` feed the candidate shell's third column
  * (prd/phase-1.md §4.2): who this matchmaker is, and since when.
  */
 export const self = query({
@@ -174,7 +174,6 @@ export const self = query({
       candidateId: v.id("candidates"),
       matchmakerUsername: v.string(),
       matchmakerDisplayName: v.string(),
-      matchmakerBusinessName: v.optional(v.string()),
       joinedAt: v.number(),
     }),
   ),
@@ -200,7 +199,6 @@ export const self = query({
       candidateId: joined._id,
       matchmakerUsername: matchmaker.username,
       matchmakerDisplayName: matchmaker.displayName,
-      matchmakerBusinessName: matchmaker.businessName,
       joinedAt: joined.membershipChangedAt,
     };
   },

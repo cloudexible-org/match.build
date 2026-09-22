@@ -23,22 +23,13 @@ export class CreateMatchmakerPage {
     return this.page.getByLabel("Display name");
   }
 
-  getBusinessNameInput() {
-    return this.page.getByLabel("Business name (optional)");
-  }
-
   getSubmitButton() {
     return this.page.getByRole("button", { name: "Create profile" });
   }
 
-  async create(profile: {
-    username: string;
-    displayName: string;
-    businessName?: string;
-  }) {
+  async create(profile: { username: string; displayName: string }) {
     await this.getUsernameInput().fill(profile.username);
     await this.getDisplayNameInput().fill(profile.displayName);
-    await this.getBusinessNameInput().fill(profile.businessName ?? "");
     await this.getSubmitButton().click();
   }
 
@@ -110,8 +101,8 @@ export class WorkspacePage {
 }
 
 /**
- * `/app/mm/:username/settings`: display name, business name, their practice
- * and their voice. Rendered by `apps/app/src/pages/matchmaker-settings.tsx`.
+ * `/app/mm/:username/settings`: display name, their practice and their
+ * voice. Rendered by `apps/app/src/pages/matchmaker-settings.tsx`.
  */
 export class MatchmakerSettingsPage {
   constructor(public readonly page: Page) {}
@@ -130,10 +121,6 @@ export class MatchmakerSettingsPage {
 
   getDisplayNameInput() {
     return this.getForm().getByLabel("Display name");
-  }
-
-  getBusinessNameInput() {
-    return this.getForm().getByLabel("Business name (optional)");
   }
 
   getSaveButton() {
@@ -214,12 +201,9 @@ export class MatchmakerSettingsPage {
     return this.page.getByTestId("matchmaker-settings-status");
   }
 
-  async save(fields: { displayName?: string; businessName?: string }) {
+  async save(fields: { displayName?: string }) {
     if (fields.displayName !== undefined) {
       await this.getDisplayNameInput().fill(fields.displayName);
-    }
-    if (fields.businessName !== undefined) {
-      await this.getBusinessNameInput().fill(fields.businessName);
     }
     await this.getSaveButton().click();
   }

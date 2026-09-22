@@ -29,8 +29,8 @@ test("changeText decodes JSON and marks absent values", () => {
   expect(changeText({ field: "name", before: '"Jane"', after: '"Jan"' })).toBe(
     "name: “Jane” → “Jan”",
   );
-  expect(changeText({ field: "businessName", after: '"Acme"' })).toBe(
-    "businessName: — → “Acme”",
+  expect(changeText({ field: "displayName", after: '"Acme"' })).toBe(
+    "displayName: — → “Acme”",
   );
   expect(
     changeText({

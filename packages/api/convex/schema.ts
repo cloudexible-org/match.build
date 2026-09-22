@@ -178,7 +178,6 @@ export default defineSchema({
     username: v.string(), // chosen form, lowercase, may contain dots; used in URLs
     usernameKey: v.string(), // canonical form, dots removed; unique
     displayName: v.string(),
-    businessName: v.optional(v.string()),
   })
     .index("by_ownerUserId", ["ownerUserId"])
     .index("by_usernameKey", ["usernameKey"]),

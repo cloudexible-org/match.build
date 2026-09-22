@@ -227,7 +227,6 @@ export function matchesAuditFilter(
 const FIELD_LABELS: Record<string, string> = {
   username: "username",
   displayName: "display name",
-  businessName: "business name",
   name: "name",
   email: "email",
   socialHandles: "social handles",

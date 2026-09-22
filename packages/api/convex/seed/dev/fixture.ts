@@ -220,7 +220,6 @@ export const DEV_MATCHMAKER = {
   ownerSlug: "matchmaker",
   username: "maya.matches",
   displayName: "Maya Matches",
-  businessName: "Maya Matches Introductions",
   /** Their voice, as if they had written it themselves (prd/phase-2.md §4.1C). */
   voice:
     "Warm and brief. I open with their name and close with a question, and I never write more than a short paragraph.",

@@ -15,7 +15,6 @@ export type Workspace = {
   matchmakerId: Id<"matchmakers">;
   username: string;
   displayName: string;
-  businessName?: string;
 };
 
 /** The workspace the current `/mm/:username/…` route selected. */

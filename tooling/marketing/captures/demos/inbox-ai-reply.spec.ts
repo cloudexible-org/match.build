@@ -105,7 +105,6 @@ test.beforeAll(async () => {
         key: "book",
         ownerKey: "maya",
         displayName: "Maya Maker",
-        businessName: "Maker & Co.",
         voice: "Warm, brief, curious. Never salesy.",
       },
     ],

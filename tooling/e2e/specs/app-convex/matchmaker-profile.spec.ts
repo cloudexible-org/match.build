@@ -113,27 +113,22 @@ test("the workspace URL accepts any case or dot placement", async ({
   await expect(page).toHaveURL(new RegExp(`/app/mm/${username}/settings$`));
 });
 
-test("settings edit the display and business names", async ({ page }) => {
+test("settings edit the display name", async ({ page }) => {
   await signInAs(page, world.email("editor"));
   const settings = new MatchmakerSettingsPage(page);
   await settings.goto(world.username("editable"));
 
   await expect(settings.getUsername()).toHaveText(world.username("editable"));
   await expect(settings.getDisplayNameInput()).toHaveValue("Editable Book");
-  await settings.save({
-    displayName: "Renamed Book",
-    businessName: "Renamed & Co",
-  });
+  await settings.save({ displayName: "Renamed Book" });
   await expect(settings.getStatus()).toHaveText("Saved.");
+  // The workspace header follows it through the subscription.
   await expect(new WorkspacePage(page).getName()).toHaveText("Renamed Book");
 
-  // A blank business name removes it. The change is still audited
-  // (`matchmakers.queries.profileHistory`, covered by its own convex-test);
-  // settings no longer shows that log.
-  await settings.save({ businessName: "" });
-  await expect(settings.getStatus()).toHaveText("Saved.");
+  // The change is still audited (`matchmakers.queries.profileHistory`, covered
+  // by its own convex-test); settings no longer shows that log.
   await page.reload();
-  await expect(settings.getBusinessNameInput()).toHaveValue("");
+  await expect(settings.getDisplayNameInput()).toHaveValue("Renamed Book");
 });
 
 test("settings reject an empty display name before sending it", async ({

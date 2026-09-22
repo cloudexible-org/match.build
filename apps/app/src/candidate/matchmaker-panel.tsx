@@ -9,7 +9,6 @@ export type SelectedMatchmaker = {
   candidateId: Id<"candidates">;
   matchmakerUsername: string;
   matchmakerDisplayName: string;
-  matchmakerBusinessName?: string;
   joinedAt: number;
 };
 
@@ -56,11 +55,6 @@ export function MatchmakerPanel({
           >
             {name}
           </h2>
-          {matchmaker.matchmakerBusinessName !== undefined && (
-            <p className="text-sm text-muted-foreground">
-              {matchmaker.matchmakerBusinessName}
-            </p>
-          )}
           <p className="text-sm text-muted-foreground">
             @{matchmaker.matchmakerUsername}
           </p>

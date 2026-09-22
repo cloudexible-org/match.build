@@ -6,9 +6,7 @@ import { requireUser } from "../users/helpers";
 import { normaliseName } from "../users/rules";
 import { requireMatchmaker } from "./helpers";
 import {
-  businessNameError,
   displayNameError,
-  normaliseBusinessName,
   normaliseUsername,
   usernameError,
   usernameKey,
@@ -26,7 +24,6 @@ export const create = mutation({
   args: {
     username: v.string(),
     displayName: v.string(),
-    businessName: v.optional(v.string()),
   },
   returns: v.object({
     matchmakerId: v.id("matchmakers"),
@@ -35,9 +32,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
     const invalid =
-      usernameError(args.username) ??
-      displayNameError(args.displayName) ??
-      businessNameError(args.businessName ?? "");
+      usernameError(args.username) ?? displayNameError(args.displayName);
     if (invalid) throw new ConvexError(invalid);
 
     const username = normaliseUsername(args.username);
@@ -51,7 +46,6 @@ export const create = mutation({
     const profile = {
       username,
       displayName: normaliseName(args.displayName),
-      businessName: normaliseBusinessName(args.businessName ?? ""),
     };
     const matchmakerId = await ctx.db.insert("matchmakers", {
       ownerUserId: user._id,
@@ -67,7 +61,6 @@ export const create = mutation({
       changes: diffFields<Partial<typeof profile>>({}, profile, [
         "username",
         "displayName",
-        "businessName",
       ]),
     });
     return { matchmakerId, username };
@@ -82,7 +75,6 @@ export const update = mutation({
   args: {
     matchmakerId: v.id("matchmakers"),
     displayName: v.string(),
-    businessName: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -90,19 +82,11 @@ export const update = mutation({
       ctx,
       args.matchmakerId,
     );
-    const invalid =
-      displayNameError(args.displayName) ??
-      businessNameError(args.businessName);
+    const invalid = displayNameError(args.displayName);
     if (invalid) throw new ConvexError(invalid);
 
-    const next = {
-      displayName: normaliseName(args.displayName),
-      businessName: normaliseBusinessName(args.businessName),
-    };
-    const changes = diffFields(matchmaker, next, [
-      "displayName",
-      "businessName",
-    ]);
+    const next = { displayName: normaliseName(args.displayName) };
+    const changes = diffFields(matchmaker, next, ["displayName"]);
     if (changes.length === 0) return null;
 
     await ctx.db.patch("matchmakers", matchmaker._id, next);

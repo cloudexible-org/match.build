@@ -40,7 +40,6 @@ describe("matchmakers.workspace", () => {
         matchmakerId,
         username: "jane.smith",
         displayName: "Jane",
-        businessName: undefined,
       });
     }
   });

@@ -21,7 +21,6 @@ export const workspace = query({
       matchmakerId: v.id("matchmakers"),
       username: v.string(),
       displayName: v.string(),
-      businessName: v.optional(v.string()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -40,7 +39,6 @@ export const workspace = query({
       matchmakerId: matchmaker._id,
       username: matchmaker.username,
       displayName: matchmaker.displayName,
-      businessName: matchmaker.businessName,
     };
   },
 });

@@ -1,6 +1,5 @@
 import {
   api,
-  businessNameError,
   displayNameError,
   MATCHMAKER_LIMITS,
   normaliseUsername,
@@ -27,7 +26,6 @@ import { Page, PageHeader } from "../shell/page";
 type Errors = {
   username?: string;
   displayName?: string;
-  businessName?: string;
   form?: string;
 };
 
@@ -48,7 +46,6 @@ export function CreateMatchmakerPage() {
   const [username, setUsername] = useState("");
   const [usernameTouched, setUsernameTouched] = useState(false);
   const [displayName, setDisplayName] = useState("");
-  const [businessName, setBusinessName] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
 
@@ -74,15 +71,12 @@ export function CreateMatchmakerPage() {
     const invalid: Errors = {
       username: usernameError(username) ?? undefined,
       displayName: displayNameError(displayName) ?? undefined,
-      businessName: businessNameError(businessName) ?? undefined,
     };
     setErrors(invalid);
-    if (invalid.username || invalid.displayName || invalid.businessName) {
-      return;
-    }
+    if (invalid.username || invalid.displayName) return;
     setSaving(true);
     try {
-      const created = await create({ username, displayName, businessName });
+      const created = await create({ username, displayName });
       navigate(`/mm/${created.username}`, { replace: true });
     } catch (error) {
       const message = serverErrorMessage(
@@ -153,19 +147,6 @@ export function CreateMatchmakerPage() {
                   <FieldDescription>
                     What candidates see. You can change it any time.
                   </FieldDescription>
-                )}
-              </Field>
-
-              <Field invalid={errors.businessName !== undefined}>
-                <FieldLabel>Business name (optional)</FieldLabel>
-                <Input
-                  autoComplete="organization"
-                  maxLength={MATCHMAKER_LIMITS.businessName + 10}
-                  value={businessName}
-                  onChange={(event) => setBusinessName(event.target.value)}
-                />
-                {errors.businessName && (
-                  <FieldError match>{errors.businessName}</FieldError>
                 )}
               </Field>
 

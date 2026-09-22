@@ -207,7 +207,6 @@ test.beforeAll(async () => {
         key: "book",
         ownerKey: "maya",
         displayName: "Maya Maker",
-        businessName: "Maker & Co.",
       },
     ],
     // No `matches`: the board opens empty on purpose, so the cards that appear

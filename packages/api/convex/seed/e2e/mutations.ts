@@ -367,7 +367,6 @@ export const scenario = internalMutation({
           ownerKey: v.string(),
           username: v.optional(v.string()),
           displayName: v.optional(v.string()),
-          businessName: v.optional(v.string()),
           voice: v.optional(v.string()),
           voiceSuggestion: v.optional(v.string()),
         }),
@@ -555,7 +554,6 @@ export const scenario = internalMutation({
         username,
         usernameKey: username.replaceAll(".", ""),
         displayName,
-        businessName: profile.businessName,
       });
       matchmakerIds[profile.key] = id;
       matchmakers[profile.key] = { id, username, displayName };

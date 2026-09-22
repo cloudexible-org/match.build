@@ -34,7 +34,6 @@ test.beforeAll(async () => {
         key: "book",
         ownerKey: "maya",
         displayName: "Maya Matches",
-        businessName: "Maya Matches Ltd",
       },
       { key: "other", ownerKey: "rose", displayName: "Rose's Book" },
       { key: "inviting", ownerKey: "ida", displayName: "Ida's Book" },
@@ -116,7 +115,8 @@ test("the third column says who the matchmaker is and what can be done about it"
   const chat = new CandidateChatPage(page);
   await shell.goto(world.username("book"));
 
-  await expect(chat.getPanel()).toContainText("Maya Matches Ltd");
+  // The display name, which is now the whole of who the matchmaker is here.
+  await expect(chat.getPanel()).toContainText("Maya Matches");
   await expect(chat.getPanel()).toContainText(`@${world.username("book")}`);
   await expect(chat.getPanelMembership()).toContainText("Joined");
   await expect(chat.getNotificationSettingsLink()).toHaveAttribute(

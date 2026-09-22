@@ -31,7 +31,6 @@ describe("matchmakers.create", () => {
     const created = await asOwner.mutation(api.matchmakers.mutations.create, {
       username: "  Jane.Smith ",
       displayName: " Jane   Smith ",
-      businessName: "   ",
     });
     expect(created.username).toBe("jane.smith");
 
@@ -45,7 +44,6 @@ describe("matchmakers.create", () => {
       usernameKey: "janesmith",
       displayName: "Jane Smith",
     });
-    expect(profile?.businessName).toBeUndefined();
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
@@ -123,20 +121,12 @@ describe("matchmakers.update", () => {
 
     await asOwner.mutation(api.matchmakers.mutations.update, {
       matchmakerId,
-      displayName: "Jane",
-      businessName: " Smith  & Co ",
+      displayName: "Jane Smith",
     });
     // No change → no event.
     await asOwner.mutation(api.matchmakers.mutations.update, {
       matchmakerId,
-      displayName: " Jane ",
-      businessName: "Smith & Co",
-    });
-    // Blank clears the business name.
-    await asOwner.mutation(api.matchmakers.mutations.update, {
-      matchmakerId,
-      displayName: "Jane Smith",
-      businessName: "",
+      displayName: " Jane Smith ",
     });
 
     const { profile, updates } = await t.run(async (ctx) => ({
@@ -146,13 +136,8 @@ describe("matchmakers.update", () => {
       ),
     }));
     expect(profile?.displayName).toBe("Jane Smith");
-    expect(profile?.businessName).toBeUndefined();
     expect(updates.map((event) => event.changes)).toEqual([
-      [{ field: "businessName", after: '"Smith & Co"' }],
-      [
-        { field: "displayName", before: '"Jane"', after: '"Jane Smith"' },
-        { field: "businessName", before: '"Smith & Co"' },
-      ],
+      [{ field: "displayName", before: '"Jane"', after: '"Jane Smith"' }],
     ]);
   });
 
@@ -166,7 +151,6 @@ describe("matchmakers.update", () => {
       asStranger.mutation(api.matchmakers.mutations.update, {
         matchmakerId,
         displayName: "Hijacked",
-        businessName: "",
       }),
     ).rejects.toThrow("Matchmaker profile not found.");
   });

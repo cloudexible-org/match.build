@@ -1,8 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
-  businessNameError,
   displayNameError,
-  normaliseBusinessName,
   normaliseUsername,
   usernameError,
   usernameKey,
@@ -64,15 +62,6 @@ describe("profile fields", () => {
     expect(displayNameError("a".repeat(60))).toBeNull();
     expect(displayNameError("a".repeat(61))).toBe(
       "That display name is too long.",
-    );
-  });
-
-  test("the business name is optional and bounded", () => {
-    expect(businessNameError("")).toBeNull();
-    expect(normaliseBusinessName("   ")).toBeUndefined();
-    expect(normaliseBusinessName(" Smith   & Co ")).toBe("Smith & Co");
-    expect(businessNameError("a".repeat(81))).toBe(
-      "That business name is too long.",
     );
   });
 });

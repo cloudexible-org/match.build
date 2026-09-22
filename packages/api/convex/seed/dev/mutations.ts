@@ -348,7 +348,6 @@ export const apply = internalMutation({
         username: DEV_MATCHMAKER.username,
         usernameKey,
         displayName: DEV_MATCHMAKER.displayName,
-        businessName: DEV_MATCHMAKER.businessName,
       });
       matchmaker = await ctx.db.get("matchmakers", id);
       created.push(`matchmaker ${DEV_MATCHMAKER.username}`);

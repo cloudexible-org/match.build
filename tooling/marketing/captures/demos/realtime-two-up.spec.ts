@@ -85,7 +85,6 @@ test.beforeAll(async () => {
         // On camera in the candidate shell's header, like `candidate-view`.
         username: "makerandco",
         displayName: "Maya Maker",
-        businessName: "Maker & Co.",
       },
     ],
     candidates: [
