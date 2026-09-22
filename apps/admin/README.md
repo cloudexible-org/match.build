@@ -24,5 +24,7 @@ signing in to `/app` as someone else does not replace the admin's own session.
 ```bash
 pnpm --filter admin dev     # portless: https://admin.matchbuild.localhost
                             # (and https://matchbuild.localhost/admin/ via apps/app)
+                            # in a worktree both carry the branch as a prefix
+pnpm dev:ports              # no portless: this app at http://127.0.0.1:<port>/admin/
 pnpm --filter admin test    # Vitest, plain logic only; UI is covered by apps/e2e
 ```

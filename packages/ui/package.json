@@ -30,7 +30,7 @@
     "vitest": "^4.1.11"
   },
   "scripts": {
-    "storybook": "portless storybook.matchbuild --app-port 6006 storybook dev -p 6006",
+    "storybook": "portless run --name storybook.matchbuild sh -c 'storybook dev -p ${PORT:-6006}'",
     "build-storybook": "storybook build",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",

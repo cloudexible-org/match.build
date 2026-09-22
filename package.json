@@ -9,6 +9,7 @@
     "ship": "pnpm --filter @repo/api run ship",
     "ship:preview": "pnpm --filter @repo/api run preview:www && pnpm --filter @repo/api run preview:app && pnpm --filter @repo/api run preview:admin",
     "dev": "turbo dev --ui tui",
+    "dev:ports": "node scripts/dev-ports.mjs",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test --filter=!e2e",

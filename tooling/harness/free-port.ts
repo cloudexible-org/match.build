@@ -1,10 +1,13 @@
 /**
  * Free TCP ports for the suite's own app servers.
  *
- * The suite used to pin 5173 and 3100. 5173 is also what `pnpm dev` serves
- * `apps/app` on, so running the two at once failed with "http://127.0.0.1:5173
- * is already used" — and stopping your dev server to run tests is a tax on
- * every run. Asking the OS for a free port removes the collision entirely.
+ * The suite used to pin 5173 and 3100, and 5173 is what `apps/app`'s Vite
+ * config still defaults to, so running the two at once failed with
+ * "http://127.0.0.1:5173 is already used" — and stopping your dev server to run
+ * tests is a tax on every run. Asking the OS for a free port removes the
+ * collision entirely. Nothing pins a dev port any more either: portless assigns
+ * one per app under `pnpm dev`, and `pnpm dev:ports` draws its own from this
+ * same allocator.
  *
  * The picking itself lives in `scripts/pick-ports.mjs` — including why it
  * avoids `listen(0)`, which collided once several worktrees ran at once.

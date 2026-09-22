@@ -7,6 +7,7 @@ This document defines the core standards and automated workflows that any AI age
 * **Command Syntax:** * Use POSIX-compliant commands for macOS/Linux.
     * Use PowerShell or CMD-specific syntax if the environment is detected as Windows.
 * **Package Manager:** Always use `pnpm` for all package operations and script executions (e.g., `pnpm dev`, `pnpm install`).
+* **Running the apps: use `pnpm dev:ports`, not `pnpm dev`.** `pnpm dev` puts the three apps behind portless on one HTTPS origin, `https://matchbuild.localhost`, which needs a locally trusted CA and a proxy on port 443 — neither of which you can set up unattended, and both of which belong to whoever is at the keyboard. `pnpm dev:ports` starts the same servers with no proxy, each on a free port, and prints the URLs; `DEV_PORTS_FILE=<path>` also writes them as JSON. Each app then answers only for itself — `/app/` is on the app server, `/admin/` on the admin server, `/` on the www server — because nothing proxies to anything. Ports are drawn fresh each run, so it never collides with a developer's `pnpm dev`, with a test run, or with another worktree. See the README and `scripts/dev-ports.mjs`.
 
 ## 2. Local Scratch Space
 * **Use `.scratch/`:** For any temporary file — throwaway scripts, repro cases, screenshots, logs, dumps, draft notes, intermediate output — write it under `.scratch/` instead of `/tmp` or the repo root. Its contents are gitignored, so nothing leaks into a commit.

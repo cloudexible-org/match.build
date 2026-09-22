@@ -31,12 +31,16 @@ export default defineConfig({
   // packages/api/convex/http.ts. In dev, portless serves this server at
   // https://admin.matchbuild.localhost, and apps/app's Vite server (the front
   // door at https://matchbuild.localhost) proxies /admin/ here, so dev has
-  // production's one-origin layout.
+  // production's one-origin layout. In a linked git worktree both hostnames
+  // carry the branch as a further label; apps/app derives ours from its own,
+  // so the pair always match (see `portlessSibling` there).
   base: ADMIN_BASE_PATH,
   plugins: [react(), redirectBareBase()],
   server: {
     // IPv4 loopback, for the IPv4-targeting portless proxy (see apps/app).
     host: "127.0.0.1",
+    // Only the default, for a bare `vite`; portless, `pnpm dev:ports` and the
+    // e2e suite each pass a `--port` of their own, which wins. See apps/app.
     port: 5174,
     strictPort: true,
   },

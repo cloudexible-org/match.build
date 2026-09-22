@@ -28,13 +28,22 @@ const nextConfig: NextConfig = {
   // which Next treats as cross-origin: it blocks /_next dev resources (including the
   // HMR client) from any unlisted host, so the page ships HTML but never hydrates.
   // Dev-only — Next ignores this in production builds.
-  // `127.0.0.1` is where the Playwright suite serves this app (see
-  // apps/e2e/playwright.config.ts). Without it Next blocks every /_next dev
-  // chunk from that host, so the page ships HTML and never hydrates — which
-  // reads as "every animation is broken" rather than as a blocked request.
+  //
+  // `**` matches one or more labels and `*` matches exactly one, so the
+  // recursive form is the one that covers a linked git worktree, where portless
+  // prepends the branch: `<branch>.www.matchbuild.localhost`. (Next 16 already
+  // allows `**.localhost` unconditionally, so these entries are belt and
+  // braces — but they are what states the intent, and what would still hold if
+  // dev ever moved to a `--tld` of its own.)
+  //
+  // `127.0.0.1` is where `pnpm dev:ports` and the Playwright suite serve this
+  // app (see `scripts/dev-ports.mjs` and `tooling/harness/playwright.config.ts`).
+  // Without it Next blocks every /_next dev chunk from that host, so the page
+  // ships HTML and never hydrates — which reads as "every animation is broken"
+  // rather than as a blocked request.
   allowedDevOrigins: [
     "matchbuild.localhost",
-    "*.matchbuild.localhost",
+    "**.matchbuild.localhost",
     "127.0.0.1",
     "localhost",
   ],

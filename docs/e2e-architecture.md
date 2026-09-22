@@ -145,13 +145,14 @@ to fire, nothing is seeded and no data is destroyed.
 
 ## 1b. Why the suite can run alongside `pnpm dev`
 
-`pnpm dev` serves `apps/app` on 5173, `apps/www` through portless, and points
-`packages/api` at the **cloud** Convex deployment. The suite has to avoid all
-three without asking you to shut anything down.
+`pnpm dev` serves all three apps through portless, each on a port portless
+assigns, and points `packages/api` at the **cloud** Convex deployment.
+`pnpm dev:ports` serves them on free ports of its own. The suite has to avoid
+all of that without asking you to shut anything down.
 
 | Collision | How it is avoided |
 |---|---|
-| Vite's port (5173) | The suite asks the OS for free ports (`free-port.ts`) |
+| Another dev server's port | The suite asks the OS for free ports (`free-port.ts`) |
 | Next's dev lock | Its own `distDir` (`.next-e2e`) — the lock is `<distDir>/lock` |
 | Convex deployment | Its own local, anonymous backend on its own port |
 | `convex/_generated/` churn | `convex dev --codegen disable` on the e2e backend |
@@ -372,9 +373,9 @@ The config used to be exactly that shape:
 command: "PORTLESS=0 pnpm --filter app dev",
 ```
 
-`apps/app`'s `dev` script is `portless app.turbostack --app-port 5173 vite`, so
-the chain was **pnpm → portless → vite**. Verified at the time: after a run, a
-`vite.js` process remained with `PPID 1`.
+`apps/app`'s `dev` script runs Vite under portless, so the chain was
+**pnpm → portless → vite**. Verified at the time: after a run, a `vite.js`
+process remained with `PPID 1`.
 
 The server is now a **direct child**, on a port allocated for the run rather
 than the fixed 5173 it used to claim (see §1b):

@@ -4,7 +4,7 @@
   "version": "4.5.0",
   "type": "module",
   "scripts": {
-    "dev": "doppler run -- portless admin.matchbuild --app-port 5174 vite",
+    "dev": "doppler run -- portless run --name admin.matchbuild vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "preview": "vite preview",

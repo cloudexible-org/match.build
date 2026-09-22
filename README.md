@@ -76,9 +76,46 @@ it proxies `/admin/` to the admin app's Vite server and every other path
 outside `/app/` to the Next dev server. Portless also serves those two directly
 at `https://www.matchbuild.localhost` and `https://admin.matchbuild.localhost`.
 
+In a **linked git worktree** portless prepends the branch to every one of those
+hostnames — `https://<branch>.matchbuild.localhost` and friends — so each
+worktree gets a set of its own and any number can run `pnpm dev` at once. The
+app derives its siblings' hostnames from its own, so the front door of one
+worktree never proxies into the Next server of another. `portless list` shows
+what is currently registered, and `portless get matchbuild` prints this
+checkout's front door.
+
+### Without portless
+
+Portless needs a trusted local CA and a proxy on port 443. When that is not
+wanted — an agent driving the app over plain HTTP, a machine where the CA
+cannot be installed — there is a second door:
+
+```bash
+pnpm dev:ports
+```
+
+Each app gets a free port of its own and is reachable directly, with the URLs
+printed on startup:
+
+```
+www    http://127.0.0.1:20996/
+app    http://127.0.0.1:31454/app/
+admin  http://127.0.0.1:31446/admin/
+```
+
+Nothing proxies to anything here: `/app/` exists only on the app server and
+`/admin/` only on the admin server, so the marketing site's links into the app
+will 404. The one-origin layout is what `pnpm dev` is for. Ports are drawn
+fresh every run from below the OS's ephemeral range, so this can run beside
+`pnpm dev`, beside a test run and beside itself in another worktree. Pin one
+with `DEV_APP_PORT` / `DEV_ADMIN_PORT` / `DEV_WWW_PORT`; write them to a file
+for a caller that would rather not scrape stdout with `DEV_PORTS_FILE=<path>`;
+skip `convex dev` with `DEV_CONVEX=0`, and Doppler with `DEV_DOPPLER=0`.
+
 ## Development
 
-- `pnpm dev`: all apps and `convex dev` via Turbo
+- `pnpm dev`: all apps and `convex dev` via Turbo, behind portless
+- `pnpm dev:ports`: the same, without portless, one free port per app
 - `pnpm lint` / `pnpm format` / `pnpm check`: Biome
 - `pnpm typecheck`
 - `pnpm test`: Storybook component tests

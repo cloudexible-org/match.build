@@ -30,6 +30,8 @@ pnpm-debug.log*
 # The e2e suite's own Next distDir. Separate from .next so its `next dev`
 # has its own lock and can run while `pnpm dev` is up — see apps/www/next.config.ts.
 .next-e2e
+# Same, for `pnpm dev:ports` — see scripts/dev-ports.mjs.
+.next-ports
 
 # typescript
 *.tsbuildinfo
