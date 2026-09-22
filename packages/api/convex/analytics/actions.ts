@@ -26,7 +26,7 @@ export const capture = internalAction({
   returns: v.null(),
   handler: async (_ctx, args) => {
     // The key can be removed between scheduling and running.
-    const apiKey = env.POSTHOG_API_KEY;
+    const apiKey = env.POSTHOG_PROJECT_TOKEN;
     if (!apiKey) return null;
     const response = await fetch(batchUrl(env.POSTHOG_HOST), {
       method: "POST",

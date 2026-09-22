@@ -72,7 +72,7 @@ async function flush(t: ReturnType<typeof convexTest>) {
 
 describe("emitAuditAnalytics", () => {
   test("an audited change reaches PostHog, grouped under the workspace", async () => {
-    vi.stubEnv("POSTHOG_API_KEY", "phc_test");
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "phc_test");
     const w = await world();
     await w.asOwner.mutation(api.candidates.mutations.setStatus, {
       matchmakerId: w.matchmakerId,
@@ -102,7 +102,7 @@ describe("emitAuditAnalytics", () => {
   });
 
   test("a match, recorded on both candidates' trails, is sent once", async () => {
-    vi.stubEnv("POSTHOG_API_KEY", "phc_test");
+    vi.stubEnv("POSTHOG_PROJECT_TOKEN", "phc_test");
     vi.stubEnv("POSTHOG_HOST", "https://eu.i.posthog.com/");
     const w = await world();
     await w.asOwner.mutation(api.matches.mutations.create, {

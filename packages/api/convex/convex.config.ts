@@ -77,12 +77,12 @@ const app = defineApp({
     // zero, because a run per message is the thing §4.1C says this must not
     // be.
     AI_VOICE_SAMPLE_MESSAGES: v.optional(v.string()),
-    // PostHog project API key for server-side analytics (analytics/helpers.ts)
+    // PostHog project token for server-side analytics (analytics/helpers.ts)
     // — the same public `phc_` key the apps use as VITE_POSTHOG_KEY, so
     // server and browser events land in one project. Unset means audited
     // changes are not forwarded, which is the state of a local backend, the
     // e2e one and convex-test.
-    POSTHOG_API_KEY: v.optional(v.string()),
+    POSTHOG_PROJECT_TOKEN: v.optional(v.string()),
     // PostHog ingestion host. Unset means PostHog US cloud; set it to match
     // VITE_POSTHOG_HOST if that is set.
     POSTHOG_HOST: v.optional(v.string()),

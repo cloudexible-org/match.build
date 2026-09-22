@@ -291,7 +291,7 @@ per accepted suggestion is the one to put next to it.
    either used or not. Emit at write time (**S**), or add an audit action for it?
    The second is more consistent; the first is cheaper.
 3. ~~**Does the `recordAudit` emitter ship before the client events?**~~ Yes —
-   shipped (`convex/analytics/`). It needs `POSTHOG_API_KEY` set on the
+   shipped (`convex/analytics/`). It needs `POSTHOG_PROJECT_TOKEN` set on the
    deployment before it sends anything.
 4. **`account.erased`** — send it at all? See §5.8 and #3.
 5. **Group properties on the matchmaker** (`candidate_count` etc.) mean writing
