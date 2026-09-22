@@ -33,17 +33,26 @@ const MAX_WORDS_PER_CUE = 14;
 const MAX_CHARS_PER_LINE = 46;
 
 /**
- * Pulls the narration out of `docs/demo-script.md`, one entry per `### N · …`
- * section, in the order the sections appear.
+ * Reads `docs/demo-script.md` — the film's edit, not a description of it.
  *
- * Each entry is the section's blockquote, split into paragraphs — a bare `>`
- * line is a paragraph break, and the closing tagline in the last section is one
- * of those, which is why it always gets a card of its own.
+ * Three things come out of it:
+ *
+ * - the `## Title card` blockquote, one line per line of the opening card;
+ * - one entry per `### N · …` section, in order, carrying that scene's
+ *   narration; and
+ * - each section's optional `**Card:**` line, the silent title that introduces
+ *   its clip.
+ *
+ * A section's narration is its blockquote split into paragraphs: a bare `>`
+ * line is a break, which is why the closing tagline always gets a subtitle of
+ * its own rather than being run onto the end of the line before it.
  */
 export function parseNarration(scriptPath) {
   const lines = readFileSync(scriptPath, "utf8").split("\n");
   const sections = [];
+  const title = [];
   let current = null;
+  let inTitle = false;
 
   for (const line of lines) {
     const heading = /^###\s+(\d+)\s+·\s+(.+?)\s+—/.exec(line);
@@ -51,18 +60,35 @@ export function parseNarration(scriptPath) {
       current = {
         index: Number(heading[1]),
         title: heading[2],
+        card: null,
         paragraphs: [],
       };
       sections.push(current);
+      inTitle = false;
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      current = null;
+      inTitle = /^##\s+Title card\s*$/.test(line);
+      continue;
+    }
+
+    if (inTitle) {
+      if (line.startsWith(">")) title.push(line.replace(/^>\s?/, "").trim());
       continue;
     }
     if (!current) continue;
-    if (line.startsWith("## ")) current = null;
+
+    const card = /^\*\*Card:\*\*\s*(.+?)\s*$/.exec(line);
+    if (card) {
+      current.card = card[1];
+      continue;
+    }
     if (!line.startsWith(">")) continue;
 
     const text = line.replace(/^>\s?/, "").trim();
     if (text === "") {
-      // A bare `>`: end the paragraph, so the next line starts a new card.
+      // A bare `>`: end the paragraph, so the next line starts a new subtitle.
       if (current.paragraphs.at(-1)?.length) current.paragraphs.push([]);
       continue;
     }
@@ -70,15 +96,18 @@ export function parseNarration(scriptPath) {
     current.paragraphs.at(-1).push(text);
   }
 
-  return sections
-    .sort((a, b) => a.index - b.index)
-    .map((s) => ({
-      ...s,
-      // Lines inside a paragraph are wrapped prose, not separate thoughts.
-      paragraphs: s.paragraphs
-        .filter((p) => p.length > 0)
-        .map((p) => p.join(" ")),
-    }));
+  return {
+    title: title.filter(Boolean),
+    sections: sections
+      .sort((a, b) => a.index - b.index)
+      .map((s) => ({
+        ...s,
+        // Lines inside a paragraph are wrapped prose, not separate thoughts.
+        paragraphs: s.paragraphs
+          .filter((p) => p.length > 0)
+          .map((p) => p.join(" ")),
+      })),
+  };
 }
 
 /**
@@ -284,4 +313,73 @@ export function writeSrt(cues, path) {
       )
       .join("\n")}\n`,
   );
+}
+
+/**
+ * Draws the full-frame cards: the opening title, and the silent one that
+ * introduces each scene.
+ *
+ * These are the film's punctuation. Seven clips cut straight together play as
+ * seven demos in a row — nothing tells the viewer a new thought has started,
+ * and the narrator has nowhere to breathe. A held title on a dark frame does
+ * both, and costs about two seconds.
+ *
+ * Opaque, unlike the subtitle strips: a card replaces the picture rather than
+ * sitting under it, so it is its own segment in the cut and needs no alpha.
+ *
+ * `cards` is `[{ id, lines, kind }]`, where `kind` is `"title"` or `"scene"`.
+ */
+export async function renderFrameCards(cards, { width, height, outDir }) {
+  mkdirSync(outDir, { recursive: true });
+
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+    });
+
+    const files = {};
+    for (const card of cards) {
+      const title = card.kind === "title";
+      const body = card.lines
+        .map((line, i) =>
+          title && i === 0
+            ? `<h1>${escapeHtml(line)}</h1>`
+            : `<p${title ? ' class="sub"' : ""}>${escapeHtml(line)}</p>`,
+        )
+        .join("");
+
+      await page.setContent(
+        `<!doctype html><meta charset="utf-8"><style>
+           html,body{margin:0}
+           /* The same warm near-black as the caption band, the letterbox and
+              the two-up gutter, so a card reads as part of the film rather
+              than as a slide dropped into it. */
+           .card{display:flex;flex-direction:column;gap:18px;
+                 justify-content:center;align-items:center;
+                 width:${width}px;height:${height}px;background:#2b2724;
+                 padding:0 200px;box-sizing:border-box;text-align:center}
+           h1,p{margin:0;color:#f7f4f1;-webkit-font-smoothing:antialiased;
+                font-family:-apple-system,"Helvetica Neue",Arial,sans-serif}
+           /* The product's own display face is a serif; the title card is the
+              one place in the film that is branding rather than interface. */
+           h1{font-family:"Instrument Serif",Georgia,"Times New Roman",serif;
+              font-weight:400;font-size:92px;line-height:1.1}
+           /* Long-hand, not the font shorthand: that shorthand REQUIRES a
+              family, and without one the whole declaration is dropped, which
+              silently rendered every card at the 16px default. (And no
+              backticks in here — this is inside a template literal.) */
+           p{font-weight:500;font-size:62px;line-height:1.25}
+           .sub{font-weight:400;font-size:40px;line-height:1.4;color:#cfc7bf}
+         </style><div class="card">${body}</div>`,
+      );
+      const file = join(outDir, `card-${card.id}.png`);
+      await page.screenshot({ path: file });
+      files[card.id] = file;
+    }
+    return files;
+  } finally {
+    await browser.close();
+  }
 }

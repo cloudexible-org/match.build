@@ -43,6 +43,7 @@ import {
   layOutCues,
   parseNarration,
   renderCueCards,
+  renderFrameCards,
   writeSrt,
 } from "../lib/subtitles.mjs";
 
@@ -204,57 +205,22 @@ rmSync(workDir, { recursive: true, force: true });
 mkdirSync(workDir, { recursive: true });
 mkdirSync(outDir, { recursive: true });
 
-/**
- * Each clip's length and start *in the finished film* — after the slowdown, and
- * after each dissolve has eaten `xfade` seconds out of the running total.
- *
- * The subtitles are laid out against these, so a cue's time is a time in the
- * file the narrator will actually play.
- */
-let at = 0;
-const timeline = clips.map((clip) => {
-  const duration = clip.duration / speed;
-  const start = at;
-  at += duration - xfade;
-  return { ...clip, duration, start };
-});
+/** How long a held card stays up. Long enough to read, short enough to be punctuation. */
+const TITLE_CARD_SECONDS = Number(args.titleCard || 3.2);
+const SCENE_CARD_SECONDS = Number(args.sceneCard || 2.2);
 
-// ── The narration, cut into cards and timed to the clips ────────────────────
-let cues = [];
-if (subtitled) {
-  const sections = parseNarration(scriptPath);
-  if (sections.length !== timeline.length) {
-    throw new Error(
-      `${scriptPath} has ${sections.length} narration sections but the film has ` +
-        `${timeline.length} clips (${names.join(", ")}).\n` +
-        "They are matched by position, so the script and DEFAULT_ORDER have to " +
-        "agree — add, remove or reorder a section to match, or pass --no-subtitles.",
-    );
-  }
-  cues = timeline.flatMap((clip, i) =>
-    layOutCues(sections[i].paragraphs, clip.start, clip.duration).map(
-      (cue) => ({
-        ...cue,
-        clip: i,
-      }),
-    ),
+// ── Read the edit out of the script ─────────────────────────────────────────
+const script =
+  subtitled || args.cards !== "false" ? parseNarration(scriptPath) : null;
+if (script && script.sections.length !== clips.length) {
+  throw new Error(
+    `${scriptPath} has ${script.sections.length} scenes but the film has ` +
+      `${clips.length} clips (${names.join(", ")}).\n` +
+      "They are matched by position, so the script and DEFAULT_ORDER have to " +
+      "agree — add, remove or reorder a section to match, or pass --no-subtitles.",
   );
 }
 
-console.log(`\n  stitching ${clips.length} clips → ${name}.mp4`);
-for (const clip of clips) {
-  console.log(
-    `    ${clip.name.padEnd(24)} ${(clip.duration / speed).toFixed(2)}s  ` +
-      `${clip.width}x${clip.height}`,
-  );
-}
-
-// ── Draw the subtitle cards ─────────────────────────────────────────────────
-/**
- * One transparent PNG per cue, drawn in Chromium — this ffmpeg has neither
- * libass nor libfreetype, so `subtitles` and `drawtext` are both unavailable
- * and `overlay` is the only way text reaches the picture. See `lib/subtitles.mjs`.
- */
 /**
  * The caption band under the picture.
  *
@@ -267,6 +233,96 @@ for (const clip of clips) {
 const BAND_HEIGHT = subtitled ? Number(args.bandHeight || 170) : 0;
 const frameHeight = canvasHeight + BAND_HEIGHT;
 
+/**
+ * The cut: a held card, then the clip it introduces, all the way down.
+ *
+ * Cards are segments in their own right rather than something drawn over a
+ * clip, which is the whole point of them — the picture *stops*. That is what
+ * separates one thought from the next and gives the narrator somewhere to
+ * breathe, and it is what the first cut of this film was missing.
+ */
+const segments = [];
+if (script?.title.length) {
+  segments.push({
+    kind: "card",
+    id: "title",
+    cardKind: "title",
+    lines: script.title,
+    duration: TITLE_CARD_SECONDS,
+  });
+}
+clips.forEach((clip, i) => {
+  const card = script?.sections[i]?.card;
+  if (card) {
+    segments.push({
+      kind: "card",
+      id: `scene-${i + 1}`,
+      cardKind: "scene",
+      lines: [card],
+      duration: SCENE_CARD_SECONDS,
+    });
+  }
+  segments.push({
+    ...clip,
+    kind: "clip",
+    clipIndex: i,
+    duration: clip.duration / speed,
+  });
+});
+
+/**
+ * Where each segment starts in the finished film.
+ *
+ * Every join is a dissolve that *overlaps* its two segments, so each one begins
+ * `xfade` seconds before the previous ends. The subtitles are laid out against
+ * these, so a cue's time is a time in the file the narrator will actually play.
+ */
+let at = 0;
+for (const segment of segments) {
+  segment.start = at;
+  at += segment.duration - xfade;
+}
+
+// ── The narration, cut into subtitles and timed to the clips ────────────────
+const cues = subtitled
+  ? segments
+      .filter((s) => s.kind === "clip")
+      .flatMap((s) =>
+        layOutCues(
+          script.sections[s.clipIndex].paragraphs,
+          s.start,
+          s.duration,
+        ).map((cue) => ({ ...cue, segment: s.id ?? s.name })),
+      )
+  : [];
+
+console.log(`\n  stitching ${segments.length} segments → ${name}.mp4`);
+for (const segment of segments) {
+  const label =
+    segment.kind === "card" ? `▪ ${segment.lines[0]}` : segment.name;
+  console.log(
+    `    ${label.padEnd(34)} ${segment.duration.toFixed(2)}s` +
+      (segment.kind === "clip" ? `  ${segment.width}x${segment.height}` : ""),
+  );
+}
+
+// ── Draw the cards ──────────────────────────────────────────────────────────
+/**
+ * Both kinds of card are drawn in Chromium, because this ffmpeg is built
+ * without libass *and* without libfreetype: `subtitles` and `drawtext` are both
+ * unavailable, so there is no text renderer in the pipeline at all. The browser
+ * is the better typesetter anyway. See `lib/subtitles.mjs`.
+ */
+const frameCards = segments.some((s) => s.kind === "card")
+  ? await renderFrameCards(
+      // `kind` on a segment says card-or-clip; the renderer wants title-or-scene.
+      segments
+        .filter((s) => s.kind === "card")
+        .map((s) => ({ id: s.id, lines: s.lines, kind: s.cardKind })),
+      { width, height: frameHeight, outDir: join(workDir, "cards") },
+    )
+  : {};
+
 const cueCards = subtitled
   ? await renderCueCards(cues, {
       width,
@@ -277,12 +333,41 @@ const cueCards = subtitled
 
 if (subtitled) {
   writeSrt(cues, join(outDir, `${name}.srt`));
-  console.log(`    ${String(cues.length).padStart(2)} subtitle cards`);
+  console.log(
+    `\n    ${cues.length} subtitles, ${Object.keys(frameCards).length} cards`,
+  );
 }
 
-// ── Normalise each clip onto the canvas, subtitles and all ──────────────────
-const normalised = timeline.map((clip, i) => {
-  const out = join(workDir, `${String(i).padStart(2, "0")}-${clip.name}.mp4`);
+// ── Normalise every segment onto the canvas ─────────────────────────────────
+const normalised = segments.map((segment, i) => {
+  const out = join(
+    workDir,
+    `${String(i).padStart(2, "0")}-${segment.id ?? segment.name}.mp4`,
+  );
+
+  if (segment.kind === "card") {
+    // A still becomes a segment of its own length; `-loop 1 -t` is the whole
+    // trick, and the card is already the exact size of the frame.
+    ffmpeg([
+      "-y",
+      "-loop",
+      "1",
+      "-t",
+      segment.duration.toFixed(3),
+      "-i",
+      frameCards[segment.id],
+      "-vf",
+      `fps=${fps},format=yuv420p,setsar=1`,
+      "-c:v",
+      "libx264",
+      "-crf",
+      String(crf),
+      "-preset",
+      "slow",
+      out,
+    ]);
+    return { ...segment, file: out };
+  }
 
   /**
    * This clip's cues, in *clip-local* seconds.
@@ -293,7 +378,7 @@ const normalised = timeline.map((clip, i) => {
    */
   const mine = cues
     .map((cue, index) => ({ ...cue, index }))
-    .filter((cue) => cue.clip === i);
+    .filter((cue) => cue.segment === (segment.id ?? segment.name));
 
   const base = [
     // Slower than filmed: PTS/0.95 stretches every frame's presentation time.
@@ -313,8 +398,8 @@ const normalised = timeline.map((clip, i) => {
 
   const chain = [`${base}[v0]`];
   mine.forEach((cue, n) => {
-    const from = (cue.start - clip.start).toFixed(3);
-    const to = (cue.end - clip.start).toFixed(3);
+    const from = (cue.start - segment.start).toFixed(3);
+    const to = (cue.end - segment.start).toFixed(3);
     const next = n === mine.length - 1 ? "out" : `v${n + 1}`;
     chain.push(
       `[v${n}][${n + 1}:v]overlay=x=0:y=${canvasHeight}:` +
@@ -326,7 +411,7 @@ const normalised = timeline.map((clip, i) => {
   ffmpeg([
     "-y",
     "-i",
-    clip.file,
+    segment.file,
     ...mine.flatMap((cue) => ["-i", cueCards[cue.index]]),
     "-filter_complex",
     chain.join(";"),
@@ -341,19 +426,17 @@ const normalised = timeline.map((clip, i) => {
     "slow",
     out,
   ]);
-  return { ...clip, file: out };
+  return { ...segment, file: out };
 });
 
 const mp4 = join(outDir, `${name}.mp4`);
 
 if (xfade > 0) {
   /**
-   * `xfade` takes two inputs at a time, so the clips are folded left to right:
-   * the running blend is input 0 and the next clip is input 1, every time.
-   *
-   * Each dissolve *overlaps* the two clips, so it eats `xfade` seconds of the
-   * total — the offset for step N is "everything joined so far, minus the
-   * dissolves already spent, minus this one".
+   * `xfade` takes two inputs at a time, so the segments are folded left to
+   * right: the running blend is input 0 and the next segment is input 1, every
+   * time. The offset for step N is everything joined so far, minus the
+   * dissolves already spent, minus this one.
    */
   const filters = [];
   let previous = "0:v";
@@ -366,7 +449,7 @@ if (xfade > 0) {
         `offset=${offset.toFixed(3)}[${label}]`,
     );
     previous = label;
-    elapsed = offset + xfade + normalised[i].duration - xfade;
+    elapsed = offset + normalised[i].duration;
   }
 
   ffmpeg([
@@ -389,7 +472,7 @@ if (xfade > 0) {
     mp4,
   ]);
 } else {
-  // Hard cuts: every clip is already the same size, codec and frame rate, so
+  // Hard cuts: every segment is already the same size, codec and frame rate, so
   // the demuxer can copy the streams straight through.
   const quote = (p) => `'${p.replaceAll("'", "'\\''")}'`;
   const listPath = join(workDir, "concat.txt");

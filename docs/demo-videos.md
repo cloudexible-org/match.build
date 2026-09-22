@@ -215,6 +215,21 @@ The script prints the finished length and **warns if it goes over three
 minutes**, which is the hackathon submission's own limit. To shorten it, cut a
 clip's `hold` numbers and re-render that clip — not the whole film.
 
+### Cards, and why the film has them
+
+The first cut was seven clips joined by dissolves, and it played as seven demos
+in a row: nothing carried from one to the next, and the matchmaker on screen was
+never introduced. The fix is in the edit, not the footage.
+
+`stitch-demo.mjs` reads [`demo-script.md`](./demo-script.md) for two more things
+besides the narration — a `## Title card` blockquote, and a `**Card:**` line in
+each scene — and inserts each as a **segment of its own**: the picture stops,
+a held title sits on a dark frame for about two seconds, and the next scene
+begins. That pause is the punctuation. It ends one thought, tells the viewer a
+new one is starting, and gives the narrator somewhere to breathe.
+`--title-card` / `--scene-card` change how long they hold; a scene with no
+`**Card:**` line simply gets none.
+
 ### Subtitles
 
 The cards come from the blockquotes in
