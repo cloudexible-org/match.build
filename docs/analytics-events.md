@@ -1,9 +1,24 @@
 # Analytics events — draft taxonomy
 
-**Status: a draft to argue with. Nothing here is implemented.** Tier 1 — SPA
+**Status: a draft to argue with, partly implemented.** Tier 1 — SPA
 pageviews, URL masking and identity — shipped; see `packages/analytics` and
-`apps/app/src/analytics/`. This document is the list of *named* events that
-would come next, written to be cut down rather than added to.
+`apps/app/src/analytics/`. The **A** events below ship too, from the server:
+`convex/analytics/` forwards audited changes, and its `RULES` table is the
+authority on which actions are sent and with what. The **S** and **C** events
+are still proposals, as is every property marked *derived* in §5.
+
+What the shipped **A** half does differently from the tables below:
+
+- **Invites keep their audit names.** `invite.created`, `invite.sent`,
+  `invite.resent` and `membership.reinvited` are sent as themselves rather than
+  as one `invite.sent` with a `trigger` — the names already say which.
+- **Only properties readable from the audit event are sent:** actor, and
+  `from`/`to`, `outcome`, `closed_by`, `kind`, `has_note`, `has_reason`. The
+  ones that need a lookup or a clock (*derived*: `hours_to_accept`,
+  `days_joined`, `fields_filled`, `has_social`, `score_bucket`, `origin`,
+  `had_matchmaker`, `was_first`, `archive_both`) are not yet.
+- **Profile events are one per entry**, so `profile.suggested` counts entries
+  offered, like accepted and rejected do.
 
 Every event below is marked **core** or **later**. Cutting all the `later` rows
 leaves 12 events, which is enough to answer §6.
@@ -275,9 +290,9 @@ per accepted suggestion is the one to put next to it.
 2. **`reply_suggestion.offered` has no record today** — a draft is written and
    either used or not. Emit at write time (**S**), or add an audit action for it?
    The second is more consistent; the first is cheaper.
-3. **Does the `recordAudit` emitter ship before the client events?** It is the
-   cheaper half and covers more ground — but it needs a Convex-side PostHog key
-   and the `fetch`-only constraint (no `"use node"`, ever).
+3. ~~**Does the `recordAudit` emitter ship before the client events?**~~ Yes —
+   shipped (`convex/analytics/`). It needs `POSTHOG_API_KEY` set on the
+   deployment before it sends anything.
 4. **`account.erased`** — send it at all? See §5.8 and #3.
 5. **Group properties on the matchmaker** (`candidate_count` etc.) mean writing
    tenant size to a third party. Cheap and useful; still a disclosure.

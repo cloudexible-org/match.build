@@ -30,7 +30,7 @@ Built on [turbostack](https://github.com/cloudexible-org/turbostack).
 ├── packages/
 │   ├── api/          # Convex backend: schema, functions, http.ts, static-hosting mounts
 │   ├── ui/           # Shared UI components
-│   ├── analytics/    # Key-gated PostHog provider, URL masking, identity
+│   ├── analytics/    # Key-gated PostHog provider, URL masking, identity (server side: packages/api/convex/analytics)
 │   └── config/       # Shared TypeScript configs
 └── docs/             # Changelog and architecture notes
 ```

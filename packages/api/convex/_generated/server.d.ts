@@ -39,6 +39,8 @@ type Env = {
   readonly NOTIFICATION_EMAIL_DELAY_SECONDS: string | undefined;
   readonly NOTIFICATION_PUSH_DELAY_SECONDS: string | undefined;
   readonly PLATFORM_ADMIN_EMAILS: string | undefined;
+  readonly POSTHOG_API_KEY: string | undefined;
+  readonly POSTHOG_HOST: string | undefined;
   readonly RESEND_API_KEY: string | undefined;
   readonly SITE_URL: string | undefined;
   readonly VAPID_PRIVATE_KEY: string | undefined;
