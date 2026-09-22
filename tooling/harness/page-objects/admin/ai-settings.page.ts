@@ -47,6 +47,37 @@ export class AiSettingsPage {
     return this.getAgent(agent).getByRole("alert");
   }
 
+  /*
+   * ─── Restoring the shipped instructions ───────────────────────────────────
+   *
+   * Two clicks: the first asks, the second writes. It replaces all three
+   * agents at once, which is why any spec driving it has to be in the file
+   * that owns `aiAgentSettings` rather than one of its own.
+   */
+
+  getRestoreSeed() {
+    return this.page.getByTestId("restore-seed");
+  }
+
+  /** The button that asks for confirmation. */
+  getRestoreSeedStart() {
+    return this.getRestoreSeed().getByTestId("restore-seed-start");
+  }
+
+  /** The button that actually writes, shown only after the first click. */
+  getRestoreSeedConfirm() {
+    return this.getRestoreSeed().getByTestId("restore-seed-confirm");
+  }
+
+  getRestoreSeedCancel() {
+    return this.getRestoreSeed().getByRole("button", { name: "Cancel" });
+  }
+
+  /** What it reports afterwards: which agents moved, which already matched. */
+  getRestoreSeedResult() {
+    return this.getRestoreSeed().getByTestId("restore-seed-result");
+  }
+
   /** Shown when AI_ENABLED isn't "true" — the state of the e2e backend. */
   getNoGatewayNotice() {
     return this.page.getByRole("heading", {

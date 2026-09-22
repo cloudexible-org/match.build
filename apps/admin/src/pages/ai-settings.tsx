@@ -1,4 +1,5 @@
 import {
+  AI_AGENT_LABELS,
   type AiAgentId,
   api,
   MODEL_ID_HINT,
@@ -120,6 +121,8 @@ export function AiSettingsPage() {
         </CardContent>
       </Card>
 
+      <RestoreSeedCard />
+
       {data === undefined ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
@@ -128,6 +131,142 @@ export function AiSettingsPage() {
         ))
       )}
     </div>
+  );
+}
+
+/** What the mutation reports: which agents moved, and which were already there. */
+type ResetResult = { reset: string[]; unchanged: string[] };
+
+/**
+ * Agent ids as people read them. The mutation returns the ids the audit trail
+ * uses, and "candidate_profile" is not a thing to show somebody.
+ */
+function agentNames(ids: string[]): string {
+  return ids
+    .map((id) =>
+      id in AI_AGENT_LABELS
+        ? AI_AGENT_LABELS[id as AiAgentId].label.toLowerCase()
+        : id,
+    )
+    .join(", ");
+}
+
+/**
+ * Puts all three agents back to the instructions the release shipped with.
+ *
+ * **Why this is on the page at all.** A deployment's agents are seeded once and
+ * then owned by whoever is reading this, so an instruction improved in a later
+ * release never reaches a deployment that has already been seeded — the only
+ * way to pick one up was to open `seed/ai/fixture.ts` and paste it in by hand.
+ *
+ * **Two clicks, because it overwrites all three.** Not a typed confirmation
+ * like an erasure: that one is irreversible and this one is not. Every agent it
+ * changes is recorded in the audit trail with the whole previous instruction,
+ * which is where an instruction's history lives and how a reset is undone.
+ */
+function RestoreSeedCard() {
+  const restore = useMutation(api.admin.mutations.resetAiAgentsToSeed);
+
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<ResetResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onRestore() {
+    setBusy(true);
+    setError(null);
+    try {
+      setResult(await restore({}));
+      setConfirming(false);
+    } catch (thrown) {
+      setError(serverErrorMessage(thrown, "Couldn't restore those."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card data-testid="restore-seed">
+      <CardHeader>
+        <CardTitle className="text-xl">
+          Restore the shipped instructions
+        </CardTitle>
+        <CardDescription>
+          Puts all three agents back to the model and standing instruction this
+          release ships with — the same seed{" "}
+          <code>pnpm --filter @repo/api ai:setup</code> writes. Use it to pick
+          up an instruction improved in a later release, or to undo an
+          experiment. Anything you have written here is replaced, and each agent
+          it changes is recorded in the audit trail with the whole previous
+          instruction — which is how you get one back.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {error !== null && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+
+        {result !== null && (
+          <p
+            className="text-sm text-muted-foreground"
+            role="status"
+            data-testid="restore-seed-result"
+          >
+            {result.reset.length === 0 ? (
+              <>All three agents already match the shipped instructions.</>
+            ) : (
+              <>
+                <span className="text-foreground">
+                  Restored {agentNames(result.reset)}.
+                </span>
+                {result.unchanged.length > 0 && (
+                  <> {agentNames(result.unchanged)} already matched.</>
+                )}
+              </>
+            )}
+          </p>
+        )}
+
+        {confirming ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={busy}
+              data-testid="restore-seed-confirm"
+              onClick={onRestore}
+            >
+              {busy ? "Restoring…" : "Yes, replace all three"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => setConfirming(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="restore-seed-start"
+              onClick={() => {
+                setResult(null);
+                setError(null);
+                setConfirming(true);
+              }}
+            >
+              Restore seeded defaults
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

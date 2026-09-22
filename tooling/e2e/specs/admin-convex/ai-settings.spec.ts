@@ -12,9 +12,13 @@ import { SEED_ADMINS } from "@repo/harness/seed";
  *
  * `aiAgentSettings` is global by design, so unlike most specs this one cannot
  * seed its own private copy: there is one row per agent for the whole
- * deployment. It therefore owns the `voice_profile` agent for the length of the
- * run and touches no other. Any new spec that writes these settings must pick a
- * different agent.
+ * deployment. **This file owns that table.** The first test confines itself to
+ * the `voice_profile` agent; the second drives the restore button, which
+ * replaces all three at once and so could not live in a file of its own —
+ * files run in parallel across workers (`fullyParallel: false` makes a file's
+ * tests serial, not the files themselves), and it would clobber the first test
+ * mid-run. Anything else that writes these settings belongs here too, after
+ * the restore, or it is racing.
  *
  * The e2e backend is never seeded with agents, so this starts from the state a
  * fresh deployment is in: nothing configured, everything off.
@@ -79,6 +83,61 @@ test("an admin configures an agent from nothing, and can turn it off two ways", 
 
   // Every change is in the platform trail, which is where an instruction's
   // history is kept (prd/phase-2.md §4.4).
+  const trail = new AuditTrailPage(page);
+  await trail.goto();
+  await expect(
+    trail.getEvents().filter({ hasText: "AI agent settings changed" }).first(),
+  ).toBeVisible();
+});
+
+/**
+ * Restoring the shipped instructions (`admin/mutations:resetAiAgentsToSeed`).
+ *
+ * Runs second on purpose: it reads whatever the test above left behind — an
+ * agent someone has edited — which is the state the button exists for.
+ */
+test("an admin restores the shipped instructions, and the trail keeps what was replaced", async ({
+  page,
+}) => {
+  if (!admin) throw new Error("No seed admin 'admin-ai'");
+  await signInToAdmin(page, admin.email);
+
+  // Through the nav rather than `ai.goto()`: a hard navigation straight after
+  // signing in races the redirect and lands back on the sign-in page.
+  await new AdminLayout(page).getNavLink("AI agents").click();
+  const ai = new AiSettingsPage(page);
+  await expect(ai.getHeading()).toBeVisible();
+
+  // Asking is not doing. The first click only offers the confirmation, and
+  // cancelling leaves the edited agent exactly as the previous test left it.
+  await ai.getRestoreSeedStart().click();
+  await expect(ai.getRestoreSeedConfirm()).toBeVisible();
+  await ai.getRestoreSeedCancel().click();
+  await expect(ai.getRestoreSeedConfirm()).toHaveCount(0);
+  await expect(ai.getModelInput(AGENT)).toHaveValue("");
+
+  // The second click writes. Every agent was either unconfigured or edited, so
+  // all three move.
+  await ai.getRestoreSeedStart().click();
+  await ai.getRestoreSeedConfirm().click();
+  await expect(ai.getRestoreSeedResult()).toContainText("Restored");
+
+  // The page follows the write through the subscription: all three now carry a
+  // model and an instruction, and none says it was never set up.
+  for (const agent of ["conversation", "candidate_profile", AGENT] as const) {
+    await expect(ai.getModelInput(agent)).not.toHaveValue("");
+    await expect(ai.getPromptInput(agent)).not.toHaveValue("");
+    await expect(ai.getOff(agent)).toHaveCount(0);
+  }
+
+  // Idempotent: a second run finds nothing to do and says so rather than
+  // writing three more events.
+  await ai.getRestoreSeedStart().click();
+  await ai.getRestoreSeedConfirm().click();
+  await expect(ai.getRestoreSeedResult()).toContainText("already match");
+
+  // The replaced instructions are in the trail, which is the only way back to
+  // one — the page has no undo and says as much.
   const trail = new AuditTrailPage(page);
   await trail.goto();
   await expect(

@@ -8,6 +8,7 @@ import { recordAudit } from "../audit/helpers";
 import { diffFields } from "../audit/rules";
 import { anonymiseCandidateProfile } from "../candidateProfiles/helpers";
 import { forgetAgentThread } from "../replySuggestions/helpers";
+import { AI_AGENT_SEED } from "../seed/ai/fixture";
 import {
   anonymiseAccount,
   anonymiseCandidate,
@@ -300,6 +301,100 @@ export const setAiAgent = mutation({
       ),
     });
     return null;
+  },
+});
+
+/**
+ * Puts every agent back to the model and standing instruction it was seeded
+ * with (`seed/ai/fixture.ts`).
+ *
+ * **This is the same seed `pnpm --filter @repo/api ai:setup` writes, run with
+ * `force`** — the difference is only that it is reachable by someone who has a
+ * browser and not a terminal. A deployment's agents are seeded once and then
+ * owned by a platform admin, which leaves no way to pick up an instruction that
+ * shipped in a later release short of pasting it in by hand from the source.
+ * This is that way.
+ *
+ * **It overwrites, and there is no undo on this page.** The recovery is the
+ * audit trail: one `ai_agent.updated` event per agent that actually moved,
+ * carrying the whole previous instruction, exactly as a hand-edit does. That is
+ * where an instruction's history lives (§4.4), so a reset is recoverable by
+ * reading the trail and pasting the old text back — which is why this writes
+ * per agent rather than calling `seed/ai/mutations:apply`, whose `force` branch
+ * records nothing.
+ *
+ * An agent already identical to its seed is left alone and reported as
+ * unchanged, so a second click is a no-op rather than three empty events.
+ */
+export const resetAiAgentsToSeed = mutation({
+  args: {},
+  returns: v.object({
+    reset: v.array(v.string()),
+    unchanged: v.array(v.string()),
+  }),
+  handler: async (ctx) => {
+    const admin = await requirePlatformAdmin(ctx);
+
+    const reset: string[] = [];
+    const unchanged: string[] = [];
+
+    for (const seed of AI_AGENT_SEED) {
+      const before = await agentSettings(ctx, seed.agent);
+      const nextModel = seed.model.trim();
+      const nextPrompt = seed.systemPrompt.trim();
+
+      if (
+        before.exists &&
+        before.enabled === seed.enabled &&
+        before.model === nextModel &&
+        before.systemPrompt === nextPrompt
+      ) {
+        unchanged.push(seed.agent);
+        continue;
+      }
+
+      const existing = await storedAgentSettings(ctx, seed.agent);
+      const fields = {
+        enabled: seed.enabled,
+        model: nextModel,
+        systemPrompt: nextPrompt,
+        updatedAt: Date.now(),
+        // The admin who pressed the button, not the seed. `seed/ai:apply`
+        // leaves this empty because nobody decided it; here somebody did, and
+        // the card should say their name rather than "by the seed".
+        updatedByUserId: admin._id,
+      };
+      if (existing === null) {
+        await ctx.db.insert("aiAgentSettings", {
+          agent: seed.agent,
+          ...fields,
+        });
+      } else {
+        await ctx.db.patch("aiAgentSettings", existing._id, fields);
+      }
+
+      await recordAudit(ctx, {
+        actor: { type: "user", userId: admin._id, role: "platform_admin" },
+        action: "ai_agent.updated",
+        entity: { table: "aiAgentSettings", id: seed.agent },
+        changes: diffFields(
+          {
+            enabled: before.enabled,
+            model: before.model,
+            systemPrompt: before.systemPrompt,
+          },
+          {
+            enabled: seed.enabled,
+            model: nextModel,
+            systemPrompt: nextPrompt,
+          },
+          ["enabled", "model", "systemPrompt"],
+        ),
+      });
+      reset.push(seed.agent);
+    }
+
+    return { reset, unchanged };
   },
 });
 
