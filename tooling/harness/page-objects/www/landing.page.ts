@@ -32,9 +32,49 @@ export class LandingPage {
     return this.getNav().getByRole("link", { name: "match.build" });
   }
 
-  /** Sign-in lives in the Vite app; the marketing site only links to it. */
+  /**
+   * Sign-in lives in the Vite app; the marketing site only links to it.
+   *
+   * This is the bar's copy, which is `md`-and-up. Below that the link lives in
+   * `MobileNav` — see `getMobileNavItem("Sign in")`. Role queries skip
+   * `display: none`, so exactly one of the two is ever matchable, and a spec
+   * that asks for the wrong one fails rather than quietly asserting on the
+   * other.
+   */
   getSignInLink() {
     return this.getNav().getByRole("link", { name: "Sign in", exact: true });
+  }
+
+  // --- Mobile nav ---------------------------------------------------------
+
+  /** The hamburger. `md:hidden`, so it is absent from a desktop run. */
+  getMobileNavTrigger() {
+    return this.page.getByRole("button", { name: "Menu", exact: true });
+  }
+
+  /**
+   * The popup. Base UI portals it to `<body>`, so it is NOT inside
+   * `getNav()` — scope from the page, not the nav.
+   */
+  getMobileNav() {
+    return this.page.getByTestId("mobile-nav");
+  }
+
+  /**
+   * One row. Every row is `role="menuitem"`, links included: inside a menu
+   * that is the correct ARIA pattern, and Base UI sets it. The links are
+   * still real `<a href>`s, so assert the href, not the role.
+   */
+  getMobileNavItem(label: string) {
+    return this.getMobileNav().getByRole("menuitem", {
+      name: label,
+      exact: true,
+    });
+  }
+
+  async openMobileNav() {
+    await this.getMobileNavTrigger().click();
+    await this.getMobileNav().waitFor({ state: "visible" });
   }
 
   getNavWaitlistLink() {

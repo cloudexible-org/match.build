@@ -8,11 +8,16 @@ import {
 } from "motion/react";
 import * as React from "react";
 import { BrandMark } from "@/components/landing/brand-mark";
+import { MobileNav, type NavLink } from "@/components/landing/mobile-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const LINKS = [
+/**
+ * The section links. Shown as a row from `md` up and inside `MobileNav` below
+ * it — one list, so a section added here cannot reach only half the visitors.
+ */
+const LINKS: readonly NavLink[] = [
   { href: "#how-it-works", label: "How it works" },
   { href: "#features", label: "Features" },
   { href: "#privacy", label: "Privacy" },
@@ -47,7 +52,14 @@ export function SiteNav(): React.ReactNode {
         isScrolled ? "border-border/60" : "border-transparent",
       )}
     >
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+      {/*
+        The tightening below 360px is for the 320px class of screen, where the
+        bar has never fitted: the brand and the waitlist CTA alone are wider
+        than the room between the gutters, and the page scrolled sideways. Held
+        behind `min-[360px]` rather than `sm` so that every mainstream phone —
+        360 and up — keeps the bar at full size.
+      */}
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 min-[360px]:gap-4 min-[360px]:px-4 sm:px-6">
         <a
           href="#top"
           className="flex items-center gap-2 text-foreground"
@@ -60,7 +72,7 @@ export function SiteNav(): React.ReactNode {
           >
             <BrandMark className="h-4 w-4" />
           </motion.span>
-          <span className="font-display text-2xl leading-none">
+          <span className="font-display text-xl leading-none min-[360px]:text-2xl">
             match.build
           </span>
         </a>
@@ -78,19 +90,26 @@ export function SiteNav(): React.ReactNode {
           ))}
         </ul>
 
+        {/*
+          Everything but the brand, the waitlist CTA and the menu button is
+          `md`-and-up. The bar is 375px wide at its narrowest and the brand and
+          that CTA already claim 260 of it, so what is left is one control —
+          and it has to be the one that leads to all the others.
+        */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <ThemeToggle />
+          <ThemeToggle className="hidden md:inline-flex" />
           <ButtonLink
             href="/app/"
             variant="ghost"
             size="sm"
-            className="hidden rounded-full px-4 sm:inline-flex"
+            className="hidden rounded-full px-4 md:inline-flex"
           >
             Sign in
           </ButtonLink>
           <ButtonLink href="#waitlist" size="sm" className="rounded-full px-4">
             Join the waitlist
           </ButtonLink>
+          <MobileNav links={LINKS} />
         </div>
       </div>
 
