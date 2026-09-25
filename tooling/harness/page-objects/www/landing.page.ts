@@ -36,13 +36,16 @@ export class LandingPage {
    * Sign-in lives in the Vite app; the marketing site only links to it.
    *
    * This is the bar's copy, which is `md`-and-up. Below that the link lives in
-   * `MobileNav` — see `getMobileNavItem("Sign in")`. Role queries skip
+   * `MobileNav` — see `getMobileNavItem("Sign in / Sign up")`. Role queries skip
    * `display: none`, so exactly one of the two is ever matchable, and a spec
    * that asks for the wrong one fails rather than quietly asserting on the
    * other.
    */
   getSignInLink() {
-    return this.getNav().getByRole("link", { name: "Sign in", exact: true });
+    return this.getNav().getByRole("link", {
+      name: "Sign in / Sign up",
+      exact: true,
+    });
   }
 
   // --- Mobile nav ---------------------------------------------------------

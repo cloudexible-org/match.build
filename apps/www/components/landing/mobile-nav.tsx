@@ -92,7 +92,7 @@ export function MobileNav({
               closeOnClick
               className={cn(ITEM, "font-medium text-foreground")}
             >
-              Sign in
+              Sign in / Sign up
             </Menu.LinkItem>
 
             {/*

@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { uniqueUsername } from "@repo/harness/accounts";
-import { CandidateShellPage } from "@repo/harness/page-objects/app/candidate.page";
 import { HomePage } from "@repo/harness/page-objects/app/home.page";
 import {
   CreateMatchmakerPage,
@@ -53,12 +52,11 @@ test.beforeAll(async () => {
 test("a new account creates a profile, with the server's username rules", async ({
   page,
 }) => {
-  // An account with no profile lands on the candidate shell, which is where
-  // "Become a matchmaker" lives.
+  // A brand-new account is asked on home which side it is on.
   await signInAs(page, world.email("creator"));
   const home = new HomePage(page);
   await home.goto();
-  await new CandidateShellPage(page).getCreateMatchmakerLink().click();
+  await home.getChooseMatchmakerLink().click();
 
   const create = new CreateMatchmakerPage(page);
   await expect(create.getForm()).toBeVisible();

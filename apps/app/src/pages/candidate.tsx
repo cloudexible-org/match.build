@@ -43,9 +43,10 @@ function selectedUsername(hash: string): string {
  * The hash rather than a path segment keeps the shell mounted while the
  * candidate moves between matchmakers, so the list never flickers.
  *
- * An account lands here straight from `/` unless it owns a matchmaker
- * profile — including an account with no matchmakers at all, who gets the
- * empty state and a way to find one.
+ * An account lands here straight from `/` when it owns no matchmaker
+ * profile but has a matchmaker or an invitation. A brand-new account is asked
+ * on `/` which side it is on first, and comes here by choosing "looking for a
+ * match" — to the empty state and a way to find one.
  */
 export function CandidatePage() {
   const me = useQuery(api.users.queries.me);

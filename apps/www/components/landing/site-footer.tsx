@@ -6,7 +6,7 @@ const LINKS = [
   { href: "#how-it-works", label: "How it works" },
   { href: "#privacy", label: "Privacy" },
   { href: "#faq", label: "FAQ" },
-  { href: "/app/", label: "Sign in" },
+  { href: "/app/", label: "Sign in / Sign up" },
 ] as const;
 
 export function SiteFooter(): React.ReactNode {

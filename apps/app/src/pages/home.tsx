@@ -7,21 +7,27 @@ import { FullPageStatus } from "../components/full-page-status";
 import { CardList, Page, PageHeader, PageSection } from "../shell/page";
 
 /**
- * Home (prd/phase-1.md §2): the picker, for the one account that has
- * something to pick between.
+ * Home (prd/phase-1.md §2): the picker, for an account that has something to
+ * pick between.
  *
- * It only renders for an account that owns **more than one** matchmaker
- * profile. Anything else has an obvious destination and goes straight
- * there:
+ * It renders for two kinds of account:
  *
- * - no profile → `/c`, their own chat, which lists their matchmakers and
- *   invitations itself and offers "Become a matchmaker".
+ * - one with **nothing yet** — no matchmaker profile, no matchmaker joined,
+ *   no invitation — which is every account the moment it signs up. It is
+ *   asked which side it is on, so a matchmaker isn't left hunting for the
+ *   "Become a matchmaker" link at the foot of the candidate shell.
+ * - one that owns **more than one** matchmaker profile.
+ *
+ * Anything else has an obvious destination and goes straight there:
+ *
+ * - no profile, but a matchmaker or an invitation → `/c`, their own chat,
+ *   which lists both itself.
  * - one profile → that workspace.
  *
  * The UI allows one profile per account (prd/phase-1.md §1), so today
- * nobody reaches this page. It stays because the limit is a UI rule rather
- * than a schema one, and an account that somehow owns two must be able to
- * open both.
+ * nobody reaches the multi-profile picker. It stays because the limit is a
+ * UI rule rather than a schema one, and an account that somehow owns two must
+ * be able to open both.
  */
 export function HomePage() {
   const me = useQuery(api.users.queries.me);
@@ -33,7 +39,12 @@ export function HomePage() {
   if (me === null || home === null) return null; // RequireAuth handles this
 
   const profiles = home.matchmakerProfiles;
-  if (profiles.length === 0) return <Navigate to="/c" replace />;
+  if (profiles.length === 0) {
+    const isNew =
+      home.candidateProfiles.length === 0 && home.invitations.length === 0;
+    if (!isNew) return <Navigate to="/c" replace />;
+    return <ChooseSide name={me.name ?? ""} />;
+  }
   if (profiles.length === 1) {
     return <Navigate to={`/mm/${profiles[0].username}`} replace />;
   }
@@ -101,6 +112,65 @@ export function HomePage() {
         </CardList>
       </PageSection>
     </Page>
+  );
+}
+
+/**
+ * The first thing a new account sees: which side of match.build it is on.
+ *
+ * Neither choice is final. Someone who picks "looking for a match" can still
+ * become a matchmaker from the candidate shell, and this page keeps coming
+ * back until the account has a profile, a matchmaker or an invitation.
+ */
+function ChooseSide({ name }: { name: string }) {
+  return (
+    <Page accountName={name}>
+      <PageHeader
+        title={`Welcome, ${name.split(" ")[0]}`}
+        description="How will you use match.build?"
+      />
+      <div className="grid gap-4 sm:grid-cols-2" data-testid="home-choose-side">
+        <ChoiceLink
+          to="/mm/new"
+          title="I'm a matchmaker"
+          testId="home-choose-matchmaker"
+        >
+          Set up your workspace to bring candidates in and run your
+          conversations with them.
+        </ChoiceLink>
+        <ChoiceLink
+          to="/c"
+          title="I'm looking for a match"
+          testId="home-choose-candidate"
+        >
+          Your matchmaker invites you in, and your conversation with them lives
+          here.
+        </ChoiceLink>
+      </div>
+    </Page>
+  );
+}
+
+function ChoiceLink({
+  to,
+  title,
+  testId,
+  children,
+}: {
+  to: string;
+  title: string;
+  testId: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      data-testid={testId}
+      className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary hover:bg-accent focus-visible:border-primary focus-visible:bg-accent focus-visible:outline-none"
+    >
+      <span className="font-display text-xl">{title}</span>
+      <span className="text-sm text-muted-foreground">{children}</span>
+    </Link>
   );
 }
 

@@ -49,7 +49,7 @@ test.describe("mobile nav", () => {
 
     await landing.openMobileNav();
 
-    const signIn = landing.getMobileNavItem("Sign in");
+    const signIn = landing.getMobileNavItem("Sign in / Sign up");
     await expect(signIn).toBeVisible();
     await expect(signIn).toHaveAttribute("href", "/app/");
     // A real anchor, so middle-click and open-in-new-tab work. `role` is

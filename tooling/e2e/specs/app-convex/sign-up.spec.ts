@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { AccountSettingsPage } from "@repo/harness/page-objects/app/account-settings.page";
 import { CandidateShellPage } from "@repo/harness/page-objects/app/candidate.page";
+import { HomePage } from "@repo/harness/page-objects/app/home.page";
 import {
   CompleteProfilePage,
   SignInPage,
@@ -12,8 +13,7 @@ import {
 
 /**
  * A brand-new account against the seeded local backend: email → code → name
- * → their own empty candidate shell (an account with no matchmaker profile
- * never sees the home picker).
+ * → home, asking whether they are a matchmaker or looking for a match.
  *
  * Parallel-safe: every spec signs up with an address unique to this run and
  * test, so no two specs share an account or a pending code.
@@ -42,7 +42,14 @@ test("a new account signs up with an emailed code and names itself", async ({
   await expect(profile.getForm()).toBeVisible();
   await profile.submitName("  Nova   Tester ");
 
-  // Straight to their own shell, with nothing in it and both ways out.
+  // Home asks which side they are on before anything else.
+  const home = new HomePage(page);
+  await expect(home.getChooseSide()).toBeVisible();
+  await expect(home.getChooseMatchmakerLink()).toBeVisible();
+
+  // Looking for a match: their own shell, with nothing in it and both ways
+  // out.
+  await home.getChooseCandidateLink().click();
   const shell = new CandidateShellPage(page);
   await expect(page).toHaveURL(/\/app\/c$/);
   await expect(shell.getMatchmakerList()).toContainText(

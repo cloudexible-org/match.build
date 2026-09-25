@@ -8,11 +8,12 @@ import { type Scenario, seedScenario } from "@repo/harness/scenario";
 import { signInAs } from "@repo/harness/session";
 
 /**
- * Where `/app/` sends an account (prd/phase-1.md §2, §4.2). The picker only
- * renders when there is something to pick between — two matchmaker profiles
- * — and every other account goes straight to its one destination:
+ * Where `/app/` sends an account (prd/phase-1.md §2, §4.2). Home only
+ * renders when there is something to pick between — a brand-new account
+ * choosing its side, or two matchmaker profiles — and every other account
+ * goes straight to its one destination:
  *
- * - no profile → `/app/c`, its own chat.
+ * - no profile, but a matchmaker or invitation → `/app/c`, its own chat.
  * - one profile → that workspace.
  *
  * The UI allows one profile per account, so the two-profile case is seeded
@@ -98,20 +99,44 @@ test("one profile opens straight into its workspace", async ({ page }) => {
   );
 });
 
-test("an account with no profile of its own never sees home", async ({
+test("an account with nothing yet is asked which side it is on", async ({
   page,
 }) => {
   await signInAs(page, world.email("empty"));
   const home = new HomePage(page);
   await home.goto();
 
-  // Home redirects: there is nothing for this account to choose between.
+  await expect(page).toHaveURL(/\/app\/$/);
+  await expect(home.getWelcomeHeading()).toHaveText(
+    `Welcome, ${world.users.empty.name.split(" ")[0]}`,
+  );
+  await expect(home.getChooseSide()).toBeVisible();
+  await expect(home.getChooseMatchmakerLink()).toHaveAttribute(
+    "href",
+    "/app/mm/new",
+  );
+
+  // Looking for a match: the candidate shell, empty and waiting for an
+  // invitation, still offering the other way.
+  await home.getChooseCandidateLink().click();
   await expect(page).toHaveURL(/\/app\/c$/);
   const shell = new CandidateShellPage(page);
   await expect(shell.getMatchmakerList()).toContainText(
     "You haven't joined a matchmaker yet.",
   );
   await expect(shell.getCreateMatchmakerLink()).toBeVisible();
+});
+
+test("an invitation skips the choice and opens the candidate shell", async ({
+  page,
+}) => {
+  await signInAs(page, world.email("invitee"));
+  await new HomePage(page).goto();
+
+  await expect(page).toHaveURL(/\/app\/c$/);
+  await expect(
+    new CandidateShellPage(page).getInvitation(world.displayName("inviting")),
+  ).toBeVisible();
 });
 
 test("an invitation opens the accept screen", async ({ page }) => {

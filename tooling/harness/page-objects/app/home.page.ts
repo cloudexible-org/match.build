@@ -4,8 +4,10 @@ import type { Page } from "@playwright/test";
  * `apps/app` home (`/app/`): the signed-in account's invitations, matchmaker
  * profiles and joined matchmakers. Rendered by `apps/app/src/pages/home.tsx`.
  *
- * Only an account that owns a matchmaker profile gets this page; the rest
- * are redirected to `CandidateShellPage`.
+ * Two kinds of account get this page: a brand-new one with nothing yet,
+ * which is asked whether it is a matchmaker or looking for a match, and one
+ * that owns more than one matchmaker profile. The rest are redirected — to
+ * their one workspace, or to `CandidateShellPage`.
  *
  * Sections are located by `data-testid`; rows by their visible text, which is
  * what a person scans for.
@@ -19,6 +21,19 @@ export class HomePage {
 
   getWelcomeHeading() {
     return this.page.getByRole("heading", { level: 1, name: /^Welcome/ });
+  }
+
+  /** The new account's choice between the two sides of the app. */
+  getChooseSide() {
+    return this.page.getByTestId("home-choose-side");
+  }
+
+  getChooseMatchmakerLink() {
+    return this.page.getByTestId("home-choose-matchmaker");
+  }
+
+  getChooseCandidateLink() {
+    return this.page.getByTestId("home-choose-candidate");
   }
 
   getInvitationsSection() {

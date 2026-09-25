@@ -103,8 +103,12 @@ export function SiteNav(): React.ReactNode {
             variant="ghost"
             size="sm"
             className="hidden rounded-full px-4 md:inline-flex"
+            aria-label="Sign in / Sign up"
           >
-            Sign in
+            {/* The full label crowds the section links onto three lines
+                between `md` and `lg`; the name stays whole for a reader. */}
+            <span className="lg:hidden">Sign in</span>
+            <span className="hidden lg:inline">Sign in / Sign up</span>
           </ButtonLink>
           <ButtonLink href="#waitlist" size="sm" className="rounded-full px-4">
             Join the waitlist

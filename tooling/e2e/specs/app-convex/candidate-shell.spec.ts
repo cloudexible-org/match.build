@@ -132,13 +132,13 @@ test("the third column says who the matchmaker is and what can be done about it"
   await expect(chat.getComposer()).toBeVisible();
 });
 
-test("an account with no matchmakers still lands here, and waits for an invitation", async ({
+test("an account with no matchmakers waits here for an invitation", async ({
   page,
 }) => {
   await signInAs(page, world.email("nora"));
-  await page.goto("/app/");
-
   const shell = new CandidateShellPage(page);
+  await shell.goto();
+
   await expect(page).toHaveURL(/\/app\/c$/);
   await expect(shell.getNoConversations()).toBeVisible();
   await expect(shell.getInvitationsSection()).toBeHidden();
