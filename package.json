@@ -40,7 +40,10 @@
       "@clerk/shared",
       "esbuild",
       "sharp"
-    ]
+    ],
+    "patchedDependencies": {
+      "@convex-dev/static-hosting@0.2.1": "patches/@convex-dev__static-hosting@0.2.1.patch"
+    }
   },
   "packageManager": "pnpm@10.28.1",
   "engines": {

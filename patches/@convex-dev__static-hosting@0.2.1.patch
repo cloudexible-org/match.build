@@ -1,0 +1,47 @@
+diff --git a/dist/cli/upload.js b/dist/cli/upload.js
+index c56bea2295e25496a1f89abcc6c48e94754a8fb3..27ec164fdec81ce162f6511f098a11a5acf8eae5 100644
+--- a/dist/cli/upload.js
++++ b/dist/cli/upload.js
+@@ -248,6 +248,24 @@ async function cleanUpPendingStorage(componentName) {
+     console.warn("Warning: Published storage cleanup reached its per-run maintenance limit; a later upload will continue it.");
+     return deleted;
+ }
++// Patched (match.build): one dropped connection — a TLS "bad record mac",
++// a reset socket — used to fail the whole upload. Retry each request on
++// transport errors and 5xx, with backoff, before giving up.
++async function fetchWithRetry(url, init, attempts = 4) {
++    for (let attempt = 1;; attempt++) {
++        try {
++            const response = await fetch(url, init);
++            if (response.status < 500 || attempt >= attempts)
++                return response;
++            await response.body?.cancel();
++        }
++        catch (error) {
++            if (attempt >= attempts)
++                throw error;
++        }
++        await new Promise((r) => setTimeout(r, 500 * 2 ** (attempt - 1)));
++    }
++}
+ async function forEachWithConcurrency(items, concurrency, worker) {
+     let nextIndex = 0;
+     let firstError;
+@@ -390,7 +408,7 @@ async function uploadWithConcurrency(files, componentName, deploymentId, useCdn,
+             const storageIds = new Array(storageFiles.length);
+             await forEachWithConcurrency(storageFiles, concurrency, async (file, idx) => {
+                 const content = readFileSync(file.localPath);
+-                const response = await fetch(uploadUrls[idx], {
++                const response = await fetchWithRetry(uploadUrls[idx], {
+                     method: "POST",
+                     headers: { "Content-Type": file.contentType },
+                     body: content,
+@@ -426,7 +444,7 @@ async function uploadWithConcurrency(files, componentName, deploymentId, useCdn,
+         if (cdnFiles.length > 0 && cdnUploadBase) {
+             await forEachWithConcurrency(cdnFiles, concurrency, async (file) => {
+                 const content = readFileSync(file.localPath);
+-                const uploadResponse = await fetch(`${cdnUploadBase}/fs/upload`, {
++                const uploadResponse = await fetchWithRetry(`${cdnUploadBase}/fs/upload`, {
+                     method: "POST",
+                     headers: { "Content-Type": file.contentType },
+                     body: content,
