@@ -45,7 +45,7 @@ catalogs:
 
 patchedDependencies:
   '@convex-dev/static-hosting@0.2.1':
-    hash: 3463406975a7bb91a60de63c87012da2beca3179c1f75afa65ce4a776fa2e647
+    hash: fecc1b46e23bf2b8662a338cff694fb1a98643f752b29c134370834ee812c21e
     path: patches/@convex-dev__static-hosting@0.2.1.patch
 
 importers:
@@ -328,7 +328,7 @@ importers:
         version: 0.0.95(@auth/core@0.41.3)(convex@1.46.0(@clerk/clerk-react@5.61.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@clerk/react@6.16.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0))(react@19.3.0)
       '@convex-dev/static-hosting':
         specifier: ^0.2.1
-        version: 0.2.1(patch_hash=3463406975a7bb91a60de63c87012da2beca3179c1f75afa65ce4a776fa2e647)(convex@1.46.0(@clerk/clerk-react@5.61.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@clerk/react@6.16.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0))(react@19.3.0)
+        version: 0.2.1(patch_hash=fecc1b46e23bf2b8662a338cff694fb1a98643f752b29c134370834ee812c21e)(convex@1.46.0(@clerk/clerk-react@5.61.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@clerk/react@6.16.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0))(react@19.3.0)
       ai:
         specifier: ^7.0.107
         version: 7.0.107(zod@4.6.5)
@@ -4321,7 +4321,7 @@ snapshots:
     optionalDependencies:
       react: 19.3.0
 
-  '@convex-dev/static-hosting@0.2.1(patch_hash=3463406975a7bb91a60de63c87012da2beca3179c1f75afa65ce4a776fa2e647)(convex@1.46.0(@clerk/clerk-react@5.61.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@clerk/react@6.16.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0))(react@19.3.0)':
+  '@convex-dev/static-hosting@0.2.1(patch_hash=fecc1b46e23bf2b8662a338cff694fb1a98643f752b29c134370834ee812c21e)(convex@1.46.0(@clerk/clerk-react@5.61.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@clerk/react@6.16.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0))(react@19.3.0)':
     dependencies:
       convex: 1.46.0(@clerk/clerk-react@5.61.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@clerk/react@6.16.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
       react: 19.3.0
