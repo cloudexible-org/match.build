@@ -37,9 +37,9 @@
   "dependencies": {
     "@auth/core": "^0.41.3",
     "@convex-dev/agent": "^0.7.3",
-    "@convex-dev/ai-sdk-provider": "^0.1.0",
+    "@convex-dev/ai-sdk-provider": "^0.2.1",
     "@convex-dev/auth": "^0.0.95",
     "@convex-dev/static-hosting": "^0.2.1",
-    "ai": "^7.0.107"
+    "ai": "^7.0.112"
   }
 }
