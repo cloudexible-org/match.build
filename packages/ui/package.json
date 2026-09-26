@@ -27,7 +27,7 @@
     "playwright": "^1.63.0",
     "storybook": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.1"
   },
   "scripts": {
     "storybook": "portless run --name storybook.matchbuild sh -c 'storybook dev -p ${PORT:-6006}'",
