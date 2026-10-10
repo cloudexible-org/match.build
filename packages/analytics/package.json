@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "posthog-js": "^1.434.2",
+    "posthog-js": "^1.438.2",
     "react": "catalog:"
   },
   "devDependencies": {
