@@ -38,6 +38,8 @@ createRoot(rootElement).render(
     <AnalyticsProvider
       apiKey={env.VITE_POSTHOG_KEY}
       apiHost={env.VITE_POSTHOG_HOST}
+      product="match-build"
+      surface="app"
       maskPath={maskAppPath}
     >
       <ConvexAuthProvider client={convex}>

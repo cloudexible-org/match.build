@@ -222,6 +222,8 @@ describe("posthogBatch", () => {
           timestamp: "2026-09-22T00:00:00.000Z",
           properties: {
             actor_type: "system",
+            product: "match-build",
+            surface: "server",
             distinct_id: "system:nightly",
             $lib: "convex",
             $geoip_disable: true,
@@ -247,9 +249,30 @@ describe("posthogBatch", () => {
       { timestamp: 0 },
     ).batch;
     expect(sent?.properties).toEqual({
+      product: "match-build",
+      surface: "server",
       distinct_id: "u_1",
       $lib: "convex",
       $geoip_disable: true,
+    });
+  });
+
+  test("product and surface cannot be overridden by a capture", () => {
+    const [sent] = posthogBatch(
+      "phc_test",
+      [
+        {
+          event: "account.created",
+          distinctId: "u_1",
+          personless: false,
+          properties: { product: "other", surface: "app" },
+        },
+      ],
+      { timestamp: 0 },
+    ).batch;
+    expect(sent?.properties).toMatchObject({
+      product: "match-build",
+      surface: "server",
     });
   });
 });
