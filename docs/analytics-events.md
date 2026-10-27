@@ -19,6 +19,13 @@ What the shipped **A** half does differently from the tables below:
   `had_matchmaker`, `was_first`, `archive_both`) are not yet.
 - **Profile events are one per entry**, so `profile.suggested` counts entries
   offered, like accepted and rejected do.
+- **Every event carries `product` and `surface`.** The PostHog project is
+  shared with other Cloudexible products, so `product: "match-build"` is on
+  everything sent, browser and server alike, and `surface` says which part
+  sent it: `www`, `app`, or `server` for the events below. Filter on `product`
+  first, or another product's events land in every count. Both are stamped at
+  send time (`before_send` in `@repo/analytics`, `posthogBatch` in
+  `convex/analytics/rules.ts`) and override anything a capture sets.
 
 Every event below is marked **core** or **later**. Cutting all the `later` rows
 leaves 12 events, which is enough to answer §6.

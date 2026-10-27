@@ -65,6 +65,8 @@ export default function RootLayout({
           <AnalyticsProvider
             apiKey={env.NEXT_PUBLIC_POSTHOG_KEY}
             apiHost={env.NEXT_PUBLIC_POSTHOG_HOST}
+            product="match-build"
+            surface="www"
           >
             <ConvexClientProvider>
               <MotionProvider>{children}</MotionProvider>

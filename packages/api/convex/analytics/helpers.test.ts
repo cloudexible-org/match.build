@@ -93,6 +93,8 @@ describe("emitAuditAnalytics", () => {
           actor_role: "matchmaker",
           from: "active",
           to: "paused",
+          product: "match-build",
+          surface: "server",
           distinct_id: w.owner,
           $lib: "convex",
           $geoip_disable: true,

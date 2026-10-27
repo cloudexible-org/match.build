@@ -23,6 +23,15 @@ export const ANALYTICS_GROUP_TYPE = "matchmaker";
 export const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 
 /**
+ * Stamped onto every server event, as `@repo/analytics` stamps the browser's.
+ * The PostHog project is shared by several products, so `product` is what
+ * keeps match.build's events apart; `surface` says the server sent it rather
+ * than www or the app, whose events carry the same names for the same person.
+ */
+export const ANALYTICS_PRODUCT = "match-build";
+export const ANALYTICS_SURFACE = "server";
+
+/**
  * The audit event as the emitter sees it. Structural rather than imported
  * from the schema, so this file stays free of Convex imports.
  */
@@ -318,6 +327,9 @@ export function posthogBatch(
       timestamp,
       properties: {
         ...capture.properties,
+        // After the capture's own properties, so none of them can override it.
+        product: ANALYTICS_PRODUCT,
+        surface: ANALYTICS_SURFACE,
         distinct_id: capture.distinctId,
         $lib: "convex",
         // PostHog geolocates an event by the IP that sent it, which here is

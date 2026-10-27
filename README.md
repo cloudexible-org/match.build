@@ -30,7 +30,7 @@ Built on [turbostack](https://github.com/cloudexible-org/turbostack).
 ├── packages/
 │   ├── api/          # Convex backend: schema, functions, http.ts, static-hosting mounts
 │   ├── ui/           # Shared UI components
-│   ├── analytics/    # Key-gated PostHog provider, URL masking, identity (server side: packages/api/convex/analytics)
+│   ├── analytics/    # Key-gated PostHog provider, product/surface stamping, URL masking, identity (server side: packages/api/convex/analytics)
 │   └── config/       # Shared TypeScript configs
 └── docs/             # Changelog and architecture notes
 ```
@@ -152,6 +152,12 @@ logged-in Doppler CLI, the same one `pnpm dev` uses. The Convex URL is exempt
 to always wins over the one in Doppler. `admin` is built without Doppler because
 it is deliberately uninstrumented, and `pnpm ship:preview` too, so smoke tests
 on the dev deployment never count as production traffic.
+
+Server-side analytics reads `POSTHOG_PROJECT_TOKEN` (and optionally
+`POSTHOG_HOST`) from the Convex deployment's own environment, not Doppler. The
+PostHog project is shared with other Cloudexible products, so every event —
+browser and server — carries `product: "match-build"` and a `surface` (`www`,
+`app`, `server`); see `docs/analytics-events.md`.
 
 ### Custom domain
 
