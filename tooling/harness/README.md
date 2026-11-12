@@ -3,16 +3,16 @@
 The world every browser run shares. It registers **no tests of its own** — it
 is what `tooling/e2e` and `tooling/marketing` are both built on.
 
-| Import | What it gives you |
-|---|---|
-| `@repo/harness/playwright.config` | The base config (default export) plus `APP_URL`, `ADMIN_URL`, `WWW_URL`, `WITH_CONVEX`. Spread it, add `testDir` and `projects`. |
-| `@repo/harness/page-objects` | Every page object, namespaced: `POM.App.ConversationPage`. One file at a time: `@repo/harness/page-objects/app/matches.page`. |
-| `@repo/harness/scenario` | `seedScenario()` — a world of this file's own, namespaced so nothing else can see it. |
-| `@repo/harness/session` | `signInAs(page, email)` — the real Convex Auth flow over HTTP, about ten times faster than typing a code. It arms the session; your next `goto` applies it. |
-| `@repo/harness/accounts` | `signUp` / `signInToAdmin`, for the specs that are *about* signing up. |
-| `@repo/harness/seed` | The baseline fixture's constants and types (`SEED_ADMINS`, …). |
-| `@repo/harness/paths` | `REPO_ROOT`, `API_DIR`, `SCRATCH_DIR`, `appDir()`. |
-| `@repo/harness/a11y` | The axe-core scan. |
+| Import                            | What it gives you                                                                                                                                           |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@repo/harness/playwright.config` | The base config (default export) plus `APP_URL`, `ADMIN_URL`, `WWW_URL`, `WITH_CONVEX`. Spread it, add `testDir` and `projects`.                            |
+| `@repo/harness/page-objects`      | Every page object, namespaced: `POM.App.ConversationPage`. One file at a time: `@repo/harness/page-objects/app/matches.page`.                               |
+| `@repo/harness/scenario`          | `seedScenario()` — a world of this file's own, namespaced so nothing else can see it.                                                                       |
+| `@repo/harness/session`           | `signInAs(page, email)` — the real Convex Auth flow over HTTP, about ten times faster than typing a code. It arms the session; your next `goto` applies it. |
+| `@repo/harness/accounts`          | `signUp` / `signInToAdmin`, for the specs that are _about_ signing up.                                                                                      |
+| `@repo/harness/seed`              | The baseline fixture's constants and types (`SEED_ADMINS`, …).                                                                                              |
+| `@repo/harness/paths`             | `REPO_ROOT`, `API_DIR`, `SCRATCH_DIR`, `appDir()`.                                                                                                          |
+| `@repo/harness/a11y`              | The axe-core scan.                                                                                                                                          |
 
 The rest — `local-backend.ts`, `free-port.ts`, `doppler.ts`, `auth-env.ts`,
 `sign-in-codes.ts` and the outbox readers — is machinery the config drives; a
@@ -23,7 +23,7 @@ spec rarely reaches for it directly.
 Two things it buys that a shared directory would not.
 
 **Paths stop depending on where the caller sits.** Playwright resolves a
-config's relative paths against *that config's own directory*, so a relative
+config's relative paths against _that config's own directory_, so a relative
 `globalSetup` or `webServer.cwd` inherited by `tooling/marketing` would resolve
 into `tooling/marketing/` and the run would start with no backend and no seed.
 Everything the base config hands out is absolute, anchored on

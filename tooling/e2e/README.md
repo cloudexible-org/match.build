@@ -13,13 +13,13 @@ pnpm --filter e2e test:report  # the last run's HTML report
 One directory per project, and a project pins the `baseURL` of the app it
 drives — so **put a spec in the directory of the app it asserts against**:
 
-| Directory | Drives | Backend |
-|---|---|---|
-| `specs/app/` | `apps/app` | none — chrome and client-side behaviour only |
-| `specs/admin/` | `apps/admin` | none |
-| `specs/www/` | `apps/www` | none |
-| `specs/app-convex/` | `apps/app` | a real, seeded local Convex backend |
-| `specs/admin-convex/` | `apps/admin` | the same backend |
+| Directory             | Drives       | Backend                                      |
+| --------------------- | ------------ | -------------------------------------------- |
+| `specs/app/`          | `apps/app`   | none — chrome and client-side behaviour only |
+| `specs/admin/`        | `apps/admin` | none                                         |
+| `specs/www/`          | `apps/www`   | none                                         |
+| `specs/app-convex/`   | `apps/app`   | a real, seeded local Convex backend          |
+| `specs/admin-convex/` | `apps/admin` | the same backend                             |
 
 A spec seeds its own world in `beforeAll` with `seedScenario()`, under a
 namespace no other file can see, and signs in with `signInAs()` rather than

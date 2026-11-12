@@ -5,7 +5,7 @@ origin and the same Convex deployment as `apps/app` (`packages/api/convex/
 http.ts`). Today it has two pages:
 
 - **Audit trail** (`/admin/audit`) — every matchmaker's `auditEvents`, newest
-  first, filtered by matchmaker (and one of its candidates) *or* by the account
+  first, filtered by matchmaker (and one of its candidates) _or_ by the account
   that acted, and by action. The filters live in the URL.
 - **Sign-in codes** (`/admin/sign-in-codes`) — issues a sign-in code for any
   account, so an admin can sign in to the app as them for support. The code is
