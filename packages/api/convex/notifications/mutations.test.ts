@@ -102,13 +102,20 @@ async function outbox(t: T, to: string) {
   );
 }
 
-/** Runs every job due within `ms`, and the sends they schedule. */
+/**
+ * Runs every job due within `ms`, and the sends they schedule.
+ *
+ * Two 1ms steps follow the main one. convex-test pins `Date.now()` inside each
+ * handler, so a job can come due a millisecond after the test's own clock
+ * says; and a delivery then schedules its own send, due immediately.
+ */
 async function advance(t: T, ms: number) {
   vi.advanceTimersByTime(ms);
   await t.finishInProgressScheduledFunctions();
-  // A delivery schedules its own send, which is due immediately.
-  vi.advanceTimersByTime(1);
-  await t.finishInProgressScheduledFunctions();
+  for (let step = 0; step < 2; step++) {
+    vi.advanceTimersByTime(1);
+    await t.finishInProgressScheduledFunctions();
+  }
 }
 
 /** The matchmaker writes to the candidate. */

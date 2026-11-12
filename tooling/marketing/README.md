@@ -28,7 +28,7 @@ cost a re-shoot: [`docs/demo-videos.md`](../../docs/demo-videos.md).
 
 It reuses the whole test world — the local Convex backend, the seed, the app
 servers, **the page objects** — from [`@repo/harness`](../harness), the same
-package `tooling/e2e` builds on. What it does *not* share is the suite itself:
+package `tooling/e2e` builds on. What it does _not_ share is the suite itself:
 these scripts assert nothing, guard everything, and seed worlds of their own, so
 a run of `pnpm test:e2e` must never reach them.
 

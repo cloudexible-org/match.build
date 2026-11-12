@@ -12,15 +12,15 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@convex-dev/auth": "^0.0.95",
+    "@convex-dev/auth": "^0.0.96",
     "@repo/api": "workspace:*",
     "@repo/ui": "workspace:*",
     "@t3-oss/env-core": "^0.13.11",
     "convex": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-router": "^7.18.4",
-    "zod": "^4.6.5"
+    "react-router": "^8.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@repo/config": "workspace:*",
@@ -28,11 +28,11 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-react": "^6.2.1",
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "^8.3.0",
-    "vitest": "^4.1.11"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.1"
   }
 }
