@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@convex-dev/auth": "^0.0.96",
+    "@convex-dev/auth": "^0.0.98",
     "@repo/analytics": "workspace:*",
     "@repo/api": "workspace:*",
     "@repo/ui": "workspace:*",
@@ -29,11 +29,11 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "^6.2.1",
+    "@vitejs/plugin-react": "^6.3.0",
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "^8.3.5",
+    "vite": "^8.3.8",
     "vitest": "^5.0.1"
   }
 }
