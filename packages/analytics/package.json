@@ -11,13 +11,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "posthog-js": "^1.445.5",
+    "posthog-js": "^1.451.1",
     "react": "catalog:"
   },
   "devDependencies": {
     "@repo/config": "workspace:*",
     "@types/react": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^5.0.1"
+    "vitest": "^5.1.1"
   }
 }

@@ -19,7 +19,7 @@
     "convex": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-router": "^8.4.0",
+    "react-router": "^8.5.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -28,11 +28,11 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "^6.2.1",
+    "@vitejs/plugin-react": "^6.3.0",
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vite": "^8.3.5",
-    "vitest": "^5.0.1"
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
   }
 }
